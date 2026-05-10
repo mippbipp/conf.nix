@@ -14,7 +14,6 @@
       llms = with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
         opencode
         amp
-        kilocode-cli
       ];
     in
     with pkgs;
