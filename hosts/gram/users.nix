@@ -40,7 +40,6 @@ in
           zoom-us
           discord
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
-          pkgs.affinity-v3
         ];
         openssh.authorizedKeys.keys = [ ];
       };

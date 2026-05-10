@@ -46,7 +46,6 @@
       url = "github:vicinaehq/extensions";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    affinity-nix.url = "github:mrshmllow/affinity-nix";
     xmcl = {
       url = "github:x45iq/xmcl-nix";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -125,7 +124,6 @@
                 nixpkgs.overlays = [
                   inputs.oskars-dotfiles.overlays.spotx
                   inputs.nix-cachyos-kernel.overlays.pinned
-                  inputs.affinity-nix.overlays.default
                   inputs.rust-overlay.overlays.default
                 ];
 
