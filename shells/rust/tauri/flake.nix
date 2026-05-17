@@ -21,6 +21,12 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+          ];
+        };
       in
       {
         devShells.default =
@@ -30,12 +36,7 @@
             nativeBuildInputs = [
               nodejs_25
               pnpm
-              (rust-bin.stable.latest.default.override {
-                extensions = [
-                  "rust-src"
-                  "rust-analyzer"
-                ];
-              })
+              rustToolchain
               pkg-config
               gobject-introspection
             ];
@@ -59,6 +60,11 @@
 
             # env vars
             GIO_MODULE_DIR = "${pkgs.glib-networking}/lib/gio/modules/"; # https://github.com/tauri-apps/tauri/issues/11647
+
+            shellHook = ''
+              # Expose GTK schemas to the runtime environment. Makes FileChooser schema available in Tauri app to open / select through files app.
+              export XDG_DATA_DIRS="${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:$XDG_DATA_DIRS";
+            '';
           };
       }
     );
