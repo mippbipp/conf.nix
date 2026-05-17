@@ -23,6 +23,9 @@
         scroll_factor = 0.8;
       };
     };
+    cursor = {
+      no_hardware_cursors = 1;
+    };
 
     gesture = [ "3, swipe, workspace" ];
 
@@ -33,7 +36,6 @@
       mouse_move_enables_dpms = true;
       key_press_enables_dpms = true;
       focus_on_activate = true;
-      vfr = true;
     };
 
     xwayland = {
@@ -41,7 +43,6 @@
     };
 
     dwindle = {
-      pseudotile = true;
       preserve_split = true;
       special_scale_factor = 0.8;
     };

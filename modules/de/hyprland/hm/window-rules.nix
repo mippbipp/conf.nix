@@ -43,176 +43,86 @@
         workspace = 6;
       }
 
-      # Floats
+      # window rules
       {
-        name = "float-polkit";
+        name = "polkit";
         match.class = "^(org.kde.polkit-kde-authentication-agent-1)$";
         float = true;
       }
       {
-        name = "float-zoom-onedrive";
-        match.class = "([Zz]oom|onedriver|onedriver-launcher)";
+        name = "zoom";
+        match.class = "([Zz]oom)";
         float = true;
       }
       {
-        name = "float-thunar-operations";
-        match.class = "([Tt]hunar)";
-        match.title = "(File Operation Progress|Confirm to replace files)";
-        float = true;
-      }
-      {
-        name = "float-xdg-portal";
+        name = "xdg-portal";
         match.class = "(xdg-desktop-portal-gtk)";
         float = true;
+        size = "70% 70%";
       }
       {
-        name = "float-rofi";
-        match.class = "^([Rr]ofi)$";
-        float = true;
-      }
-      {
-        name = "float-image-viewer";
+        name = "image-viewer";
         match.class = "^(eog|org.gnome.Loupe)$";
         float = true;
       }
       {
-        name = "float-nautilus";
-        match.class = "^(org.gnome.Nautilus)$";
+        name = "files";
+        match.class = "^(org.gnome.Nautilus|file-roller|org.gnome.FileRoller)$";
         float = true;
+        size = "60% 70%";
       }
       {
-        name = "float-pavucontrol";
+        name = "pavucontrol";
         match.class = "^(pavucontrol|org.pulseaudio.pavucontrol|com.saivert.pwvucontrol)$";
         float = true;
+        size = "70% 70%";
       }
       {
-        name = "float-theme-tools";
+        name = "theme-tools";
         match.class = "^(nwg-look|qt5ct|qt6ct)$";
         float = true;
+        size = "60% 70%";
       }
       {
-        name = "float-media-player";
+        name = "media-player";
         match.class = "^(mpv|com.github.rafostar.Clapper)$";
         float = true;
+        size = "70% 70%";
       }
       {
-        name = "float-network-tools";
+        name = "network-tools";
         match.class = "^(nm-applet|nm-connection-editor|.blueman-manager-wrapped)$";
         float = true;
+        size = "70% 70%";
       }
       {
-        name = "float-system-monitor";
+        name = "system-monitor";
         match.class = "^(gnome-system-monitor|org.gnome.SystemMonitor|io.missioncenter.MissionCenter)$";
         float = true;
+        size = "70% 70%";
       }
       {
-        name = "float-yad";
-        match.class = "^([Yy]ad)$";
-        float = true;
-      }
-      {
-        name = "float-wifi-hotspot";
-        match.class = "^(wihotspot(-gui)?)$";
-        float = true;
-      }
-      {
-        name = "float-archive-manager";
-        match.class = "^(file-roller|org.gnome.FileRoller)$";
-        float = true;
-      }
-      {
-        name = "float-baobab";
-        match.class = "^([Bb]aobab|org.gnome.[Bb]aobab)$";
-        float = true;
-      }
-      {
-        name = "float-kvantum-manager";
+        name = "kvantum-manager";
         match.title = "(Kvantum Manager)";
         float = true;
+        size = "60% 70%";
       }
       {
-        name = "float-qalculate";
+        name = "qalculate";
         match.class = "^([Qq]alculate-gtk)$";
         float = true;
       }
       {
-        name = "float-ferdium";
-        match.class = "^([Ff]erdium)$";
-        float = true;
-      }
-      {
-        name = "float-pip";
+        name = "pip";
         match.title = "^(Picture-in-Picture)$";
         float = true;
+        size = "25% 25%";
+        pin = true;
       }
       {
-        name = "float-auth";
+        name = "auth";
         match.title = "^(Authentication Required)$";
         float = true;
-      }
-
-      # Window Sizing
-      {
-        name = "size-mpv";
-        match.class = "^(mpv)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-pavucontrol";
-        match.class = "^(pavucontrol|org.pulseaudio.pavucontrol|com.saivert.pwvucontrol)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-network";
-        match.class = "^(nm-applet|nm-connection-editor|.blueman-manager-wrapped)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-system-monitor";
-        match.class = "^(gnome-system-monitor|org.gnome.SystemMonitor|io.missioncenter.MissionCenter)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-xdg-portal";
-        match.class = "^(xdg-desktop-portal-gtk)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-kvantum";
-        match.title = "(Kvantum Manager)";
-        size = "60% 70%";
-      }
-      {
-        name = "size-qt6ct";
-        match.class = "^(qt6ct)$";
-        size = "60% 70%";
-      }
-      {
-        name = "size-document-tools";
-        match.class = "^(evince|wihotspot(-gui)?)$";
-        size = "70% 70%";
-      }
-      {
-        name = "size-archive";
-        match.class = "^(file-roller|org.gnome.FileRoller)$";
-        size = "60% 70%";
-      }
-      {
-        name = "size-ferdium";
-        match.class = "^([Ff]erdium)$";
-        size = "60% 70%";
-      }
-      {
-        name = "size-pip";
-        match.title = "^(Picture-in-Picture)$";
-        size = "25% 25%";
-      }
-
-      # Pinning
-      {
-        name = "pin-pip";
-        match.title = "^(Picture-in-Picture)$";
-        pin = true;
       }
     ];
   };
