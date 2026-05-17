@@ -20,6 +20,7 @@
     enable = true;
     xwayland.enable = true;
     systemd.enable = false; # using uwsm instead
+    configType = "hyprlang";
 
     # https://wiki.hypr.land/Nix/Hyprland-on-Home-Manager/#using-the-home-manager-module-with-nixos
     package = null;
@@ -35,7 +36,7 @@
     ../lock/hm.nix
     ./env.nix
 
-    # settings imports
+    # hyprland config imports
     (import ./startup.nix { inherit pkgs; })
     ./variables.nix
     (import ./keybinds.nix {
