@@ -1,6 +1,6 @@
 {
   # cuda setup from https://gist.github.com/r3rer3/de4be0ad6be012264c641222eecb359a
-  description = "Python CUDA";
+  description = "CUDA";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
@@ -41,8 +41,6 @@
           linuxPackages.nvidia_x11
           libGLU
           libGL
-
-          uv
         ];
 
         shellHook = ''
@@ -50,9 +48,6 @@
           export CUDA_PATH=${pkgs.cudaPackages.cudatoolkit}
           export EXTRA_LDFLAGS="-L/lib -L${pkgs.linuxPackages.nvidia_x11}/lib"
           export EXTRA_CCFLAGS="-I/usr/include"
-
-          uv sync
-          source .venv/bin/activate
         '';
       };
     };
