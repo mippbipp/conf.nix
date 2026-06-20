@@ -2,7 +2,7 @@
 
 ## manual things
 
-* [lanzaboote setup](https://github.com/nix-community/lanzaboote/blob/master/docs/QUICK_START.md)
+* [lanzaboote setup](https://nix-community.github.io/lanzaboote/)
   * just reverse and redo the steps on a new machine
 * `ssh-keygen -t ed25519` with `{host}_ed25519` as the filename
 * `sudo passwd {username}` to change password
