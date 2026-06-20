@@ -29,7 +29,7 @@
       go
       tokei
       repomix
-      (import ./scripts/rebuild.nix { inherit pkgs username host; })
+      (import ./scripts/nrs.nix { inherit pkgs username host; })
     ]
     ++ llms;
 

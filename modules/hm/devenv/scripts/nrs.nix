@@ -5,7 +5,7 @@
 }:
 
 pkgs.writeShellApplication {
-  name = "rebuild";
+  name = "nrs";
 
   text = ''
     if [ $# -eq 0 ]; then
