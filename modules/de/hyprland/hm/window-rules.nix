@@ -67,9 +67,10 @@
       }
       {
         name = "files";
-        match.class = "^(org.gnome.Nautilus|file-roller|org.gnome.FileRoller)$";
+        match.class = "^(thunar|file-roller|org.gnome.FileRoller)$";
         float = true;
-        size = "60% 70%";
+        size = "70% 70%";
+        center = true;
       }
       {
         name = "pavucontrol";

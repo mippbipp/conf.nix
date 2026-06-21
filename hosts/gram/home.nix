@@ -29,6 +29,7 @@ in
           ;
       }
     ))
+    ../../modules/de/thunar/hm.nix
     ../../modules/hm/apps/ghostty.nix
     ../../modules/hm/apps/winapps/default.nix
     ../../modules/hm/apps/zen/default.nix

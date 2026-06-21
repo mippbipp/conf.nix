@@ -25,10 +25,10 @@ in
     ../../modules/system/config/resolved.nix
     ../../modules/system/apps/obs.nix
     ../../modules/system/apps/gaming.nix
-    ../../modules/system/apps/nautilus.nix
     ../../modules/de/audio.nix
     ../../modules/de/hyprland/system.nix
     ../../modules/de/greetd/login.nix
+    ../../modules/de/thunar/system.nix
     ../../modules/ssh/system.nix
   ];
 
