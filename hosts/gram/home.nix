@@ -1,6 +1,5 @@
 {
   pkgs,
-  host,
   ...
 }@args:
 let
@@ -35,7 +34,7 @@ in
     ../../modules/hm/apps/zen/default.nix
     ../../modules/hm/apps/gimp.nix
     ../../modules/hm/apps/mpv.nix
-    (import ../../modules/ssh/hm.nix { inherit host; })
+    ../../modules/ssh/hm.nix
     ../../modules/ssh/sops.nix
   ];
 }

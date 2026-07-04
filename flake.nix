@@ -54,6 +54,10 @@
       url = "github:numtide/llm-agents.nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -155,6 +159,20 @@
               wsl.enable = true;
               wsl.defaultUser = username;
             }
+          ];
+        };
+        pewter = mkHostConfig {
+          host = "pewter";
+          username = "mippbipp";
+          nixosModules = [
+            (
+              { pkgs, lib, ... }:
+              {
+                nixpkgs.overlays = [
+                  inputs.rust-overlay.overlays.default
+                ];
+              }
+            )
           ];
         };
       };

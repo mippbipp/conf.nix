@@ -20,7 +20,6 @@
     [
       eza
       sccache
-      code-cursor
       pnpm
       nodejs
       python312

@@ -39,6 +39,7 @@ in
           gptfdisk
           zoom-us
           discord
+          code-cursor
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
         ];
         openssh.authorizedKeys.keys = [ ];

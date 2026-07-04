@@ -1,0 +1,3 @@
+{
+  gitUsername = "mippbipp";
+}

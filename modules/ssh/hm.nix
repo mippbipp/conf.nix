@@ -1,4 +1,9 @@
-{ host }:
+{
+  username,
+  host,
+  lib,
+  ...
+}:
 {
   programs.ssh = {
     enable = true;
@@ -15,11 +20,19 @@
         controlMaster = "no";
         controlPath = "~/.ssh/master-%r@%n:%p";
         controlPersist = "no";
+        identityFile = "~/.ssh/${host}_ed25519";
       };
       "github.com" = {
         host = "github.com";
         hostname = "github.com";
         user = "git";
+        identityFile = "~/.ssh/${host}_ed25519";
+      };
+    }
+    // lib.optionalAttrs (host == "gram") {
+      "pewter" = {
+        hostname = "129.146.39.109";
+        user = username;
         identityFile = "~/.ssh/${host}_ed25519";
       };
     };
