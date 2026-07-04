@@ -10,7 +10,7 @@
     enable = true;
     disableUpstreamLogging = true; # disables debug logging
     # Prevent Tailscale from injecting silent firewall bypasses
-    extraSetFlags = [ "--netfilter-mode=nodivert" ];
+    extraUpFlags = [ "--netfilter-mode=nodivert" ];
   };
 
   networking = {

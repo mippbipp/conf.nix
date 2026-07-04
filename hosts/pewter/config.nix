@@ -18,7 +18,6 @@
     ../../modules/system/config/common.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
-    ../../modules/system/config/resolved.nix
     ../../modules/system/config/tailscale.nix
   ];
 
@@ -60,6 +59,7 @@
       network = {
         enable = true;
         ssh = {
+          # Enable root SSH for LUKS unlocking
           enable = true;
           port = 2222;
           hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
@@ -71,6 +71,28 @@
     };
   };
 
-  # Oracle Cloud dynamically assigns the IP/Gateway via DHCP
-  networking.useDHCP = true;
+  networking = {
+    # Oracle Cloud dynamically assigns the IP/Gateway via DHCP
+    useDHCP = true;
+    nftables.tables = {
+      # Custom NAT table to handle routing between Tailscale and Public Internet
+      "pewter-nat" = {
+        family = "ip";
+        content = ''
+          chain postrouting {
+            type nat hook postrouting priority srcnat; policy accept;
+            # IP Masquerading: Translates node traffic into exit node's public IP
+            # "enp0s6" is the public interface name in `ip a` matching VNIC's MAC address
+            oifname "enp0s6" masquerade
+          }
+
+          chain forward {
+            type filter hook forward priority filter; policy accept;
+            # MTU/MSS Clamping: Automatically shrinks packets to fit perfectly inside the WireGuard tunnel
+            tcp flags syn tcp option maxseg size set rt mtu
+          }
+        '';
+      };
+    };
+  };
 }
