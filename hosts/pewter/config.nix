@@ -8,7 +8,7 @@
 {
   # ARM architecture for the Oracle VM.Standard.A1.Flex shape
   nixpkgs.hostPlatform = "aarch64-linux";
-  system.stateVersion = "24.05";
+  system.stateVersion = "26.05";
 
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
@@ -19,7 +19,11 @@
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/resolved.nix
+    ../../modules/system/config/tailscale.nix
   ];
+
+  security.sudo.wheelNeedsPassword = false;
+  services.tailscale.useRoutingFeatures = "both"; # enable IP forwarding as exit node
 
   # Enable root SSH explicitly
   services.openssh = {

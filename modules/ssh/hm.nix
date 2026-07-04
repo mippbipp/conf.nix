@@ -31,7 +31,7 @@
     }
     // lib.optionalAttrs (host == "gram") {
       "pewter" = {
-        hostname = "129.146.39.109";
+        hostname = "pewter";
         user = username;
         identityFile = "~/.ssh/${host}_ed25519";
       };

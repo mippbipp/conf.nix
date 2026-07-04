@@ -3,7 +3,7 @@ let
   inherit (import ./variables.nix) gitUsername;
 in
 {
-  home.stateVersion = "24.05";
+  home.stateVersion = "26.05";
 
   # Import your baseline Home Manager modules, excluding GUI elements
   imports = [

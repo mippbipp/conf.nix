@@ -4,7 +4,10 @@
     loader.timeout = 1;
     initrd = {
       verbose = false;
-      systemd.enable = true;
+      systemd = {
+        enable = true;
+        network.wait-online.enable = false;
+      };
     };
     kernelParams = [
       "quiet" # Reduce console output
@@ -39,6 +42,7 @@
 
   networking = {
     hostName = host;
+    nftables.enable = true;
   };
 
   # Security / Polkit
@@ -68,9 +72,6 @@
       # Don't wait for udev to settle
       systemd-udev-settle.enable = false;
 
-      # Don't wait for network before considering boot complete
-      "NetworkManager-wait-online".enable = false;
-
       # Prevent hanging on shutdown
       usbmuxd.serviceConfig = {
         TimeoutStopSec = 5;
@@ -86,6 +87,7 @@
       bluetooth.wantedBy = lib.mkForce [ ]; # blueman
       upower.wantedBy = lib.mkForce [ ]; # starts when battery status queried
     };
+    network.wait-online.enable = false; # Don't wait for network before considering boot complete
     sockets.avahi-daemon.wantedBy = [ "sockets.target" ]; # Will start automatically when needed via socket activation
 
     # Disable core dumps (slight performance improvement)

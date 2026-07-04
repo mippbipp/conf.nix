@@ -3,6 +3,10 @@
     enable = true;
     settings = {
       Resolve = {
+        Domains = [
+          # MagicDNS for tailscale
+          "~."
+        ];
         DNS = [
           # nextdns
           "45.90.28.0#${host}-7b9721.dns.nextdns.io"

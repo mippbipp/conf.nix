@@ -23,6 +23,7 @@ in
     ../../modules/system/config/secret.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/resolved.nix
+    ../../modules/system/config/tailscale.nix
     ../../modules/system/apps/obs.nix
     ../../modules/system/apps/gaming.nix
     ../../modules/de/audio.nix
@@ -125,6 +126,7 @@ in
   };
 
   services = {
+    tailscale.useRoutingFeatures = "client";
     libinput.enable = true;
     fstrim.enable = true;
     flatpak.enable = true;
@@ -146,7 +148,6 @@ in
       dataDir = "/home/${username}";
       configDir = "/home/${username}/.config/syncthing";
     };
-    tailscale.enable = false;
   };
   systemd = {
     services = {
