@@ -1,4 +1,4 @@
-# pewter notes
+# pewter - cloud VM
 
 - LUKS + BTRFS setup
   - LUKS password set in `/tmp/pewter-luks.key`
@@ -11,7 +11,7 @@
   nix run github:nix-community/nixos-anywhere -- \
     --flake .#pewter \
     --disk-encryption-keys /tmp/secret.key /tmp/pewter-luks.key \
-  --extra-files /tmp/pewter-extra-files root@<PUBLIC_IP>
+    --extra-files /tmp/pewter-extra-files root@<PUBLIC_IP>
   ```
 
 - if rebooted, use `ssh -p 2222 root@<PUBLIC_IP>` and `systemd-tty-ask-password-agent` to decrypt
