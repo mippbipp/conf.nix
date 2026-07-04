@@ -1,0 +1,18 @@
+# pewter notes
+
+- LUKS + BTRFS setup
+  - LUKS password set in `/tmp/pewter-luks.key`
+  - initrd host keys made with `ssh-keygen -t ed25519 -N "" -f /tmp/pewter-extra-files/etc/secrets/initrd/ssh_host_ed25519_key`
+  - chmod 600 above files
+
+- init VM:
+
+  ```bash
+  nix run github:nix-community/nixos-anywhere -- \
+    --flake .#pewter \
+    --disk-encryption-keys /tmp/secret.key /tmp/pewter-luks.key \
+  --extra-files /tmp/pewter-extra-files root@<PUBLIC_IP>
+  ```
+
+- if rebooted, use `ssh -p 2222 root@<PUBLIC_IP>` and `systemd-tty-ask-password-agent` to decrypt
+- tailscale enabled, no need for TCP port 22 in ingress rules, but pubkeys kept in config.nix for users as backup

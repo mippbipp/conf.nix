@@ -10,8 +10,10 @@
           partitions = {
             # UEFI Boot Partition
             ESP = {
+              label = "EFI";
+              name = "ESP";
+              size = "512M";
               type = "EF00";
-              size = "500M";
               content = {
                 type = "filesystem";
                 format = "vfat";
@@ -20,13 +22,41 @@
                 mountOptions = [ "umask=0077" ];
               };
             };
-            # Root Partition
-            root = {
+            luks = {
               size = "100%";
               content = {
-                type = "filesystem";
-                format = "ext4";
-                mountpoint = "/";
+                type = "luks";
+                name = "crypted";
+                # Tells disko where to look for the key during automated kexec formatting
+                passwordFile = "/tmp/secret.key";
+                # binds the inner Btrfs filesystem to the decrypted container
+                content = {
+                  type = "btrfs";
+                  extraArgs = [ "-f" ]; # Force overwrite if partitions exist
+                  subvolumes = {
+                    "@" = {
+                      mountpoint = "/";
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
+                    };
+                    "@home" = {
+                      mountpoint = "/home";
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
+                    };
+                    "@nix" = {
+                      mountpoint = "/nix";
+                      mountOptions = [
+                        "compress=zstd"
+                        "noatime"
+                      ];
+                    };
+                  };
+                };
               };
             };
           };

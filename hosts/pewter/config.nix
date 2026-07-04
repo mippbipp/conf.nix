@@ -23,22 +23,51 @@
   ];
 
   security.sudo.wheelNeedsPassword = false;
-  services.tailscale.useRoutingFeatures = "both"; # enable IP forwarding as exit node
-
-  # Enable root SSH explicitly
-  services.openssh = {
-    enable = true;
-    settings.PermitRootLogin = "prohibit-password";
-    settings.PasswordAuthentication = false;
-    openFirewall = true;
+  services = {
+    fstrim.enable = false; # managed by Oracle's underlying SAN
+    tailscale.useRoutingFeatures = "both"; # enable IP forwarding as exit node
+    openssh = {
+      # Enable root SSH explicitly
+      enable = true;
+      settings.PermitRootLogin = "prohibit-password";
+      settings.PasswordAuthentication = false;
+      openFirewall = true;
+    };
   };
 
   # Standard bootloader configuration for UEFI on Oracle ARM
   boot = {
     kernelPackages = pkgs.linuxPackages_latest;
+    supportedFilesystems = [ "btrfs" ];
     loader = {
       systemd-boot.enable = true;
       efi.canTouchEfiVariables = true;
+    };
+    initrd = {
+      # Load network card drivers early for Oracle's ARM instances
+      availableKernelModules = [
+        "nvme"
+        "ahci"
+        "virtio_net"
+        "virtio_pci"
+        "virtio_scsi"
+        "virtio_blk"
+      ];
+      kernelModules = [
+        "btrfs"
+        "dm-crypt"
+      ];
+      network = {
+        enable = true;
+        ssh = {
+          enable = true;
+          port = 2222;
+          hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
+          authorizedKeys = [
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram"
+          ];
+        };
+      };
     };
   };
 
