@@ -3,11 +3,13 @@
   config,
   pkgs,
   lib,
+  host,
   ...
 }:
 {
   services.tailscale = {
     enable = true;
+    useRoutingFeatures = if host == "pewter" then "both" else "client";
     disableUpstreamLogging = true; # disables debug logging
     # Prevent Tailscale from injecting silent firewall bypasses
     extraUpFlags = [ "--netfilter-mode=nodivert" ];
@@ -65,5 +67,4 @@
       ACTION=="add", SUBSYSTEM=="net", KERNEL=="en*", RUN+="${pkgs.ethtool}/bin/ethtool -K $name rx-udp-gro-forwarding on rx-gro-list off"
     '';
   };
-
 }

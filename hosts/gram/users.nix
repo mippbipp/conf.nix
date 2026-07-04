@@ -46,5 +46,4 @@ in
       };
     };
   };
-  imports = [ ./scripts/sync-things.nix ];
 }

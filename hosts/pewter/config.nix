@@ -19,12 +19,12 @@
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/tailscale.nix
+    ../../modules/system/config/syncthing.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;
   services = {
     fstrim.enable = false; # managed by Oracle's underlying SAN
-    tailscale.useRoutingFeatures = "both"; # enable IP forwarding as exit node
     openssh = {
       # Enable root SSH explicitly
       enable = true;
@@ -72,26 +72,30 @@
   };
 
   networking = {
+    firewall.enable = true;
     # Oracle Cloud dynamically assigns the IP/Gateway via DHCP
     useDHCP = true;
-    nftables.tables = {
-      # Custom NAT table to handle routing between Tailscale and Public Internet
-      "pewter-nat" = {
-        family = "ip";
-        content = ''
-          chain postrouting {
-            type nat hook postrouting priority srcnat; policy accept;
-            # IP Masquerading: Translates node traffic into exit node's public IP
-            # "enp0s6" is the public interface name in `ip a` matching VNIC's MAC address
-            oifname "enp0s6" masquerade
-          }
+    nftables = {
+      enable = true;
+      tables = {
+        # Custom NAT table to handle routing between Tailscale and Public Internet
+        "pewter-nat" = {
+          family = "ip";
+          content = ''
+            chain postrouting {
+              type nat hook postrouting priority srcnat; policy accept;
+              # IP Masquerading: Translates node traffic into exit node's public IP
+              # "enp0s6" is the public interface name in `ip a` matching VNIC's MAC address
+              oifname "enp0s6" masquerade
+            }
 
-          chain forward {
-            type filter hook forward priority filter; policy accept;
-            # MTU/MSS Clamping: Automatically shrinks packets to fit perfectly inside the WireGuard tunnel
-            tcp flags syn tcp option maxseg size set rt mtu
-          }
-        '';
+            chain forward {
+              type filter hook forward priority filter; policy accept;
+              # MTU/MSS Clamping: Automatically shrinks packets to fit perfectly inside the WireGuard tunnel
+              tcp flags syn tcp option maxseg size set rt mtu
+            }
+          '';
+        };
       };
     };
   };

@@ -1,6 +1,5 @@
 {
   pkgs,
-  username,
   options,
   ...
 }:
@@ -24,6 +23,7 @@ in
     ../../modules/system/config/programs.nix
     ../../modules/system/config/resolved.nix
     ../../modules/system/config/tailscale.nix
+    ../../modules/system/config/syncthing.nix
     ../../modules/system/apps/obs.nix
     ../../modules/system/apps/gaming.nix
     ../../modules/de/audio.nix
@@ -126,7 +126,6 @@ in
   };
 
   services = {
-    tailscale.useRoutingFeatures = "client";
     libinput.enable = true;
     fstrim.enable = true;
     flatpak.enable = true;
@@ -142,12 +141,6 @@ in
       openFirewall = true;
     };
     ipp-usb.enable = true;
-    syncthing = {
-      enable = false;
-      user = "${username}";
-      dataDir = "/home/${username}";
-      configDir = "/home/${username}/.config/syncthing";
-    };
   };
   systemd = {
     services = {

@@ -16,3 +16,5 @@
 
 - if rebooted, use `ssh -p 2222 root@<PUBLIC_IP>` and `systemd-tty-ask-password-agent` to decrypt
 - tailscale enabled, no need for TCP port 22 in ingress rules, but pubkeys kept in config.nix for users as backup
+
+- check syncthing status: `ssh -L 8385:127.0.0.1:8384 pewter` -> `http://127.0.0.1:8385`
