@@ -1,24 +1,22 @@
 {
-  config,
   pkgs,
   ...
 }:
 {
-  home.packages = [
-    pkgs.ghostty
-  ];
-  xdg.configFile."ghostty/config".text = ''
-    background = 000000
-    background-opacity = 0.50
-    font-size = ${toString config.stylix.fonts.sizes.applications}
-    font-family = "${config.stylix.fonts.monospace.name} Mono"
-    window-padding-x = 4
-    confirm-close-surface = false
-    window-decoration = none
-    theme = TokyoNight
-
-    keybind = ctrl+enter=ignore
-  '';
+  programs.ghostty = {
+    enable = true;
+    package = if pkgs.stdenv.isDarwin then pkgs.ghostty-bin else pkgs.ghostty;
+    enableZshIntegration = true;
+    settings = {
+      background = "000000";
+      background-opacity = 0.50;
+      confirm-close-surface = false;
+      window-decoration = "none";
+      window-padding-x = 4;
+      keybind = "ctrl+enter=ignore";
+      shell-integration-features = "sudo,title,ssh-env,ssh-terminfo";
+    };
+  };
   xdg.mimeApps = {
     defaultApplications = {
       "x-scheme-handler/terminal" = "com.mitchellh.ghostty.desktop";

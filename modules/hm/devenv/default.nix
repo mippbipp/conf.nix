@@ -94,14 +94,10 @@
             eval "$(uv generate-shell-completion zsh)"
             eval "$(uvx --generate-shell-completion zsh)"
 
-            function session-widget() {
-                # Preserve terminal context by using zsh's BUFFER
-                BUFFER="tms"
-                # Execute the command
-                zle accept-line
-            }
-            zle -N session-widget
-            bindkey '^f' session-widget
+            # autoconnect tmux on ssh
+            if [ -n "$SSH_TTY" ] && [ -z "$TMUX" ]; then
+              exec tmux new-session -A -s ssh_session
+            fi
           '';
         in
         lib.mkMerge [
