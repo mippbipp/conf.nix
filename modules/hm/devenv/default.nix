@@ -13,7 +13,6 @@
     let
       llms = with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
         opencode
-        amp
       ];
     in
     with pkgs;
