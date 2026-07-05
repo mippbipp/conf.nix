@@ -9,10 +9,18 @@
 {
   services.tailscale = {
     enable = true;
-    useRoutingFeatures = if host == "pewter" then "both" else "client";
     disableUpstreamLogging = true; # disables debug logging
-    # Prevent Tailscale from injecting silent firewall bypasses
-    extraUpFlags = [ "--netfilter-mode=nodivert" ];
+    useRoutingFeatures = "client";
+  }
+  // lib.optionalAttrs (host == "pewter") {
+    useRoutingFeatures = "both";
+    authKeyFile = "/var/lib/tailscale/authkey";
+    extraUpFlags = [
+      # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
+      "--netfilter-mode=nodivert"
+      "--ssh"
+      "--advertise-exit-node"
+    ];
   };
 
   networking = {

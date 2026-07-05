@@ -21,19 +21,23 @@
         controlPath = "~/.ssh/master-%r@%n:%p";
         controlPersist = "no";
         identityFile = "~/.ssh/${host}_ed25519";
+        identitiesOnly = "yes";
       };
       "github.com" = {
         host = "github.com";
         hostname = "github.com";
         user = "git";
-        identityFile = "~/.ssh/${host}_ed25519";
       };
     }
     // lib.optionalAttrs (host == "gram") {
       "pewter" = {
         hostname = "pewter";
         user = username;
-        identityFile = "~/.ssh/${host}_ed25519";
+      };
+      "pewter-luks" = {
+        hostname = "129.146.202.171";
+        user = "root";
+        port = 2222;
       };
     };
   };
