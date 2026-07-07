@@ -35,6 +35,7 @@
     wget
     exiftool
     ncdu
+    officecli
   ];
 
   services = {
