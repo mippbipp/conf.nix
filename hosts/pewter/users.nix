@@ -4,7 +4,7 @@ let
   inherit (import ./variables.nix) gitUsername;
 in
 {
-  services.userborn.enable = true;
+  services.userborn.enable = false;
   users = {
     mutableUsers = true;
     users = {
