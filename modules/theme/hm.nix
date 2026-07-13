@@ -20,4 +20,5 @@
       dark = "Papirus-Dark";
     };
   };
+  home.pointerCursor.enable = false;
 }
