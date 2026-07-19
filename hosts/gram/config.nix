@@ -24,7 +24,9 @@ in
     ../../modules/system/config/resolved.nix
     ../../modules/system/config/tailscale.nix
     ../../modules/system/config/syncthing.nix
+    ../../modules/system/config/printing.nix
     ../../modules/system/apps/obs.nix
+    ../../modules/system/apps/libreoffice.nix
     ../../modules/system/apps/gaming.nix
     ../../modules/de/audio.nix
     ../../modules/de/hyprland/system.nix
@@ -129,18 +131,6 @@ in
     libinput.enable = true;
     fstrim.enable = true;
     flatpak.enable = true;
-    printing = {
-      enable = true;
-      drivers = [
-        # pkgs.hplipWithPlugin
-      ];
-    };
-    avahi = {
-      enable = true;
-      nssmdns4 = true;
-      openFirewall = true;
-    };
-    ipp-usb.enable = true;
   };
   systemd = {
     services = {
