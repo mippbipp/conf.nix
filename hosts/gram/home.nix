@@ -28,7 +28,7 @@ in
           ;
       }
     ))
-    ../../modules/de/thunar/hm.nix
+    (import ../../modules/de/thunar/hm.nix { inherit pkgs terminal; })
     ../../modules/hm/apps/ghostty.nix
     ../../modules/hm/apps/winapps/default.nix
     ../../modules/hm/apps/zen/default.nix
