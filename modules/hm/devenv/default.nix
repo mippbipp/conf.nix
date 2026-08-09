@@ -36,7 +36,7 @@
     ./neovim.nix
     ./starship.nix
     ./superfile/default.nix
-    ./tms/default.nix
+    ./herdr/default.nix
   ];
 
   home.sessionVariables = {
@@ -92,11 +92,6 @@
 
             eval "$(uv generate-shell-completion zsh)"
             eval "$(uvx --generate-shell-completion zsh)"
-
-            # autoconnect tmux on ssh
-            if [ -n "$SSH_TTY" ] && [ -z "$TMUX" ]; then
-              exec tmux new-session -A -s ssh_session
-            fi
           '';
         in
         lib.mkMerge [
@@ -112,55 +107,6 @@
         la = "eza -lah --icons --group-directories-first";
         ".." = "cd ..";
       };
-    };
-    tmux = {
-      enable = true;
-      shell = "${pkgs.zsh}/bin/zsh";
-      mouse = true;
-      prefix = "C-a";
-      escapeTime = 0;
-      baseIndex = 1;
-
-      # Plugin management
-      plugins = with pkgs.tmuxPlugins; [
-        sensible
-        catppuccin
-        yank
-        pain-control
-      ];
-
-      extraConfig =
-        let
-          tmuxConfig = ''
-            # Terminal overrides
-            set -g terminal-overrides ",xterm-ghostty:RGB"
-
-            # Shift Alt vim keys to switch windows
-            bind -n M-H previous-window
-            bind -n M-L next-window
-
-            # Ctrl Alt vim keys to switch active sessions
-            bind -n M-C-h switch-client -p
-            bind -n M-C-l switch-client -n
-
-            # Set vi mode
-            set-window-option -g mode-keys vi
-
-            # Vim-style copy mode bindings
-            bind-key -T copy-mode-vi v send-keys -X begin-selection
-            bind-key -T copy-mode-vi C-v send-keys -X rectangle-toggle
-            bind-key -T copy-mode-vi y send-keys -X copy-selection-and-cancel
-
-            # catppuccin plugin
-            set -g @catppuccin_flavor "mocha"
-            set -g status-left ""
-            set -g status-right "#{E:@catppuccin_status_application}"
-            set -ag status-right "#{E:@catppuccin_status_session}"
-          '';
-        in
-        lib.mkMerge [
-          tmuxConfig
-        ];
     };
   };
 }

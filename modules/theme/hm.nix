@@ -6,7 +6,6 @@
     targets = {
       waybar.enable = false;
       hyprland.enable = false;
-      tmux.enable = false;
       starship.enable = false;
       zen-browser.enable = false;
 

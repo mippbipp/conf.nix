@@ -615,6 +615,29 @@
         "type": "github"
       }
     },
+    "herdr": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "rust-overlay": [
+          "rust-overlay"
+        ]
+      },
+      "locked": {
+        "lastModified": 1786286740,
+        "narHash": "sha256-p/tkXg//d8G8Fx0zVQ7IdeNuKE7wRQ3pNt98gytnEFA=",
+        "owner": "herdrdev",
+        "repo": "herdr",
+        "rev": "ca1af383a82733608a0563fce2252058b478498c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "herdrdev",
+        "repo": "herdr",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -1178,6 +1201,7 @@
     "root": {
       "inputs": {
         "disko": "disko",
+        "herdr": "herdr",
         "home-manager": "home-manager",
         "lanzaboote": "lanzaboote",
         "llm-agents": "llm-agents",
