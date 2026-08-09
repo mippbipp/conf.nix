@@ -35,7 +35,7 @@
     (import ./git.nix { inherit config host gitUsername; })
     ./neovim.nix
     ./starship.nix
-    ./yazi/default.nix
+    ./superfile/default.nix
     ./tms/default.nix
   ];
 
@@ -134,11 +134,6 @@
           tmuxConfig = ''
             # Terminal overrides
             set -g terminal-overrides ",xterm-ghostty:RGB"
-
-            # yazi
-            set -g allow-passthrough on
-            set -ga update-environment TERM
-            set -ga update-environment TERM_PROGRAM
 
             # Shift Alt vim keys to switch windows
             bind -n M-H previous-window

@@ -33,7 +33,6 @@
     jq
     curl
     wget
-    exiftool
     ncdu
     officecli
   ];

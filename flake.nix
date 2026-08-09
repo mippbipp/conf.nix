@@ -58,6 +58,10 @@
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    superfile = {
+      url = "github:yorukot/superfile";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =

@@ -9,9 +9,9 @@
   home.packages = [
     inputs.winapps.packages.${pkgs.stdenv.hostPlatform.system}.winapps
   ];
-  xdg.configFile."winapps/compose.yaml".text = ''${
+  xdg.configFile."winapps/compose.yaml".text = "${
     (import ./compose.nix { inherit config username; })
-  }'';
+  }";
   xdg.configFile."winapps/winapps.conf".text = ''
     ##################################
     #   WINAPPS CONFIGURATION FILE   #
