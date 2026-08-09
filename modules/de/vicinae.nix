@@ -25,14 +25,4 @@
       };
     };
   };
-
-  wayland.windowManager.hyprland.settings = {
-    bind = [
-      "$mainMod, Space, exec, vicinae vicinae://toggle"
-      "$mainMod, V, exec, vicinae vicinae://launch/clipboard/history?toggle=true"
-    ];
-    layerrule = [
-      "blur on, ignore_alpha 0, match:namespace vicinae"
-    ];
-  };
 }

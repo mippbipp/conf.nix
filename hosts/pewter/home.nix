@@ -1,15 +1,15 @@
-args:
+_:
 let
   inherit (import ./variables.nix) gitUsername;
 in
 {
+  _module.args = { inherit gitUsername; };
   home.stateVersion = "26.05";
 
-  # Import your baseline Home Manager modules, excluding GUI elements
   imports = [
     ../../modules/hm/config.nix
     ../../modules/ssh/hm.nix
     ../../modules/ssh/sops.nix
-    (import ../../modules/hm/devenv/default.nix (args // { inherit gitUsername; }))
+    ../../modules/hm/devenv/default.nix
   ];
 }

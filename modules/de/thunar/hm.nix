@@ -1,4 +1,4 @@
-{ pkgs, terminal }: {
+{ pkgs, terminal, ... }: {
   xfconf.settings = {
     thunar = {
       "last-show-hidden" = true;

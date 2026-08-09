@@ -1,20 +1,16 @@
-{
-  pkgs,
-  ...
-}@args:
+_:
 let
   inherit (import ./variables.nix) gitUsername;
 in
 {
-  # Home Manager Settings
+  _module.args = { inherit gitUsername; };
   home.stateVersion = "24.05";
 
-  # Import Program Configurations
   imports = [
     ../../modules/hm/config.nix
     ../../modules/ssh/hm.nix
     ../../modules/ssh/sops.nix
-    (import ../../modules/theme/hm.nix { inherit pkgs; })
-    (import ../../modules/hm/devenv/default.nix (args // { inherit gitUsername; }))
+    ../../modules/theme/hm.nix
+    ../../modules/hm/devenv/default.nix
   ];
 }
