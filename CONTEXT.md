@@ -9,3 +9,21 @@ Declarative NixOS/home-manager configuration for the host machines (gram, harpe,
 ## Terminal multiplexing
 
 `ws`: The herdr project picker that jumps from a base terminal into a workspace by fuzzy-searching repo directories. Successor of tmux-sessionizer.
+
+## AI
+
+**Agent provider**:
+A CLI agent (opencode, codex, claude-code, grok, cursor-agent) that t3code discovers on its PATH and drives.
+_Avoid_: agent (ambiguous), provider (too generic)
+
+**Control surface**:
+t3code's role in this setup — it doesn't run agents itself, it drives agent providers.
+_Avoid_: GUI, frontend
+
+**Provider flag**:
+An `enable*` toggle on nixpkgs' t3code package that decides which agent providers are wrapped into its PATH.
+_Avoid_: option, switch
+
+**Bundled provider**:
+An agent provider shipped in a package's PATH unconditionally; llm-agents' t3code bundles all five, nixpkgs' t3code bundles only flag-enabled ones.
+_Avoid_: built-in provider

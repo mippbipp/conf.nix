@@ -11,8 +11,15 @@
 {
   home.packages =
     let
-      llms = with inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}; [
-        opencode
+      llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
+      t3code = pkgs.t3code.override {
+        enableCodex = false;
+        enableOpencode = true;
+        inherit (llm) opencode;
+      };
+      llms = [
+        llm.opencode
+        t3code
       ];
     in
     with pkgs;
