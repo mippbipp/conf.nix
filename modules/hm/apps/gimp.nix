@@ -3,10 +3,10 @@
   ...
 }:
 let
-  gimp-plugins = pkgs.gimp3-with-plugins.override {
+  gimp-plugins = pkgs.gimp-with-plugins.override {
     plugins = with pkgs; [
-      gimp3Plugins.gmic # Tons of filters, features, more photoshop-like stuff
-      # gimpPlugins.resynthesizer # Content aware fill + more
+      gimpPlugins.gmic # Tons of filters, features, more photoshop-like stuff
+      gimpPlugins.resynthesizer # Content aware fill + more
     ];
   };
 in
