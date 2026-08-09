@@ -1,3 +1,7 @@
+## Build
+
+`nrs` rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. See `modules/hm/devenv/scripts/nrs.nix`.
+
 ## Agent skills
 
 ### Issue tracker

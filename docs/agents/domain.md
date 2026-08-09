@@ -9,6 +9,8 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
+This repo's domain model is thin: host roles (gram the desktop, pewter the Oracle ARM server, harpe the WSL guest) and a few repo-specific conventions. Expect a future `CONTEXT.md` to name those.
+
 ## File structure example
 
 Single-context repo (most repos):

@@ -49,30 +49,11 @@
   # Optimize performance for high-throughput exit nodes/subnet routers
   environment.systemPackages = with pkgs; [
     ethtool
-    iproute2
-    gawk
   ];
-  services = {
-    networkd-dispatcher = {
-      enable = true;
-      rules."50-tailscale-optimizations" = {
-        onState = [ "routable" ];
-        script = ''
-          # Dynamically locate the primary active WAN interface routing to the internet
-          WAN_INTERFACE=$(${pkgs.iproute2}/bin/ip -o route get 8.8.8.8 | ${pkgs.gawk}/bin/awk '{print $5}')
-
-          # Apply Tailscale UDP transport layer offloading optimizations directly to that device
-          if [ -n "$WAN_INTERFACE" ]; then
-            ${pkgs.ethtool}/bin/ethtool -K "$WAN_INTERFACE" rx-udp-gro-forwarding on rx-gro-list off
-          fi
-        '';
-      };
-    };
+  services.udev.extraRules = ''
     # Automate UDP Generic Receive Offload (GRO) for high-throughput Tailscale routing.
-    # This udev rule triggers immediately when any ethernet interface (en*) initializes,
+    # Triggers when any ethernet or wireless interface (en*|wl*) initializes,
     # enabling packet aggregation before the CPU processes the UDP stream.
-    udev.extraRules = ''
-      ACTION=="add", SUBSYSTEM=="net", KERNEL=="en*", RUN+="${pkgs.ethtool}/bin/ethtool -K $name rx-udp-gro-forwarding on rx-gro-list off"
-    '';
-  };
+    ACTION=="add", SUBSYSTEM=="net", KERNEL=="en*|wl*", RUN+="${pkgs.ethtool}/bin/ethtool -K $name rx-udp-gro-forwarding on rx-gro-list off"
+  '';
 }
