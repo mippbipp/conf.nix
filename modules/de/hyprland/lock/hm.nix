@@ -7,7 +7,7 @@
         general = {
           lock_cmd = "pidof hyprlock || hyprlock";
           before_sleep_cmd = "loginctl lock-session"; # lock before suspend
-          after_sleep_cmd = "hyprctl dispatch dpms on && hyprctl reload"; # monitors on and reloaded to prevent hyprlock freezing
+          after_sleep_cmd = "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })' && hyprctl reload"; # monitors on and reloaded to prevent hyprlock freezing
           inhibit_sleep = 3; # wait until screen is locked
         };
         listener = [
@@ -17,8 +17,8 @@
           }
           {
             timeout = 330;
-            on-timeout = "hyprctl dispatch dpms off";
-            on-resume = "hyprctl dispatch dpms on";
+            on-timeout = "hyprctl dispatch 'hl.dsp.dpms({ action = \"off\" })'";
+            on-resume = "hyprctl dispatch 'hl.dsp.dpms({ action = \"on\" })'";
           }
           {
             timeout = 1200;

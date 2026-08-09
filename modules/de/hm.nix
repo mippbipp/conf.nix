@@ -1,4 +1,4 @@
-args: {
+_: {
   xdg = {
     userDirs = {
       enable = true;
@@ -9,7 +9,7 @@ args: {
 
   imports = [
     ./vicinae.nix
-    (import ./hyprland/hm/default.nix args)
+    ./hyprland/hm.nix
     ./waybar.nix
     ./swaync.nix
     ./wlogout/config.nix
