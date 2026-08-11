@@ -120,3 +120,21 @@ hl.layer_rule({
 	blur = true,
 	ignore_alpha = 0,
 })
+
+hl.window_rule({
+	match = { class = "flameshot" },
+	no_anim = true,
+	pin = true,
+	float = true,
+	decorate = false,
+	no_blur = true,
+	no_shadow = true,
+})
+hl.window_rule({
+	match = { class = "flameshot", title = "flameshot" },
+	move = { 0, 0 },
+})
+hl.window_rule({
+	match = { class = "flameshot", title = "flameshot-pin" },
+	move = { "cursor_x-(window_w*0.5)", "cursor_y-(window_h*0.5)" },
+})

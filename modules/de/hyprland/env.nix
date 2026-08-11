@@ -32,8 +32,5 @@
     # hyprcursor
     export HYPRCURSOR_THEME=${config.stylix.cursor.name}
     export HYPRCURSOR_SIZE=${toString config.stylix.cursor.size}
-
-    # hyprshot
-    export HYPRSHOT_DIR=Pictures/Screenshots
   '';
 }

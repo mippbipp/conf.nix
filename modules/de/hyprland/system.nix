@@ -22,10 +22,8 @@
     ifuse
     libimobiledevice
     hyprpicker
-    hyprshot
     hyprland-qtutils
     wl-mirror
-    wayscriber
   ];
 
   programs = {

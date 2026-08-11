@@ -13,6 +13,7 @@ _: {
     ./waybar.nix
     ./swaync.nix
     ./wlogout/config.nix
+    ../hm/apps/flameshot.nix
   ];
 
   home.file."Pictures/wallpapers" = {

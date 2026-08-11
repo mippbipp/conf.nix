@@ -39,11 +39,14 @@ hl.bind("XF86AudioNext", hl.dsp.exec_cmd("playerctl next"), { locked = true })
 hl.bind("XF86AudioPrev", hl.dsp.exec_cmd("playerctl previous"), { locked = true })
 hl.bind("XF86AudioStop", hl.dsp.exec_cmd("playerctl stop"), { locked = true })
 
-hl.bind(mod .. " + S", hl.dsp.exec_cmd("hyprshot -m window"))
-hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("hyprshot -m region --clipboard-only"))
-hl.bind("Print", hl.dsp.exec_cmd("hyprshot -m output"))
+-- PrintScreen key pressed -> the currently focused monitor is captured, and the Flameshot GUI launches
+hl.bind("Print", function()
+	local mon = hl.get_active_monitor()
+	local n = mon and mon.id or 0
+	hl.exec_cmd("flameshot screen --number " .. n .. " --edit")
+end)
+hl.bind(mod .. " + SHIFT + S", hl.dsp.exec_cmd("flameshot gui"))
 hl.bind(mod .. " + SHIFT + T", hl.dsp.exec_cmd("normcap"))
-hl.bind(mod .. " + D", hl.dsp.exec_cmd("wayscriber --active"))
 
 hl.bind(mod .. " + tab", hl.dsp.focus({ workspace = "m+1" }))
 hl.bind(mod .. " + SHIFT + tab", hl.dsp.focus({ workspace = "m-1" }))
