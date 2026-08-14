@@ -14,11 +14,27 @@ hl.bind("CTRL + ALT + Delete", hl.dsp.exit())
 hl.bind(mod .. " + B", hl.dsp.exec_cmd("caelestia shell drawers toggle bar"))
 
 hl.bind(mod .. " + Q", hl.dsp.window.close())
-hl.bind(mod .. " + F", hl.dsp.window.fullscreen())
-hl.bind(mod .. " + SHIFT + F", hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen())
+hl.bind(mod .. " + CTRL + F", hl.dsp.window.float({ action = "toggle" }))
+hl.bind(mod .. " + F", function()
+	local ws = hl.get_active_workspace()
+	if not ws then
+		return
+	end
+	local next = ws.tiled_layout == "monocle" and "dwindle" or "monocle"
+	hl.workspace_rule({ workspace = tostring(ws.id), layout = next })
+end)
 
-hl.bind("ALT + tab", hl.dsp.window.cycle_next())
-hl.bind("ALT + tab", hl.dsp.window.alter_zorder({ mode = "top" }))
+-- monocle layout needs to dispatch its own `cyclenext` to work
+hl.bind("ALT + tab", function()
+	local ws = hl.get_active_workspace()
+	if not ws or ws.tiled_layout ~= "monocle" then
+		hl.dispatch(hl.dsp.window.cycle_next())
+		hl.dispatch(hl.dsp.window.alter_zorder({ mode = "top" }))
+		return
+	end
+	hl.dispatch(hl.dsp.layout("cyclenext"))
+end)
 
 hl.bind(mod .. " + h", hl.dsp.focus({ direction = "left" }))
 hl.bind(mod .. " + l", hl.dsp.focus({ direction = "right" }))

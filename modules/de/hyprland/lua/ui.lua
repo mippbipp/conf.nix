@@ -34,6 +34,8 @@ hl.config({
 		mouse_move_enables_dpms = true,
 		key_press_enables_dpms = true,
 		focus_on_activate = true,
+		on_focus_under_fullscreen = true,
+		exit_window_retains_fullscreen = true,
 	},
 
 	xwayland = {
