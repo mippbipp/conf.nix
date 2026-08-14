@@ -6,10 +6,6 @@ Declarative NixOS/home-manager configuration for the host machines (gram, harpe,
 
 `nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. See `modules/hm/devenv/scripts/nrs.nix`.
 
-## Terminal multiplexing
-
-`ws`: The herdr project picker that jumps from a base terminal into a workspace by fuzzy-searching repo directories. Successor of tmux-sessionizer.
-
 ## Config live-editing
 
 - **out-of-store config**: a config file tracked in this repo that home-manager symlinks into place instead of writing from the store, so edits take effect without a rebuild. Precedent: the nvim submodule, the hyprland Lua root.

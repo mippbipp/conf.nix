@@ -1,3 +1,0 @@
-# Herdr replaces tmux
-
-tmux has been replaced with herdr (pinned upstream flake input, one-shot swap on all hosts) as the terminal multiplexer. Herdr was chosen over staying on tmux because its server-resident model gives better persistence, and because the tmux setup's sessionizer (tms) had to go anyway; the agent-state sidebar is deliberately disabled — opencode will run in t3-code, so herdr's agent features are not wanted right now. The trade-off is that herdr is young relative to tmux's mature plugin ecosystem; the keybindings preserve the tmux muscle memory (C-a prefix, alt+h/l tabs, ctrl+alt+h/l workspaces) to keep the migration cost low and make switching back cheap.

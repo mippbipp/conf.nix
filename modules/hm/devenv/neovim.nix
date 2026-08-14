@@ -35,6 +35,7 @@
         python312Packages.pylatexenc # markdown preview
         lua51Packages.jsregexp # luasnip
         nil
+        qt6.qtdeclarative # qmlls
 
         # snacks.image
         imagemagick

@@ -1,17 +1,17 @@
 local mod = H.mod
 local term = H.env.terminal
-local env = H.env
 
 hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(term))
-hl.bind(mod .. " + B", hl.dsp.exec_cmd("pidof waybar >/dev/null && pkill -SIGUSR1 waybar || waybar &"))
-hl.bind(mod .. " + SHIFT + N", hl.dsp.exec_cmd("swaync-client -t -sw"))
-hl.bind(mod .. " + ALT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock -q"))
-hl.bind("CTRL + ALT + P", hl.dsp.exec_cmd(env.wlogout))
+hl.bind(mod .. " + SHIFT + N", hl.dsp.exec_cmd("caelestia shell drawers toggle sidebar"))
+hl.bind(mod .. " + ALT + L", hl.dsp.exec_cmd("caelestia shell lock lock"))
+hl.bind("CTRL + ALT + P", hl.dsp.exec_cmd("caelestia shell drawers toggle session"))
 hl.bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a"))
 hl.bind("CTRL + ALT + Delete", hl.dsp.exit())
+
+hl.bind(mod .. " + B", hl.dsp.exec_cmd("caelestia shell drawers toggle bar"))
 
 hl.bind(mod .. " + Q", hl.dsp.window.close())
 hl.bind(mod .. " + F", hl.dsp.window.fullscreen())
@@ -62,8 +62,8 @@ hl.bind(mod .. " + U", hl.dsp.workspace.toggle_special())
 hl.bind(mod .. " + Space", hl.dsp.exec_cmd("vicinae vicinae://toggle"))
 hl.bind(mod .. " + V", hl.dsp.exec_cmd("vicinae vicinae://launch/clipboard/history?toggle=true"))
 
-hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd(env.brightness .. " --dec"), { repeating = true })
-hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd(env.brightness .. " --inc"), { repeating = true })
+hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("caelestia shell brightness set 5%-"), { repeating = true })
+hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("caelestia shell brightness set +5%"), { repeating = true })
 
 for i = 1, 10 do
 	local key = i % 10

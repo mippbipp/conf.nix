@@ -21,6 +21,10 @@
       url = "github:nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    caelestia-shell = {
+      url = "github:caelestia-dots/shell";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake/beta";
       inputs = {
@@ -158,6 +162,9 @@
                 };
               }
             )
+          ];
+          homeManagerModules = [
+            inputs.caelestia-shell.homeManagerModules.default
           ];
         };
         harpe = mkHostConfig rec {

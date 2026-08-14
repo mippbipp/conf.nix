@@ -1,5 +1,5 @@
 hl.bind("switch:on:Lid Switch", function()
-	hl.exec_cmd("pidof hyprlock || hyprlock -q")
+	hl.exec_cmd("caelestia shell lock lock")
 	if H.internal then
 		hl.monitor({ output = H.internal, disabled = true })
 	end

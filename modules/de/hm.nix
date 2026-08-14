@@ -10,13 +10,11 @@ _: {
   imports = [
     ./vicinae.nix
     ./hyprland/hm.nix
-    ./waybar.nix
-    ./swaync.nix
-    ./wlogout/config.nix
+    ./quickshell.nix
     ../hm/apps/flameshot.nix
   ];
 
-  home.file."Pictures/wallpapers" = {
+  home.file."Pictures/Wallpapers" = {
     source = ./wallpapers;
     recursive = true;
   };

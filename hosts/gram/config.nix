@@ -3,9 +3,6 @@
   options,
   ...
 }:
-let
-  inherit (import ./variables.nix) wallpaper;
-in
 {
   imports = [
     ./hardware.nix
@@ -17,7 +14,7 @@ in
     ../../modules/system/hardware/mouse.nix
     ../../modules/system/config/virtualization.nix
     ../../modules/system/config/common.nix
-    (import ../../modules/theme/system.nix { inherit pkgs wallpaper; })
+    ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/secret.nix
     ../../modules/system/config/programs.nix
@@ -58,11 +55,6 @@ in
         configurationLimit = 5;
       };
       efi.canTouchEfiVariables = true;
-    };
-    # Make /tmp a tmpfs
-    tmp = {
-      useTmpfs = false;
-      tmpfsSize = "30%";
     };
     # Appimage Support
     binfmt.registrations.appimage = {

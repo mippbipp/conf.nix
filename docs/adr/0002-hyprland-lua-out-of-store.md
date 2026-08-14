@@ -1,5 +1,0 @@
-# Hyprland config moves to an out-of-store Lua root
-
-Hyprland's hyprlang config (deprecated since 0.55, removed in 0.57) was replaced by a hand-written Lua config living out-of-store in `modules/de/hyprland/lua/` and symlinked into `~/.config/hypr/hyprland.lua`, so edits propagate to the running compositor immediately (auto-reload on save) without an `nrs` rebuild. We chose live-edited Lua over keeping the home-manager module's declarative settings (`configType = "lua"`) because the config is the most-tweaked file in the repo and rebuild latency kills iteration; the trade-off is that Nix-side interpolation is gone — monitors are autodetected via the `hl.get_monitors()` API, the terminal is a Lua local, and store-dependent script paths are injected through a Nix-generated host-bindings file (`env.lua`), the seam between rebuild-owned and live-edited config. The hypr ecosystem tools (hyprlock, hypridle, hyprpaper) still use hyprlang and stay in home-manager until upstream migrates them.
-
-Status: accepted

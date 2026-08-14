@@ -2,10 +2,13 @@
 
 ## manual things
 
+* initial steps
+  * `sudo -i`
+  * `passwd {username}`
+  * `systemctl start sshd`
 * [lanzaboote setup](https://nix-community.github.io/lanzaboote/)
   * just reverse and redo the steps on a new machine
 * `ssh-keygen -t ed25519` with `{host}_ed25519` as the filename
-* `sudo passwd {username}` to change password
 * github repos
 * rclone
 * [winapps](https://github.com/winapps-org/winapps)

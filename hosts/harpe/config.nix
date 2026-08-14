@@ -7,12 +7,8 @@
 
 {
   lib,
-  pkgs,
   ...
 }:
-let
-  inherit (import ./variables.nix) wallpaper;
-in
 {
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
 
@@ -22,7 +18,7 @@ in
     ../../modules/system/hardware/nvidia-prime-drivers.nix
     ../../modules/system/hardware/intel-drivers.nix
     ../../modules/system/config/common.nix
-    (import ../../modules/theme/system.nix { inherit pkgs wallpaper; })
+    ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
   ];

@@ -6,13 +6,10 @@
 
   environment.systemPackages = with pkgs; [
     libnotify
-    brightnessctl
-    ddcutil
     i2c-tools
     pavucontrol
     pulseaudio
     alsa-utils
-    swaynotificationcenter
     wev
 
     normcap

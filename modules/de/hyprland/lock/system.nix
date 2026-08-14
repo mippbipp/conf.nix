@@ -1,13 +1,6 @@
-_:
-{
-  security.pam = {
-    services = {
-      hyprlock = { };
-    };
-  };
-
+_: {
   services = {
-    # to make hyprland / hypridle work
+    # to make quickshell work
     logind.settings.Login = {
       HandleLidSwitch = "ignore";
       HandlePowerKeyLongPress = "poweroff";
