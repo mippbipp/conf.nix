@@ -22,7 +22,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     caelestia-shell = {
-      url = "github:caelestia-dots/shell";
+      url = "github:mippbipp/shell/fix/spurious-autosave-on-load";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     zen-browser = {

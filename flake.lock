@@ -167,15 +167,16 @@
         "quickshell": "quickshell"
       },
       "locked": {
-        "lastModified": 1786238888,
-        "narHash": "sha256-pnO0u0UUYwkr72pJR5Giu93LZfU/fhTKJZYa1xeM7Po=",
-        "owner": "caelestia-dots",
+        "lastModified": 1786814772,
+        "narHash": "sha256-ezq+l2g+3TsBCKVpeH9qGo62Sww5m43Bm7pOhbcfdlQ=",
+        "owner": "mippbipp",
         "repo": "shell",
-        "rev": "817a220e8e87c4df9f3681033a0d8a8054cdaa30",
+        "rev": "dce07a65733180d1fd2b3db6d51c918964cfb5ea",
         "type": "github"
       },
       "original": {
-        "owner": "caelestia-dots",
+        "owner": "mippbipp",
+        "ref": "fix/spurious-autosave-on-load",
         "repo": "shell",
         "type": "github"
       }
