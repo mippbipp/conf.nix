@@ -91,7 +91,6 @@
           host,
           username,
           nixosModules ? [ ],
-          homeManagerModules ? [ ],
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
@@ -121,7 +120,7 @@
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   backupFileExtension = "backup";
-                  users.${username}.imports = [ ./hosts/${host}/home.nix ] ++ homeManagerModules;
+                  users.${username}.imports = [ ./hosts/${host}/home.nix ];
                 };
               }
             )
@@ -162,9 +161,6 @@
                 };
               }
             )
-          ];
-          homeManagerModules = [
-            inputs.caelestia-shell.homeManagerModules.default
           ];
         };
         harpe = mkHostConfig rec {

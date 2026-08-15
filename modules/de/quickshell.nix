@@ -1,9 +1,13 @@
 {
-  terminal,
+  inputs,
   config,
+  terminal,
   ...
 }:
 {
+  imports = [
+    inputs.caelestia-shell.homeManagerModules.default
+  ];
   programs.caelestia = {
     enable = true;
     systemd = {
@@ -29,7 +33,49 @@
       bar = {
         persistent = false;
         showOnHover = true;
-        workspaces.shown = 5;
+        workspaces = {
+          occupiedLabel = "󰊠";
+          activeLabel = "󰮯";
+          showWindows = false;
+        };
+        entries = [
+          {
+            id = "logo";
+            enabled = true;
+          }
+          {
+            id = "workspaces";
+            enabled = true;
+          }
+          {
+            id = "spacer";
+            enabled = true;
+          }
+          {
+            id = "activeWindow";
+            enabled = false;
+          }
+          {
+            id = "spacer";
+            enabled = true;
+          }
+          {
+            id = "tray";
+            enabled = true;
+          }
+          {
+            id = "clock";
+            enabled = true;
+          }
+          {
+            id = "statusIcons";
+            enabled = true;
+          }
+          {
+            id = "power";
+            enabled = true;
+          }
+        ];
         statusIcons = [
           {
             id = "lockStatus";
@@ -81,6 +127,7 @@
           "stop"
         ];
       };
+      paths.sessionGif = "root:/assets/bongocat.gif";
       services.audioIncrement = 0.05;
     };
     cli = {
