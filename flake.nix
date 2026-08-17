@@ -122,6 +122,10 @@
                   backupFileExtension = "backup";
                   users.${username}.imports = [ ./hosts/${host}/home.nix ];
                 };
+
+                nixpkgs.overlays = [
+                  inputs.rust-overlay.overlays.default
+                ];
               }
             )
           ]
@@ -141,7 +145,6 @@
                 nixpkgs.overlays = [
                   inputs.oskars-dotfiles.overlays.spotx
                   inputs.nix-cachyos-kernel.overlays.pinned
-                  inputs.rust-overlay.overlays.default
                 ];
 
                 environment.systemPackages = [
@@ -178,16 +181,6 @@
         pewter = mkHostConfig {
           host = "pewter";
           username = "mippbipp";
-          nixosModules = [
-            (
-              { pkgs, lib, ... }:
-              {
-                nixpkgs.overlays = [
-                  inputs.rust-overlay.overlays.default
-                ];
-              }
-            )
-          ];
         };
       };
     };
