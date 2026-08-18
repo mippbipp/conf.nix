@@ -21,6 +21,13 @@
       "--ssh"
       "--advertise-exit-node"
     ];
+  }
+  // lib.optionalAttrs (host == "warpe") {
+    extraUpFlags = [
+      # WSL2 has no /dev/net/tun; tailscaled proxies the tunnel in userspace
+      "--tun=userspace-networking"
+      "--ssh"
+    ];
   };
 
   networking = {
@@ -31,8 +38,6 @@
       trustedInterfaces = [ config.services.tailscale.interfaceName ];
       # Allow the Tailscale UDP port through the firewall
       allowedUDPPorts = [ config.services.tailscale.port ];
-      # for Exit Nodes: prevents systemd from dropping routed packets
-      checkReversePath = "loose";
     };
   };
 
