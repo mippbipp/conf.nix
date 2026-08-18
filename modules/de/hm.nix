@@ -1,12 +1,4 @@
 _: {
-  xdg = {
-    userDirs = {
-      enable = true;
-      createDirectories = true;
-      setSessionVariables = false;
-    };
-  };
-
   imports = [
     ./vicinae.nix
     ./hyprland/hm.nix

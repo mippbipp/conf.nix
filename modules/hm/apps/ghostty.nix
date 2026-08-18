@@ -1,15 +1,18 @@
 {
   pkgs,
   ...
-}:
+}@args:
+let
+  background-opacity = args.background-opacity or 0.50;
+in
 {
   programs.ghostty = {
     enable = true;
-    package = if pkgs.stdenv.isDarwin then pkgs.ghostty-bin else pkgs.ghostty;
+    package = if pkgs.stdenv.hostPlatform.isDarwin then pkgs.ghostty-bin else pkgs.ghostty;
     enableZshIntegration = true;
     settings = {
       background = "000000";
-      background-opacity = 0.50;
+      inherit background-opacity;
       confirm-close-surface = false;
       window-decoration = "none";
       window-padding-x = 4;

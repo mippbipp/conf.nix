@@ -1,6 +1,14 @@
 # Configuration Flake
 
-Declarative NixOS/home-manager configuration for the host machines (gram, harpe, pewter, midd).
+Declarative NixOS/home-manager configuration for the host machines (gram, harpe, warpe, pewter, midd).
+
+## Hosts
+
+- **gram**: the desktop machine (Secure Boot via lanzaboote).
+- **harpe**: the WSL guest on the personal laptop.
+- **warpe**: the WSL guest on the work laptop; carries the company CA trust config in `hosts/warpe/work.nix`.
+- **pewter**: the Oracle ARM server.
+- **midd**: the Windows host — only `hosts/midd/setup.ps1`, not a NixOS config.
 
 ## Build
 

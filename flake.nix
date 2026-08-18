@@ -178,6 +178,18 @@
             }
           ];
         };
+        warpe = mkHostConfig rec {
+          host = "warpe";
+          username = "mippbipp";
+          nixosModules = [
+            nixos-wsl.nixosModules.default
+            {
+              system.stateVersion = "24.05";
+              wsl.enable = true;
+              wsl.defaultUser = username;
+            }
+          ];
+        };
         pewter = mkHostConfig {
           host = "pewter";
           username = "mippbipp";

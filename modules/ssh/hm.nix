@@ -39,6 +39,10 @@
         user = "root";
         port = 2222;
       };
+      "warpe" = {
+        hostname = "warpe";
+        user = username;
+      };
     };
   };
 }

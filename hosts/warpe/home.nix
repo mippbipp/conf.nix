@@ -1,0 +1,22 @@
+args:
+let
+  inherit (import ./variables.nix) terminal gitUsername;
+in
+{
+  _module.args = { inherit terminal gitUsername; };
+  home.stateVersion = "24.05";
+
+  imports = [
+    ../../modules/hm/config.nix
+    ../../modules/ssh/hm.nix
+    ../../modules/ssh/sops.nix
+    ../../modules/theme/hm.nix
+    ../../modules/hm/devenv/default.nix
+    (import ../../modules/hm/apps/ghostty.nix (
+      args
+      // {
+        background-opacity = 1;
+      }
+    ))
+  ];
+}

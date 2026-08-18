@@ -54,6 +54,7 @@
     # Go
     GOPATH = "$HOME/go";
     GOBIN = "$HOME/go/bin";
+    GOPROXY = "direct";
 
     # nvim marksman
     DOTNET_SYSTEM_GLOBALIZATION_INVARIANT = 1;

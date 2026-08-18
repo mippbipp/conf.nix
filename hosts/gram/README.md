@@ -19,3 +19,13 @@
   * [test rdp if any issues](https://github.com/winapps-org/winapps#step-4-test-freerdp)
   * `winapps-setup` to install windows
   * directly start windows through vicinae after boot
+
+### mounting bitlocker drive
+
+```sh
+sudo dislocker-fuse -v -V /dev/nvme1n1p1 -p{recovery_key} -- /mnt/bitlocker-fuse && sudo mount -o loop -t ntfs-3g /mnt/bitlocker-fuse/dislocker-file /mnt/windows
+```
+
+```sh
+sudo umount /mnt/windows && sudo sudo umount /mnt/bitlocker-fuse
+```
