@@ -112,11 +112,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1786071436,
-        "narHash": "sha256-/CQJ781dRGWWUMrJ34vIj1PQnNEEWgnEEuod0r5LKGk=",
+        "lastModified": 1786674943,
+        "narHash": "sha256-UwVo4emt9+GDslfabJfCkfO1uOqdhLroqByMEd9RpGk=",
         "owner": "caelestia-dots",
         "repo": "cli",
-        "rev": "751fbc555a83faba5dd589270d14eeb22afab174",
+        "rev": "9857e1a5c4dad637a6220fa4290026559ba86c18",
         "type": "github"
       },
       "original": {
@@ -135,16 +135,16 @@
         "quickshell": "quickshell"
       },
       "locked": {
-        "lastModified": 1786814772,
-        "narHash": "sha256-ezq+l2g+3TsBCKVpeH9qGo62Sww5m43Bm7pOhbcfdlQ=",
+        "lastModified": 1787164079,
+        "narHash": "sha256-BY5UJsK1oNkjVFEsjnHHdpI8POXuEqTC46yaLZsiepY=",
         "owner": "mippbipp",
         "repo": "shell",
-        "rev": "dce07a65733180d1fd2b3db6d51c918964cfb5ea",
+        "rev": "c105d9476c6a19bfbdd87af4864fd6e28e0fd6a3",
         "type": "github"
       },
       "original": {
         "owner": "mippbipp",
-        "ref": "fix/spurious-autosave-on-load",
+        "ref": "nexus-gpu",
         "repo": "shell",
         "type": "github"
       }
