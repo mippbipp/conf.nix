@@ -23,7 +23,8 @@ in
   # https://wiki.nixos.org/wiki/NVIDIA
   config = mkIf cfg.enable {
     hardware.nvidia.prime = {
-      sync.enable = true; # dGPU is always used + primary output device
+      # https://wiki.archlinux.org/title/NVIDIA_Optimus#Using_NVIDIA_PRIME_Render_Offload
+      offload.enable = true; # iGPU is the default renderer; dGPU is opt-in per app
 
       # lspci -d ::03xx
       intelBusId = "${cfg.intelBusID}";

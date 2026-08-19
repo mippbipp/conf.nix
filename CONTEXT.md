@@ -10,6 +10,20 @@ Declarative NixOS/home-manager configuration for the host machines (gram, harpe,
 - **pewter**: the Oracle ARM server.
 - **midd**: the Windows host — only `hosts/midd/setup.ps1`, not a NixOS config.
 
+## Gram GPU policy
+
+**iGPU**:
+The Intel UHD Graphics in gram (card1); renders everything by default.
+_Avoid_: integrated gpu, intel gpu
+
+**dGPU**:
+The NVIDIA RTX 3060 Mobile in gram (card0); renders only what is explicitly offloaded.
+_Avoid_: dedicated gpu, nvidia gpu
+
+**Offload launch**:
+Starting an app with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` so it renders on the dGPU while the session stays on the iGPU.
+_Avoid_: switch to the gpu, gpu switching
+
 ## Build
 
 `nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. See `modules/hm/devenv/scripts/nrs.nix`.

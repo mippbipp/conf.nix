@@ -39,7 +39,7 @@ in
         enable = true;
         # Fine-grained power management. Turns off GPU when not in use.
         # Experimental and only works on modern Nvidia GPUs (Turing or newer).
-        finegrained = false; # using prime sync mode
+        finegrained = true; # requires prime offload mode (see nvidia-prime-drivers.nix)
       };
       # Use the NVidia open source kernel module (not to be confused with the
       # independent third-party "nouveau" open source driver).

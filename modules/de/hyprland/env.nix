@@ -18,14 +18,30 @@
     export NIXOS_OZONE_WL=1
     export NIXPKGS_ALLOW_UNFREE=1
 
-    # nvidia
-    export LIBVA_DRIVER_NAME=nvidia
-    export GBM_BACKEND=nvidia-drm
-    export __GLX_VENDOR_LIBRARY_NAME=nvidia
-    export NVD_BACKEND=direct
-    export __GL_VRR_ALLOWED=0
-    export __GL_GSYNC_ALLOWED=1
-    export __NV_PRIME_RENDER_OFFLOAD=1;
+    # nvidia: iGPU-default policy (docs/adr/0004-gram-gpu-policy.md) — no session-wide
+    # NVIDIA forcing; offload launch vars belong to individual app launches only.
+    # AQ_DRM_DEVICES is colon-separated, first = primary renderer (Hyprland/aquamarine).
+    # Auto-detected at login so this works on any machine and survives unstable DRM
+    # card numbering across boots: every non-NVIDIA card is concatenated first, the
+    # NVIDIA card(s) last, so the dGPU is never primary.
+    {
+      _primary=
+      _offload=
+      for _c in /sys/class/drm/card[0-9]*; do
+        [ -e "$_c" ] || continue
+        case "$_c" in *-*) continue ;; esac
+        case "$(sed -n 's/^DRIVER=//p' "$_c/device/uevent" 2>/dev/null)" in
+          nvidia) _offload="$_offload:''${_c##*/}" ;;
+          *) _primary="$_primary:''${_c##*/}" ;;
+        esac
+      done
+      _list=''${_primary}''${_offload}
+      _list=''${_list#:}
+      if [ -n "$_list" ]; then
+        export AQ_DRM_DEVICES="$(printf '%s' "$_list" | sed 's|^|/dev/dri/|; s|:|:/dev/dri/|g')"
+      fi
+      unset _primary _offload _list _c
+    }
   '';
 
   xdg.configFile."uwsm/env-hyprland".text = ''
