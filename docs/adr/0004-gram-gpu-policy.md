@@ -6,4 +6,6 @@ NVIDIA session-wide environment forcing is therefore wrong by policy, not by acc
 
 Considered and rejected: prime sync (dGPU always on — wastes ~17W idle for no opt-in control) and session-wide NVIDIA forcing with iGPU-default DRM (the pre-ADR state — defeats per-app choice, forces the NVIDIA stack on every app).
 
+Exception, accepted 2026-08-19 (ticket #183): the Steam gamescope session carries the offload triple session-wide (`__NV_PRIME_RENDER_OFFLOAD=1`, `__GLX_VENDOR_LIBRARY_NAME=nvidia`, `__VK_LAYER_NV_optimus=NVIDIA_only`). This is not a re-adoption of session-wide forcing: the gamescope session is an opt-in gaming session — the user picks it deliberately, and every app inside it is a game. The desktop session stays iGPU-default with per-app opt-in.
+
 Status: accepted
