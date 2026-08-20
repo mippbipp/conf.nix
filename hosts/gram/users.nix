@@ -41,6 +41,7 @@ in
           discord
           code-cursor
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
+          pkgs.t3code
         ];
         openssh.authorizedKeys.keys = [ ];
       };

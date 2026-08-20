@@ -37,6 +37,7 @@
     officecli
     dig
     openssl
+    traceroute
   ];
 
   services = {
