@@ -29,7 +29,7 @@
         user = "git";
       };
     }
-    // lib.optionalAttrs (host == "gram") {
+    // lib.optionalAttrs (host == "gram" || host == "warpe") {
       "pewter" = {
         hostname = "pewter";
         user = username;
@@ -39,6 +39,8 @@
         user = "root";
         port = 2222;
       };
+    }
+    // lib.optionalAttrs (host == "gram") {
       "warpe" = {
         hostname = "warpe";
         user = username;

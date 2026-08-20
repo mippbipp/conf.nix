@@ -35,6 +35,9 @@
     wget
     ncdu
     officecli
+    dig
+    openssl
+    traceroute
   ];
 
   services = {

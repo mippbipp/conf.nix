@@ -1,4 +1,5 @@
-{ host, nextdns-id }: {
+{ host, nextdns-id, ... }:
+{
   services.resolved = {
     enable = true;
     settings = {

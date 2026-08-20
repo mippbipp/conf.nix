@@ -31,6 +31,7 @@
       "--tun=userspace-networking"
       "--ssh"
     ];
+    extraSetFlags = [ "--exit-node=pewter" ];
   };
 
   networking = {

@@ -14,7 +14,6 @@
       llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
       llms = [
         llm.opencode
-        pkgs.t3code
       ];
     in
     with pkgs;

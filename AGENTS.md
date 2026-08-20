@@ -1,6 +1,6 @@
 ## Agent skills
 
-Declarative NixOS/home-manager configuration for the host machines (gram, harpe, pewter, midd).
+Declarative NixOS/home-manager configuration for the host machines (gram, harpe, warpe, pewter, midd).
 
 ### Issue tracker
 

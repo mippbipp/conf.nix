@@ -18,5 +18,6 @@ in
         background-opacity = 1;
       }
     ))
+    ../../modules/hm/apps/zen/default.nix
   ];
 }
