@@ -31,8 +31,7 @@
       "--tun=userspace-networking"
       "--ssh"
     ];
-    # Disable DNS resolution since work blocks NextDNS used as global nameserver in tailnet
-    extraSetFlags = [ "--accept-dns=false" ];
+    extraSetFlags = [ "--exit-node=pewter" ];
   };
 
   networking = {
