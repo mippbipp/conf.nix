@@ -35,6 +35,8 @@
     wget
     ncdu
     officecli
+    dig
+    openssl
   ];
 
   services = {

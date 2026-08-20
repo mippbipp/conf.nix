@@ -1,12 +1,8 @@
 {
   pkgs,
   options,
-  host,
   ...
 }:
-let
-  inherit (import ./variables.nix) nextdns-id;
-in
 {
   imports = [
     ./hardware.nix
@@ -22,7 +18,7 @@ in
     ../../modules/system/config/nix.nix
     ../../modules/system/config/secret.nix
     ../../modules/system/config/programs.nix
-    (import ../../modules/system/config/resolved.nix { inherit host nextdns-id; })
+    ../../modules/system/config/resolved.nix
     ../../modules/system/config/tailscale.nix
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix

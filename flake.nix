@@ -86,6 +86,7 @@
       ...
     }@inputs:
     let
+      nextdns-id = "7b9721";
       mkHostConfig =
         {
           host,
@@ -98,6 +99,7 @@
               inputs
               username
               host
+              nextdns-id
               ;
           };
           modules = [
