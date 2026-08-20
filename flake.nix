@@ -125,6 +125,14 @@
 
                 nixpkgs.overlays = [
                   inputs.rust-overlay.overlays.default
+                  (final: prev: {
+                    # ADR 0001: t3code drives only opencode, pinned to the llm-agents build
+                    t3code = prev.t3code.override {
+                      enableCodex = false;
+                      enableOpencode = true;
+                      opencode = inputs.llm-agents.packages.${final.stdenv.hostPlatform.system}.opencode;
+                    };
+                  })
                 ];
               }
             )

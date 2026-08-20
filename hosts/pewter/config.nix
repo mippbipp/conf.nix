@@ -20,6 +20,7 @@
     ../../modules/system/config/programs.nix
     ../../modules/system/config/tailscale.nix
     ../../modules/system/config/syncthing.nix
+    ../../modules/system/config/t3code.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;

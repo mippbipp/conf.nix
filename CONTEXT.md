@@ -7,7 +7,7 @@ Declarative NixOS/home-manager configuration for the host machines (gram, harpe,
 - **gram**: the desktop machine (Secure Boot via lanzaboote).
 - **harpe**: the WSL guest on the personal laptop.
 - **warpe**: the WSL guest on the work laptop; carries the company CA trust config in `hosts/warpe/work.nix`.
-- **pewter**: the Oracle ARM server.
+- **pewter**: the always-on Oracle ARM server; tailnet exit node and host of the remote workspace.
 - **midd**: the Windows host — only `hosts/midd/setup.ps1`, not a NixOS config.
 
 ## Gram GPU policy
@@ -51,3 +51,15 @@ _Avoid_: option, switch
 **Bundled provider**:
 An agent provider shipped in a package's PATH unconditionally; llm-agents' t3code bundles all five, nixpkgs' t3code bundles only flag-enabled ones.
 _Avoid_: built-in provider
+
+**Remote workspace**:
+A t3 server running on a different machine than the client — on this tailnet, pewter's always-on server. Projects, files, git state, terminals, and provider sessions live on the server host; clients are control surfaces.
+_Avoid_: remote agent, remote machine
+
+**Tailnet transport**:
+How clients reach the remote workspace — Tailscale Serve HTTPS at `https://pewter.<tailnet>.ts.net/` with the backend loopback-bound, instead of raw HTTP on the tailnet IP.
+_Avoid_: tunnel, relay
+
+**Pairing**:
+The one-time token exchange between a client and a t3 server (`t3 pair`); after pairing, access is session-based.
+_Avoid_: login, auth (t3's `t3 auth` manages sessions separately)

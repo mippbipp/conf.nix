@@ -4,6 +4,7 @@
   pkgs,
   lib,
   host,
+  username,
   ...
 }:
 {
@@ -21,6 +22,8 @@
       "--ssh"
       "--advertise-exit-node"
     ];
+    # Lets the t3code server (running as $username) configure `tailscale serve`
+    extraSetFlags = [ "--operator=${username}" ];
   }
   // lib.optionalAttrs (host == "warpe") {
     extraUpFlags = [
