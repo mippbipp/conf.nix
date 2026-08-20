@@ -15,7 +15,6 @@
   imports = [
     ./users.nix
     ./work.nix
-    ../../modules/system/hardware/intel-drivers.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/tailscale.nix
     ../../modules/system/config/wsl.nix

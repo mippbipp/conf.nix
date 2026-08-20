@@ -14,9 +14,6 @@
 
   imports = [
     ./users.nix
-    ../../modules/system/hardware/nvidia-drivers.nix
-    ../../modules/system/hardware/nvidia-prime-drivers.nix
-    ../../modules/system/hardware/intel-drivers.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/wsl.nix
     ../../modules/theme/system.nix
