@@ -135,16 +135,16 @@
         "quickshell": "quickshell"
       },
       "locked": {
-        "lastModified": 1787165106,
-        "narHash": "sha256-dsNID2D1oQEYRYKQCAPNQ1piqVCK2gho08sDHTZb0Rc=",
+        "lastModified": 1787329681,
+        "narHash": "sha256-sb4WY295fjPufKwLuXGaLBmwxWIQbXRaS3YLMy0ywqs=",
         "owner": "mippbipp",
         "repo": "shell",
-        "rev": "dc1f54f6fb9f87890612adfaa88fda8757b9bbfb",
+        "rev": "f253ba0dc0e417332d4853615ca5555eeade772a",
         "type": "github"
       },
       "original": {
         "owner": "mippbipp",
-        "ref": "nexus-gpu",
+        "ref": "personal",
         "repo": "shell",
         "type": "github"
       }
