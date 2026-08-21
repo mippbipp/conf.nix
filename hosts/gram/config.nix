@@ -19,7 +19,7 @@
     ../../modules/system/config/secret.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/resolved.nix
-    ../../modules/system/config/tailscale.nix
+    ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix
     ../../modules/system/apps/obs.nix

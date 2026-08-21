@@ -130,13 +130,25 @@
                 nixpkgs.overlays = [
                   inputs.rust-overlay.overlays.default
                   (final: prev: {
-                    # ADR 0001: t3code drives only opencode, pinned to the llm-agents build
-                    t3code = prev.t3code.override {
-                      enableCodex = false;
-                      enableOpencode = true;
-                      opencode = inputs.llm-agents.packages.${final.stdenv.hostPlatform.system}.opencode;
-                    };
+                    t3code =
+                      let
+                        llm = inputs.llm-agents.packages.${final.stdenv.hostPlatform.system};
+                        pnpmDeps = llm.t3code.pnpmDeps.override {
+                          prePnpmInstall = ''
+                            pnpm config set fetch-timeout 900000
+                            pnpm config set fetch-retries 5
+                            pnpm config set network-concurrency 8
+                          '';
+                        };
+                      in
+                      llm.t3code.override {
+                        providerPackages = with llm; [ opencode ];
+                        t3code-unwrapped = llm.t3code.passthru.unwrapped.overrideAttrs (old: {
+                          inherit pnpmDeps;
+                        });
+                      };
                   })
+
                 ];
               }
             )

@@ -16,7 +16,7 @@
     ./users.nix
     ./work.nix
     ../../modules/system/config/common.nix
-    ../../modules/system/config/tailscale.nix
+    ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/wsl.nix
     ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix

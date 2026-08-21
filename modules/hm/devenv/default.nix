@@ -12,7 +12,7 @@
     let
       llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
       llms = [
-        llm.opencode
+        llm.opencode2
       ];
     in
     with pkgs;
@@ -28,6 +28,7 @@
       tokei
       repomix
       (import ./scripts/nrs.nix { inherit pkgs username host; })
+      t3code # see flake.nix
     ]
     ++ llms;
 
