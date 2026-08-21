@@ -55,6 +55,11 @@ Shared bootstrap for a new NixOS-WSL guest (used by harpe and warpe).
 ### useful commands
 
 ```sh
+# clone (general use)
+cd ~ && git clone --recurse-submodules --remote-submodules git@github.com:mippbipp/conf.nix.git`
+```
+
+```sh
 nix repl ~/conf.nix#nixosConfigurations.{hostname}.config
 ```
 

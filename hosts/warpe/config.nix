@@ -21,5 +21,6 @@
     ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
+    ../../modules/system/config/resolved.nix
   ];
 }

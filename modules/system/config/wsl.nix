@@ -44,6 +44,11 @@
     })
   ];
 
+  # Let systemd-resolved DNS here too. With generation on, WSL writes
+  # /etc/resolv.conf pointing at the Windows resolver and nothing ever
+  # queries systemd-resolved's stub.
+  wsl.wslConf.network.generateResolvConf = false;
+
   # WSL2 kernel rejects the nft `fib` expression that reverse-path
   # filtering uses; override the "loose" that nixpkgs' tailscale
   # module sets for clients

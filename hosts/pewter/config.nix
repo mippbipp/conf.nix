@@ -18,6 +18,7 @@
     ../../modules/system/config/common.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
+    ../../modules/system/config/resolved.nix
     ../../modules/system/config/tailscale.nix
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/t3code.nix

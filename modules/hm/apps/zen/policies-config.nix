@@ -9,6 +9,10 @@ in
 {
   AutofillAddressEnabled = true;
   AutofillCreditCardEnabled = false;
+  # Zen ships its own NSS root store and ignores /etc/ssl/certs, so WSL
+  # hosts behind TLS interception can't reach sites like
+  # addons.mozilla.org without importing the system bundle explicitly.
+  Certificates.Install = [ "/etc/ssl/certs/ca-certificates.crt" ];
   DisableAppUpdate = true;
   DisableFeedbackCommands = true;
   DisableFirefoxStudies = true;

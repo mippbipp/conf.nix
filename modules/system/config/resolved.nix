@@ -5,7 +5,6 @@
     settings = {
       Resolve = {
         Domains = [
-          # MagicDNS for tailscale
           "~."
         ];
         DNS = [
