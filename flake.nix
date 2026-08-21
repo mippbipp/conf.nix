@@ -104,11 +104,12 @@
           };
           modules = [
             ./hosts/${host}/config.nix
+            ./modules/system/config/sops.nix
             stylix.nixosModules.stylix
             nix-index-database.nixosModules.nix-index
             home-manager.nixosModules.home-manager
             (
-              { pkgs, ... }:
+              { pkgs, config, ... }:
               {
                 home-manager = {
                   extraSpecialArgs = {
@@ -118,6 +119,7 @@
                       inputs
                       host
                       ;
+                    sopsSecrets = config.sops.secrets;
                   };
                   useGlobalPkgs = true;
                   useUserPackages = true;

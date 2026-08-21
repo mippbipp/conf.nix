@@ -1,11 +1,10 @@
 {
   inputs,
-  config,
   pkgs,
   username,
   host,
   lib,
-  gitUsername,
+  sopsSecrets,
   ...
 }:
 {
@@ -33,7 +32,7 @@
     ++ llms;
 
   imports = [
-    (import ./git.nix { inherit config host gitUsername; })
+    ./git.nix
     ./neovim.nix
     ./starship.nix
     ./superfile/default.nix
@@ -90,6 +89,11 @@
             # Source personal configurations if they exist
             if [ -f $HOME/.zshrc-personal ]; then
               source $HOME/.zshrc-personal
+            fi
+
+            # gh CLI auth from sops-managed token (see modules/sops)
+            if [ -f ${sopsSecrets.github_token.path} ]; then
+              export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
             fi
 
             eval "$(uv generate-shell-completion zsh)"

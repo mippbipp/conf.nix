@@ -9,7 +9,6 @@ in
   imports = [
     ../../modules/hm/config.nix
     ../../modules/ssh/hm.nix
-    ../../modules/ssh/sops.nix
     ../../modules/theme/hm.nix
     ../../modules/hm/devenv/default.nix
     (import ../../modules/hm/apps/ghostty.nix (

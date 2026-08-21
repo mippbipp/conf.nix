@@ -22,6 +22,5 @@ in
     ../../modules/hm/apps/gimp.nix
     ../../modules/hm/apps/mpv.nix
     ../../modules/ssh/hm.nix
-    ../../modules/ssh/sops.nix
   ];
 }

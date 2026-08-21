@@ -1,14 +1,15 @@
 {
-  config,
   gitUsername,
   host,
+  sopsSecrets,
+  ...
 }:
 {
   programs = {
     git = {
       enable = true;
       includes = [
-        { inherit (config.sops.secrets.git_config) path; }
+        { path = sopsSecrets.git_config.path; }
       ];
       lfs.enable = true;
       signing = {
