@@ -1,6 +1,7 @@
 {
   pkgs,
   herdrPkg,
+  username,
 }:
 
 pkgs.writeShellApplication {
@@ -16,9 +17,9 @@ pkgs.writeShellApplication {
   text = ''
     search_dirs=(
     # path:depth
-      "/home/mippbipp/Projects:2"
-      "/home/mippbipp/work:3"
-      "/home/mippbipp:2"
+      "/home/${username}/Projects:2"
+      "/home/${username}/work:3"
+      "/home/${username}:2"
     )
 
     repos=()

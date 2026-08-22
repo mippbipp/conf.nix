@@ -5,15 +5,19 @@
   lib,
   host,
   username,
+  globals,
   ...
 }:
+let
+  self = globals.hosts.${host} or { };
+in
 {
   services.tailscale = {
     enable = true;
     disableUpstreamLogging = true; # disables debug logging
     useRoutingFeatures = "client";
   }
-  // lib.optionalAttrs (host == "pewter") {
+  // lib.optionalAttrs (self.isExitNode or false) {
     useRoutingFeatures = "both";
     authKeyFile = "/var/lib/tailscale/authkey";
     extraUpFlags = [
@@ -24,12 +28,12 @@
     # Lets the t3code server (running as $username) configure `tailscale serve`
     extraSetFlags = [ "--operator=${username}" ];
   }
-  // lib.optionalAttrs (host == "warpe") {
+  // lib.optionalAttrs (config.wsl.enable or false) {
     extraUpFlags = [
       # WSL2 has no /dev/net/tun; tailscaled proxies the tunnel in userspace
       "--tun=userspace-networking"
     ];
-    extraSetFlags = [ "--exit-node=pewter" ];
+    extraSetFlags = [ "--exit-node=${globals.exitNode}" ];
   };
 
   networking = {

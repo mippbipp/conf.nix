@@ -2,28 +2,22 @@
   lib,
   username,
   host,
+  globals,
   ...
 }:
 let
-  allDevices = {
-    gram = {
-      id = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
-      addresses = [
-        "tcp://gram:22000"
-        "dynamic"
-      ];
-    };
-    pewter = {
-      id = "POHLBBF-3AOYWFT-OK46SCB-Z4O4VHV-5NFB5MH-SX2OP5M-GNYZSTT-5VKEPQT";
-      addresses = [
-        "tcp://pewter:22000"
-        "dynamic"
-      ];
-    };
-  };
+  # One entry per peer that carries a syncId; addresses derive from the name.
+  remotePeers = lib.filterAttrs (name: peer: name != host && peer ? syncId) globals.hosts;
 
-  remotePeers = lib.filterAttrs (name: _: name != host) allDevices;
-  remotePeerNames = lib.attrNames remotePeers;
+  remoteDevices = lib.mapAttrs (name: peer: {
+    id = peer.syncId;
+    addresses = [
+      "tcp://${name}:22000"
+      "dynamic"
+    ];
+  }) remotePeers;
+
+  remotePeerNames = lib.attrNames remoteDevices;
 in
 {
   services.syncthing = {
@@ -45,7 +39,7 @@ in
       };
 
       # Automatically populate peer devices
-      devices = remotePeers;
+      devices = remoteDevices;
 
       folders = {
         "things" = {

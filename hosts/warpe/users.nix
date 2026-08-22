@@ -1,13 +1,10 @@
 {
   pkgs,
   username,
+  globals,
   ...
 }:
 
-let
-  inherit (import ./variables.nix) gitUsername;
-  inherit (import ../../modules/globals.nix) gram;
-in
 {
   services.userborn.enable = false;
   users = {
@@ -16,7 +13,7 @@ in
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
-        description = gitUsername;
+        description = globals.user.name;
         extraGroups = [
           "wheel"
           "scanner"
@@ -27,7 +24,7 @@ in
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
-          gram.pubkey
+          globals.hosts.gram.pubkey
         ];
       };
     };

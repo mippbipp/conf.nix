@@ -1,12 +1,10 @@
 {
   pkgs,
   username,
+  globals,
   ...
 }:
 
-let
-  inherit (import ./variables.nix) gitUsername;
-in
 {
   services.userborn.enable = false;
   users = {
@@ -15,7 +13,7 @@ in
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
-        description = gitUsername;
+        description = globals.user.name;
         extraGroups = [
           "wheel"
           "scanner"

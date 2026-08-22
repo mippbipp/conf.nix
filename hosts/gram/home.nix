@@ -1,12 +1,6 @@
 _:
-let
-  inherit (import ./variables.nix)
-    gitUsername
-    terminal
-    ;
-in
 {
-  _module.args = { inherit terminal gitUsername; };
+  _module.args.terminal = "ghostty";
   home.stateVersion = "23.11";
   xdg.mimeApps.enable = true;
 

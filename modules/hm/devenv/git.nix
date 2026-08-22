@@ -1,5 +1,5 @@
 {
-  gitUsername,
+  globals,
   host,
   sopsSecrets,
   ...
@@ -18,7 +18,7 @@
       };
       settings = {
         user = {
-          name = gitUsername;
+          name = globals.user.name;
           signingkey = "~/.ssh/${host}_ed25519.pub";
         };
 
@@ -77,7 +77,7 @@
       enable = true;
       hosts = {
         "github.com" = {
-          user = gitUsername;
+          user = globals.user.name;
         };
       };
       settings = {
