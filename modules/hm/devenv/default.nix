@@ -28,7 +28,6 @@
       tokei
       repomix
       (import ./scripts/nrs.nix { inherit pkgs username host; })
-      t3code # see flake.nix
     ]
     ++ llms;
 

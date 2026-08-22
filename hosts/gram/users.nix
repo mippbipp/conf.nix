@@ -41,6 +41,7 @@ in
           discord
           code-cursor
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
+          t3code.desktop # see flake.nix
         ];
         openssh.authorizedKeys.keys = [ ];
       };
