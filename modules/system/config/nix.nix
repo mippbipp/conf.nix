@@ -3,6 +3,9 @@
   nixpkgs.config = {
     allowUnfree = true;
   };
+  environment.sessionVariables = {
+    NIXPKGS_ALLOW_UNFREE = "1"; # for one-off commands like `nix-shell`
+  };
 
   # Optimization settings and garbage collection automation
   nix = {

@@ -1,4 +1,4 @@
-# ADR 0005: t3code remote workspace server, reachable via Tailscale Serve HTTPS
+# ADR 0004: t3code remote workspace server, reachable via Tailscale Serve HTTPS
 {
   pkgs,
   username,

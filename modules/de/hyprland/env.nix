@@ -16,9 +16,8 @@
 
     # nix
     export NIXOS_OZONE_WL=1
-    export NIXPKGS_ALLOW_UNFREE=1
 
-    # display: primary-renderer policy (docs/adr/0004-gram-gpu-policy.md) — no
+    # display: primary-renderer policy (docs/adr/0003-gram-gpu-policy.md) — no
     # session-wide NVIDIA forcing; offload launch vars belong to individual launches.
     # AQ_DRM_DEVICES is colon-separated, first = primary renderer (Hyprland/aquamarine).
     # Vendor-agnostic, so this works on any machine (Intel, AMD, NVIDIA): GPUs owning

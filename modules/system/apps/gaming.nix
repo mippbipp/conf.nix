@@ -8,7 +8,7 @@
     enable = true;
     gamescopeSession = {
       enable = true;
-      # Offload carve-out, ticket #183 / ADR-0004: the gamescope session is an
+      # Offload carve-out, ticket #183 / ADR-0003: the gamescope session is an
       # opt-in gaming session, so the offload triple applies session-wide there.
       env = {
         __NV_PRIME_RENDER_OFFLOAD = "1";
