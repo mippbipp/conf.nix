@@ -28,6 +28,20 @@ _Avoid_: switch to the gpu, gpu switching
 
 `nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. See `modules/hm/devenv/scripts/nrs.nix`.
 
+## Globals
+
+**Globals**:
+The single source for facts that outlive any one module: the user's identity, the fleet's DNS profile, and a Host record per machine (`modules/globals.nix`). Threaded through the flake as module arguments — modules never import it directly.
+_Avoid_: variables, hardcoded values, constants
+
+**Host record**:
+A machine's entry in Globals: the endpoints, keys, and identifiers another machine might need about it (SSH port, LUKS endpoint, public key, sync ID) plus its Role flags. Not the machine's own config, which lives in `hosts/<name>/`.
+_Avoid_: host config, machine settings
+
+**Role flag**:
+A boolean capability on a Host record (exit node, remote builder) that shared modules branch on instead of comparing host names. Where an existing NixOS option already carries the fact (wsl.enable), the option wins.
+_Avoid_: feature flag, per-host toggle
+
 ## Config live-editing
 
 - **out-of-store config**: a config file tracked in this repo that home-manager symlinks into place instead of writing from the store, so edits take effect without a rebuild. Precedent: the nvim submodule, the hyprland Lua root.

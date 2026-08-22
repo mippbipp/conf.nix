@@ -1,3 +1,0 @@
-{
-  gitUsername = "mippbipp";
-}

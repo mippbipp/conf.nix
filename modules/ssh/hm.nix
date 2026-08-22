@@ -2,10 +2,23 @@
   username,
   host,
   lib,
+  globals,
   ...
 }:
 let
-  inherit (import ../globals.nix) pewter;
+  peers = lib.filterAttrs (name: _: name != host) globals.hosts;
+
+  peerEntries = lib.mapAttrs (name: _peer: {
+    hostname = name;
+    user = username;
+  } // lib.optionalAttrs (_peer ? sshPort) { port = _peer.sshPort; }) peers;
+
+  luksEntries = lib.mapAttrs' (name: peer:
+    lib.nameValuePair "${name}-luks" {
+      hostname = peer.luksHostname;
+      user = "root";
+      port = peer.sshPort or 22;
+    }) (lib.filterAttrs (_: peer: peer ? luksHostname) peers);
 in
 {
   programs.ssh = {
@@ -31,24 +44,6 @@ in
         hostname = "github.com";
         user = "git";
       };
-    }
-    // lib.optionalAttrs (host == "gram" || host == "warpe") {
-      "pewter" = {
-        hostname = pewter.name;
-        user = username;
-        port = pewter.sshPort;
-      };
-      "pewter-luks" = {
-        hostname = pewter.luksHostname;
-        user = "root";
-        port = pewter.sshPort;
-      };
-    }
-    // lib.optionalAttrs (host == "gram") {
-      "warpe" = {
-        hostname = "warpe";
-        user = username;
-      };
-    };
+    } // peerEntries // luksEntries;
   };
 }

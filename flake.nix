@@ -86,19 +86,20 @@
       ...
     }@inputs:
     let
+      globals = import ./modules/globals.nix;
       mkHostConfig =
         {
           host,
-          username,
           nixosModules ? [ ],
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
             inherit
               inputs
-              username
               host
+              globals
               ;
+            username = globals.user.name;
           };
           modules = [
             ./hosts/${host}/config.nix
@@ -107,7 +108,7 @@
             nix-index-database.nixosModules.nix-index
             home-manager.nixosModules.home-manager
             (
-              { pkgs, config, ... }:
+              { pkgs, config, username, ... }:
               {
                 home-manager = {
                   extraSpecialArgs = {
@@ -116,6 +117,7 @@
                       username
                       inputs
                       host
+                      globals
                       ;
                     sopsSecrets = config.sops.secrets;
                   };
@@ -158,7 +160,6 @@
       nixosConfigurations = {
         gram = mkHostConfig {
           host = "gram";
-          username = "mippbipp";
           nixosModules = [
             lanzaboote.nixosModules.lanzaboote
             (
@@ -188,33 +189,36 @@
             )
           ];
         };
-        harpe = mkHostConfig rec {
+        harpe = mkHostConfig {
           host = "harpe";
-          username = "mippbipp";
           nixosModules = [
             nixos-wsl.nixosModules.default
-            {
-              system.stateVersion = "24.05";
-              wsl.enable = true;
-              wsl.defaultUser = username;
-            }
+            (
+              { username, ... }:
+              {
+                system.stateVersion = "24.05";
+                wsl.enable = true;
+                wsl.defaultUser = username;
+              }
+            )
           ];
         };
-        warpe = mkHostConfig rec {
+        warpe = mkHostConfig {
           host = "warpe";
-          username = "mippbipp";
           nixosModules = [
             nixos-wsl.nixosModules.default
-            {
-              system.stateVersion = "24.05";
-              wsl.enable = true;
-              wsl.defaultUser = username;
-            }
+            (
+              { username, ... }:
+              {
+                system.stateVersion = "24.05";
+                wsl.enable = true;
+                wsl.defaultUser = username;
+              }
+            )
           ];
         };
         pewter = mkHostConfig {
           host = "pewter";
-          username = "mippbipp";
         };
       };
     };

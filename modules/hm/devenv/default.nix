@@ -4,6 +4,7 @@
   username,
   host,
   lib,
+  globals,
   sopsSecrets,
   ...
 }:
@@ -27,7 +28,9 @@
       go
       tokei
       repomix
-      (import ./scripts/nrs.nix { inherit pkgs username host; })
+      (import ./scripts/nrs.nix {
+        inherit pkgs username host lib globals;
+      })
     ]
     ++ llms;
 

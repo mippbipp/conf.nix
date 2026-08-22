@@ -2,6 +2,7 @@
   inputs,
   pkgs,
   lib,
+  username,
   ...
 }:
 let
@@ -13,6 +14,7 @@ in
       inherit
         pkgs
         herdrPkg
+        username
         ;
     })
   ];

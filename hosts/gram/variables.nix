@@ -1,4 +1,0 @@
-{
-  gitUsername = "mippbipp";
-  terminal = "ghostty";
-}

@@ -1,9 +1,6 @@
 args:
-let
-  inherit (import ./variables.nix) terminal gitUsername;
-in
 {
-  _module.args = { inherit terminal gitUsername; };
+  _module.args.terminal = "ghostty";
   home.stateVersion = "24.05";
 
   imports = [
