@@ -2,11 +2,9 @@
   inputs,
   modulesPath,
   pkgs,
+  globals,
   ...
 }:
-let
-  inherit (import ../../modules/globals.nix) pewter gram;
-in
 {
   # ARM architecture for the Oracle VM.Standard.A1.Flex shape
   nixpkgs.hostPlatform = "aarch64-linux";
@@ -36,7 +34,7 @@ in
       settings.PasswordAuthentication = false;
       openFirewall = true;
       ports = [
-        pewter.sshPort
+        globals.hosts.pewter.sshPort
       ];
     };
   };
@@ -68,10 +66,10 @@ in
         ssh = {
           # Enable root SSH for LUKS unlocking
           enable = true;
-          port = pewter.sshPort;
+          port = globals.hosts.pewter.sshPort;
           hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
           authorizedKeys = [
-            gram.pubkey
+            globals.hosts.gram.pubkey
           ];
         };
       };

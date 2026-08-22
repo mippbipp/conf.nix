@@ -1,6 +1,6 @@
-{ host, ... }:
+{ host, globals, ... }:
 let
-  inherit (import ../../globals.nix) nextdns;
+  inherit (globals) nextdns;
 in
 {
   services.resolved = {

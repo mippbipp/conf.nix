@@ -1,4 +1,6 @@
 {
+  user.name = "mippbipp";
+
   nextdns = rec {
     id = "7b9721";
     DNS = host: [
@@ -9,16 +11,22 @@
     ];
   };
 
+  exitNode = "pewter";
+
   # hosts
-  pewter = {
-    name = "pewter";
-    sshPort = 2222; # set in oracle cloud security list ingress rules
-    luksHostname = "129.146.202.171";
+  hosts = {
+    gram = {
+      pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
+      syncId = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
+    };
+    harpe = { };
+    warpe = { };
+    pewter = {
+      sshPort = 2222; # set in oracle cloud security list ingress rules
+      luksHostname = "129.146.202.171";
+      syncId = "POHLBBF-3AOYWFT-OK46SCB-Z4O4VHV-5NFB5MH-SX2OP5M-GNYZSTT-5VKEPQT";
+      isExitNode = true;
+      remoteBuilds = true;
+    };
   };
-  gram = {
-    name = "gram";
-    pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
-  };
-  harpe.name = "harpe";
-  warpe.name = "warpe";
 }
