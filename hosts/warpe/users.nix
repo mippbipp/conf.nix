@@ -6,6 +6,7 @@
 
 let
   inherit (import ./variables.nix) gitUsername;
+  inherit (import ../../modules/globals.nix) gram;
 in
 {
   services.userborn.enable = false;
@@ -25,7 +26,9 @@ in
         ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
-        openssh.authorizedKeys.keys = [ ];
+        openssh.authorizedKeys.keys = [
+          gram.pubkey
+        ];
       };
     };
   };

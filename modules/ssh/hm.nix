@@ -4,6 +4,9 @@
   lib,
   ...
 }:
+let
+  inherit (import ../globals.nix) pewter;
+in
 {
   programs.ssh = {
     enable = true;
@@ -31,13 +34,14 @@
     }
     // lib.optionalAttrs (host == "gram" || host == "warpe") {
       "pewter" = {
-        hostname = "pewter";
+        hostname = pewter.name;
         user = username;
+        port = pewter.sshPort;
       };
       "pewter-luks" = {
-        hostname = "129.146.202.171";
+        hostname = pewter.luksHostname;
         user = "root";
-        port = 2222;
+        port = pewter.sshPort;
       };
     }
     // lib.optionalAttrs (host == "gram") {

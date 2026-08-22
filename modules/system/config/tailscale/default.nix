@@ -19,7 +19,6 @@
     extraUpFlags = [
       # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
       "--netfilter-mode=nodivert"
-      "--ssh"
       "--advertise-exit-node"
     ];
     # Lets the t3code server (running as $username) configure `tailscale serve`
@@ -29,7 +28,6 @@
     extraUpFlags = [
       # WSL2 has no /dev/net/tun; tailscaled proxies the tunnel in userspace
       "--tun=userspace-networking"
-      "--ssh"
     ];
     extraSetFlags = [ "--exit-node=pewter" ];
   };

@@ -2,6 +2,7 @@
 
 let
   inherit (import ./variables.nix) gitUsername;
+  inherit (import ../../modules/globals.nix) gram;
 in
 {
   services.userborn.enable = false;
@@ -9,7 +10,7 @@ in
     mutableUsers = true;
     users = {
       root.openssh.authorizedKeys.keys = [
-        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram"
+        gram.pubkey
       ];
       "${username}" = {
         homeMode = "755";
@@ -22,7 +23,7 @@ in
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
-          "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram"
+          gram.pubkey
         ];
       };
     };

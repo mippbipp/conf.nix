@@ -1,4 +1,7 @@
-{ host, nextdns-id, ... }:
+{ host, ... }:
+let
+  inherit (import ../../globals.nix) nextdns;
+in
 {
   services.resolved = {
     enable = true;
@@ -7,13 +10,7 @@
         Domains = [
           "~."
         ];
-        DNS = [
-          # nextdns
-          "45.90.28.0#${host}-${nextdns-id}.dns.nextdns.io"
-          "2a07:a8c0::#${host}-${nextdns-id}.dns.nextdns.io"
-          "45.90.30.0#${host}-${nextdns-id}.dns.nextdns.io"
-          "2a07:a8c1::#${host}-${nextdns-id}.dns.nextdns.io"
-        ];
+        DNS = nextdns.DNS host;
         DNSOverTLS = "yes";
       };
     };

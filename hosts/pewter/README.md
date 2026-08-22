@@ -3,6 +3,7 @@
 - set LUKS password in `/tmp/pewter-luks.key`
 - initrd host keys made with `ssh-keygen -t ed25519 -N "" -f /tmp/pewter-extra-files/etc/secrets/initrd/ssh_host_ed25519_key`
 - tailscale authKeyFile: `echo "tskey-auth-..." > /tmp/pewter-extra-files/var/lib/tailscale/authkey`
+- sops age key (see [ADR-0008](../../docs/adr/0008-sops-nixos-module-tmpfs-secrets.md)): `install -Dm400 /tmp/pewter-extra-files/var/lib/sops-nix/keys.txt /var/lib/sops-nix/keys.txt`
 - `chmod 600` above files
 
 - init VM:
