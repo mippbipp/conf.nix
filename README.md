@@ -39,7 +39,6 @@ Shared bootstrap for a new NixOS-WSL guest (used by harpe and warpe).
   * push, replace https remote with ssh remote in git and `.gitmodules`, etc
 * `cd ~/conf.nix && sudo nixos-rebuild boot --flake .#{hostname}`
 * pwsh: `wsl -t NixOS` -> `wsl -d NixOS --user root exit` -> `wsl -t NixOS` -> open WSL
-* launch terminal e.g. ghostty with a windows shortcut: `"C:\Program Files\WSL\wslg.exe" -d NixOS --cd ~ -- ghostty`
 
 ## References & Resources
 
