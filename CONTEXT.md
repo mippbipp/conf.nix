@@ -42,6 +42,28 @@ _Avoid_: host config, machine settings
 A boolean capability on a Host record (exit node, remote builder) that shared modules branch on instead of comparing host names. Where an existing NixOS option already carries the fact (wsl.enable), the option wins.
 _Avoid_: feature flag, per-host toggle
 
+## Flake update pipeline
+
+**Build gate**:
+The required CI check that builds every NixOS host's toplevel before a commit can reach main; the enforcement of "main is always buildable". See ADR 0009.
+_Avoid_: CI (generic), tests
+
+**Updater**:
+The pewter-side automation that bumps flake.lock and maintains the single accumulating update PR.
+_Avoid_: cron job, bot, auto-update
+
+**Deployer**:
+The pewter-side automation that pulls main and switches pewter onto it daily.
+_Avoid_: CD, deployment script
+
+**Health gate**:
+The post-switch probes that decide whether a new generation stays or gets rolled back.
+_Avoid_: smoke test, verification
+
+**Watchdog**:
+The weekly stale-lock alarm that fails loudly when updates stop flowing, catching silent Updater death.
+_Avoid_: dead-man switch, heartbeat
+
 ## Config live-editing
 
 - **out-of-store config**: a config file tracked in this repo that home-manager symlinks into place instead of writing from the store, so edits take effect without a rebuild. Precedent: the nvim submodule, the hyprland Lua root.
