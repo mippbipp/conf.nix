@@ -6,6 +6,5 @@ args: {
     ../../modules/ssh/hm.nix
     ../../modules/theme/hm.nix
     ../../modules/hm/devenv/default.nix
-    ../../modules/hm/apps/zen/default.nix
   ];
 }
