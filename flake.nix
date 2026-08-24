@@ -22,7 +22,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     caelestia-shell = {
-      url = "github:mippbipp/shell/personal";
+      url = "github:mippbipp/shell/nexus-gpu";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     zen-browser = {
@@ -108,7 +108,12 @@
             nix-index-database.nixosModules.nix-index
             home-manager.nixosModules.home-manager
             (
-              { pkgs, config, username, ... }:
+              {
+                pkgs,
+                config,
+                username,
+                ...
+              }:
               {
                 home-manager = {
                   extraSpecialArgs = {
