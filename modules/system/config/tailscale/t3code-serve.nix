@@ -5,6 +5,9 @@
   ...
 }:
 {
+  environment.systemPackages = [
+    pkgs.t3code # see flake.nix
+  ];
   systemd.services.t3code = {
     description = "t3code remote workspace server";
     wantedBy = [ "multi-user.target" ];

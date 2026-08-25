@@ -23,6 +23,9 @@
         ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
+        packages = with pkgs; [
+          t3code.desktop # see flake.nix
+        ];
         openssh.authorizedKeys.keys = [
           globals.hosts.gram.pubkey
         ];
