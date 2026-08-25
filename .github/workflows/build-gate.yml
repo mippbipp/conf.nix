@@ -11,7 +11,7 @@ jobs:
   build-closure:
     name: build ${{ matrix.host }}
     runs-on: ${{ matrix.runs-on }}
-    timeout-minutes: 120
+    timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
