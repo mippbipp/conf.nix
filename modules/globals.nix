@@ -13,14 +13,15 @@
 
   exitNode = "pewter";
 
-  # hosts
   hosts = {
     gram = {
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
       syncId = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
     };
     harpe = { };
-    warpe = { };
+    warpe = {
+      pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJFlGnfX0uWipIXc1rpZap0ZxEdGTi4s+QhxriJ5bBcM mippbipp@warpe";
+    };
     pewter = {
       sshPort = 2222; # set in oracle cloud security list ingress rules
       luksHostname = "129.146.202.171";

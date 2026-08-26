@@ -25,6 +25,7 @@
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
           globals.hosts.gram.pubkey
+          globals.hosts.warpe.pubkey
         ];
       };
     };
