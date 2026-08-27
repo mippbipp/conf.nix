@@ -10,9 +10,6 @@
   users = {
     mutableUsers = true;
     users = {
-      root.openssh.authorizedKeys.keys = [
-        globals.hosts.gram.pubkey
-      ];
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
@@ -25,7 +22,6 @@
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
           globals.hosts.gram.pubkey
-          globals.hosts.warpe.pubkey
         ];
       };
     };

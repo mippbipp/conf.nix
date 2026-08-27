@@ -24,12 +24,13 @@ in
       # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
       "--netfilter-mode=nodivert"
       "--advertise-exit-node"
+      "--ssh"
     ];
     # Lets the t3code server (running as $username) configure `tailscale serve`
     extraSetFlags = [
       "--operator=${username}"
     ]
-    // lib.optionalAttrs (self.isWorkPc or false) [ "--accept-dns=false" ];
+    ++ lib.optional (self.isWorkPc or false) [ "--accept-dns=false" ];
   }
   // lib.optionalAttrs (config.wsl.enable or false) {
     extraUpFlags = [

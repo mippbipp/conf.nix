@@ -8,17 +8,20 @@
 let
   peers = lib.filterAttrs (name: _: name != host) globals.hosts;
 
-  peerEntries = lib.mapAttrs (name: _peer: {
+  peerEntries = lib.mapAttrs (name: _: {
     hostname = name;
     user = username;
-  } // lib.optionalAttrs (_peer ? sshPort) { port = _peer.sshPort; }) peers;
+  }) peers;
 
-  luksEntries = lib.mapAttrs' (name: peer:
+  luksEntries = lib.mapAttrs' (
+    name: peer:
     lib.nameValuePair "${name}-luks" {
       hostname = peer.luksHostname;
       user = "root";
       port = peer.sshPort or 22;
-    }) (lib.filterAttrs (_: peer: peer ? luksHostname) peers);
+      userKnownHostsFile = "~/.ssh/known_hosts.initrd";
+    }
+  ) (lib.filterAttrs (_: peer: peer ? luksHostname) peers);
 in
 {
   programs.ssh = {
@@ -44,6 +47,8 @@ in
         hostname = "github.com";
         user = "git";
       };
-    } // peerEntries // luksEntries;
+    }
+    // peerEntries
+    // luksEntries;
   };
 }

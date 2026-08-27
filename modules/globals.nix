@@ -20,11 +20,10 @@
     };
     harpe = { };
     warpe = {
-      pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJFlGnfX0uWipIXc1rpZap0ZxEdGTi4s+QhxriJ5bBcM mippbipp@warpe";
       isWorkPc = true;
     };
     pewter = {
-      sshPort = 2222; # set in oracle cloud security list ingress rules
+      sshPort = 2222; # set in oracle cloud security list ingress rules, used for luks unlocking
       luksHostname = "129.146.202.171";
       syncId = "POHLBBF-3AOYWFT-OK46SCB-Z4O4VHV-5NFB5MH-SX2OP5M-GNYZSTT-5VKEPQT";
       isExitNode = true;
