@@ -38,7 +38,6 @@
     dig
     openssl
     traceroute
-    waypipe
   ];
 
   services = {

@@ -26,14 +26,16 @@ in
       "--advertise-exit-node"
     ];
     # Lets the t3code server (running as $username) configure `tailscale serve`
-    extraSetFlags = [ "--operator=${username}" ];
+    extraSetFlags = [
+      "--operator=${username}"
+    ]
+    // lib.optionalAttrs (self.isWorkPc or false) [ "--accept-dns=false" ];
   }
   // lib.optionalAttrs (config.wsl.enable or false) {
     extraUpFlags = [
       # WSL2 has no /dev/net/tun; tailscaled proxies the tunnel in userspace
       "--tun=userspace-networking"
     ];
-    extraSetFlags = [ "--exit-node=${globals.exitNode}" ];
   };
 
   networking = {

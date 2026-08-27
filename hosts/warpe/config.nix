@@ -16,11 +16,11 @@
     ./users.nix
     ./work.nix
     ../../modules/system/config/common.nix
-    ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/wsl.nix
+    ../../modules/system/config/tailscale/default.nix
+    ../../modules/system/config/tailscale/split-dns.nix
     ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
-    ../../modules/system/config/resolved.nix
   ];
 }

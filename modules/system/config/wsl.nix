@@ -1,21 +1,13 @@
 # NixOS-WSL specific system config, shared by the WSL hosts.
-{
-  lib,
-  ...
-}:
-{
+_: {
+  wsl.useWindowsDriver = true;
 
-  wsl = {
-    useWindowsDriver = true;
-
-    # Let systemd-resolved DNS here too. With generation on, WSL writes
-    # /etc/resolv.conf pointing at the Windows resolver and nothing ever
-    # queries systemd-resolved's stub.
-    wslConf.network.generateResolvConf = false;
+  # Stop WSL from overwriting /etc/resolv.conf on every boot
+  # systemd-resolved provides better fidelity with custom DNS
+  wsl.wslConf.network.generateResolvConf = false;
+  networking.resolvconf.enable = false;
+  services.resolved = {
+    enable = true;
+    settings.Resolve.FallbackDNS = [ "10.255.255.254" ]; # cat /etc/resolv.conf, default for WSL
   };
-
-  # WSL2 kernel rejects the nft `fib` expression that reverse-path
-  # filtering uses; override the "loose" that nixpkgs' tailscale
-  # module sets for clients
-  networking.firewall.checkReversePath = lib.mkForce false;
 }
