@@ -10,34 +10,36 @@
 }:
 let
   self = globals.hosts.${host} or { };
+  isExitNode = self.isExitNode or false;
+  isWorkPc = self.isWorkPc or false;
 in
 {
-  services.tailscale = {
-    enable = true;
-    disableUpstreamLogging = true; # disables debug logging
-    useRoutingFeatures = "client";
-  }
-  // lib.optionalAttrs (self.isExitNode or false) {
-    useRoutingFeatures = "both";
-    authKeyFile = "/var/lib/tailscale/authkey";
-    extraUpFlags = [
-      # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
-      "--netfilter-mode=nodivert"
-      "--advertise-exit-node"
-      "--ssh"
-    ];
-    # Lets the t3code server (running as $username) configure `tailscale serve`
-    extraSetFlags = [
-      "--operator=${username}"
-    ]
-    ++ lib.optional (self.isWorkPc or false) [ "--accept-dns=false" ];
-  }
-  // lib.optionalAttrs (config.wsl.enable or false) {
-    extraUpFlags = [
-      # WSL2 has no /dev/net/tun; tailscaled proxies the tunnel in userspace
-      "--tun=userspace-networking"
-    ];
-  };
+  services.tailscale = lib.mkMerge [
+    # Base config for every host
+    {
+      enable = true;
+      disableUpstreamLogging = true; # disables debug logging
+      useRoutingFeatures = "client";
+    }
+
+    # Exit-node role
+    (lib.mkIf isExitNode {
+      useRoutingFeatures = lib.mkForce "both";
+      authKeyFile = "/var/lib/tailscale/authkey";
+      extraUpFlags = [
+        # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
+        "--netfilter-mode=nodivert"
+        "--advertise-exit-node"
+        "--ssh"
+      ];
+      # Lets the t3code server (running as $username) configure `tailscale serve`
+      extraSetFlags = [ "--operator=${username}" ];
+    })
+    (lib.mkIf isWorkPc {
+      # Work PC must not accept tailnet DNS (NextDNS is blocked there)
+      extraUpFlags = [ "--accept-dns=false" ];
+    })
+  ];
 
   networking = {
     nftables.enable = lib.mkForce true;
