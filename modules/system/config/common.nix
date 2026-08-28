@@ -43,6 +43,7 @@
   networking = {
     hostName = host;
     nftables.enable = true;
+    firewall.enable = true;
   };
 
   # Security / Polkit

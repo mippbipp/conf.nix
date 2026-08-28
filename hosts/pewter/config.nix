@@ -77,7 +77,6 @@
   };
 
   networking = {
-    firewall.enable = true;
     # Oracle Cloud dynamically assigns the IP/Gateway via DHCP
     useDHCP = true;
     nftables = {
