@@ -1,9 +1,7 @@
-# split DNS between tailscale MagicDNS and computer DNS
+# Per-host split DNS: route MagicDNS domains via Tailscale MagicDNS (100.100.100.100).
 { pkgs, ... }: {
-
-  # Once tailscale0 exists, tell resolved: route *.ts.net to Quad100 only
   systemd.services.tailscale-magicdns-split = {
-    description = "Route *.ts.net queries to Tailscale MagicDNS (Quad100) only";
+    description = "Route MagicDNS domains to Tailscale MagicDNS (Quad100)";
     after = [
       "tailscaled.service"
       "systemd-resolved.service"

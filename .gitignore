@@ -1,1 +1,9 @@
 .qmlls.ini
+
+# OpenTofu local state - never commit, secrets adjacent
+terraform/tailscale/terraform.tfstate
+terraform/tailscale/terraform.tfstate.backup
+terraform/tailscale/.terraform/
+terraform/tailscale/.terraform.lock.hcl
+terraform/tailscale/*.tfvars
+terraform/tailscale/*.tfvars.json

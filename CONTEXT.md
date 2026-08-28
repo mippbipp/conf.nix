@@ -77,3 +77,13 @@ _Avoid_: tunnel, relay
 **Pairing**:
 The one-time token exchange between a client and a t3 server (`t3 pair`); after pairing, access is session-based.
 _Avoid_: login, auth (t3's `t3 auth` manages sessions separately)
+
+## Tailnet
+
+**Control plane**:
+Tailnet-wide settings that live in the Tailscale coordination server, not on any one device: the tailnet policy file (ACLs), DNS globals, and device approvals. Owned by OpenTofu in `terraform/tailscale/`; devices only carry interface flags.
+_Avoid_: server config, backend config
+
+**Tailnet policy file**:
+The single JSON policy that defines `tagOwners`, `autoApprovers`, `grants`, `ssh`, and `nodeAttrs` (including `tailscale.com/app-connectors`). Surfaced in Terraform as `tailscale_acl`. Terraform is source of truth; console edits are overwritten.
+_Avoid_: ACL file, rules file

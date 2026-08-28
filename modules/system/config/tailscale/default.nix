@@ -27,17 +27,19 @@ in
       useRoutingFeatures = lib.mkForce "both";
       authKeyFile = "/var/lib/tailscale/authkey";
       extraUpFlags = [
-        # Prevent Tailscale from injecting silent firewall bypasses, run manually for other nodes
         "--netfilter-mode=nodivert"
         "--advertise-exit-node"
         "--ssh"
       ];
-      # Lets the t3code server (running as $username) configure `tailscale serve`
-      extraSetFlags = [ "--operator=${username}" ];
+      extraSetFlags = [
+        "--operator=${username}"
+      ];
     })
     (lib.mkIf isWorkPc {
-      # Work PC must not accept tailnet DNS (NextDNS is blocked there)
       extraUpFlags = [ "--accept-dns=false" ];
+      extraSetFlags = [
+        "--accept-dns=false"
+      ];
     })
   ];
 

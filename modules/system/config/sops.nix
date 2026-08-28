@@ -19,6 +19,9 @@
     secrets = {
       git_config.owner = username;
       github_token.owner = username;
+      tailscale_tailnet.owner = username;
+      tailscale_oauth_client_id.owner = username;
+      tailscale_oauth_client_secret.owner = username;
     };
   };
 }

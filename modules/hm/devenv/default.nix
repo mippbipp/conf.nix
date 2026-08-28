@@ -28,6 +28,7 @@
       go
       tokei
       repomix
+      opentofu
       (import ./scripts/nrs.nix {
         inherit pkgs username host lib globals;
       })

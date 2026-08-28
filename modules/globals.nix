@@ -11,8 +11,6 @@
     ];
   };
 
-  exitNode = "pewter";
-
   hosts = {
     gram = {
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
