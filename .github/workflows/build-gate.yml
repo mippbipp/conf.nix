@@ -1,0 +1,47 @@
+name: build-gate
+
+on:
+  pull_request:
+
+concurrency:
+  group: build-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-closure:
+    name: build ${{ matrix.host }}
+    runs-on: ${{ matrix.runs-on }}
+    timeout-minutes: 350
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: gram
+            runs-on: ubuntu-latest
+          - host: harpe
+            runs-on: ubuntu-latest
+          - host: warpe
+            runs-on: ubuntu-latest
+          - host: pewter
+            runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Rewrite submodule SSH URLs
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Checkout repo
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/determinate-nix-action@main
+
+      - name: Build system closure
+        env:
+          NIX_CONFIG: |
+            accept-flake-config = true
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            extra-substituters = https://attic.xuyh0120.win/lantian
+            extra-trusted-public-keys = lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc=
+        run: nix build -L ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
