@@ -16,93 +16,23 @@
       environment = [ ];
     };
     settings = {
-      appearance.font = {
-        scale = 0.9;
-        clock = config.stylix.fonts.monospace.name;
-        workspaces = config.stylix.fonts.monospace.name;
-        headline.family = config.stylix.fonts.sansSerif.name;
-        title.family = config.stylix.fonts.sansSerif.name;
-        body.family = config.stylix.fonts.sansSerif.name;
-        label.family = config.stylix.fonts.sansSerif.name;
-        mono.family = config.stylix.fonts.monospace.name;
-      };
-      background = {
-        enabled = true;
-        wallpaperEnabled = true;
-      };
-      bar = {
-        persistent = false;
-        showOnHover = true;
-        workspaces = {
-          occupiedLabel = "󰊠";
-          activeLabel = "󰮯";
-          showWindows = false;
+      appearance = {
+        font = {
+          scale = 0.9;
+          clock = config.stylix.fonts.monospace.name;
+          workspaces = config.stylix.fonts.monospace.name;
+          headline.family = config.stylix.fonts.sansSerif.name;
+          title.family = config.stylix.fonts.sansSerif.name;
+          body.family = config.stylix.fonts.sansSerif.name;
+          label.family = config.stylix.fonts.sansSerif.name;
+          mono.family = config.stylix.fonts.monospace.name;
         };
-        entries = [
-          {
-            id = "logo";
-            enabled = true;
-          }
-          {
-            id = "workspaces";
-            enabled = true;
-          }
-          {
-            id = "spacer";
-            enabled = true;
-          }
-          {
-            id = "activeWindow";
-            enabled = false;
-          }
-          {
-            id = "spacer";
-            enabled = true;
-          }
-          {
-            id = "tray";
-            enabled = true;
-          }
-          {
-            id = "clock";
-            enabled = true;
-          }
-          {
-            id = "statusIcons";
-            enabled = true;
-          }
-          {
-            id = "power";
-            enabled = true;
-          }
-        ];
-        statusIcons = [
-          {
-            id = "lockStatus";
-            enabled = true;
-          }
-          {
-            id = "audio";
-            enabled = true;
-          }
-          {
-            id = "network";
-            enabled = true;
-          }
-          {
-            id = "bluetooth";
-            enabled = true;
-          }
-          {
-            id = "battery";
-            enabled = true;
-          }
-        ];
+        anim.durations.scale = 0.2;
       };
       general = {
+        showOverFullscreen = true;
         apps.terminal = [ terminal ];
         idle = {
-          lockBeforeSleep = true;
           timeouts = [
             {
               timeout = 300;
@@ -120,6 +50,24 @@
           ];
         };
       };
+      bar = {
+        persistent = false;
+        workspaces = {
+          label = "●";
+          occupiedLabel = "󰊠";
+          activeLabel = "󰮯";
+          showWindows = false;
+        };
+      };
+      border = {
+        thickness = 0;
+        rounding = 0;
+        smoothing = 1;
+      };
+      services = {
+        audioIncrement = 0.01;
+        brightnessIncrement = 0.01;
+      };
       session = {
         vimKeybinds = true;
         commands.logout = [
@@ -128,7 +76,6 @@
         ];
       };
       paths.sessionGif = "root:/assets/bongocat.gif";
-      services.audioIncrement = 0.05;
     };
     cli = {
       enable = true;

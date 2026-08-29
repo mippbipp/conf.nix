@@ -1,5 +1,4 @@
-_:
-{
+_: {
   _module.args.terminal = "ghostty";
   home.stateVersion = "23.11";
   xdg.mimeApps.enable = true;
@@ -13,7 +12,6 @@ _:
     ../../modules/hm/apps/ghostty.nix
     ../../modules/hm/apps/winapps/default.nix
     ../../modules/hm/apps/zen/default.nix
-    ../../modules/hm/apps/gimp.nix
     ../../modules/hm/apps/mpv.nix
     ../../modules/ssh/hm.nix
   ];
