@@ -22,6 +22,7 @@
     ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/tailscale/t3code-serve.nix
     ../../modules/system/config/syncthing.nix
+    ../../modules/system/config/attic.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;

@@ -44,6 +44,10 @@ _Avoid_: feature flag, per-host toggle
 
 ## Flake update pipeline
 
+**Attic cache**:
+The persistent Nix binary cache hosted on pewter. GitHub-hosted Build gate runners use it to avoid rebuilding gram's large closure on every run; the cache has public reads and authenticated CI writes.
+_Avoid_: build cache (ambiguous), GitHub cache
+
 **Build gate**:
 The required CI check that builds every NixOS host's toplevel before a commit can reach main; the enforcement of "main is always buildable". See ADR 0009.
 _Avoid_: CI (generic), tests
