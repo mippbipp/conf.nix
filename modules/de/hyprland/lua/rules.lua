@@ -5,30 +5,30 @@ hl.window_rule({
 })
 
 hl.window_rule({
-	name = "ghostty-cursor-workspace1",
+	name = "ide",
 	match = { class = "^(com.mitchellh.ghostty|cursor)$" },
 	workspace = 1,
 })
 hl.window_rule({
-	name = "zen-workspace2",
-	match = { class = "^(zen.*)$" },
+	name = "browsers",
+	match = { class = "^(zen.*|((google\\-)?chrome.*))$" },
 	workspace = 2,
 })
 hl.window_rule({
-	name = "browsers-games-workspace3",
+	name = "games-workspace3",
 	match = {
-		class = "^(((google\\-)?chrome.*)|com.obsproject.Studio|xmcl|steam|net.lutris.Lutris|lunarclient|Lunar\\s+Client.*)$",
+		class = "^(xmcl|steam|net.lutris.Lutris|lunarclient|Lunar\\s+Client.*)$",
 	},
 	workspace = 3,
 })
 hl.window_rule({
-	name = "spotify-workspace4",
-	match = { class = "^([Ss]potify)$" },
+	name = "spotify-discord-workspace4",
+	match = { class = "^([Ss]potify|discord)$" },
 	workspace = 4,
 })
 hl.window_rule({
 	name = "virt-manager-workspace6",
-	match = { class = "^(virt-manager)$" },
+	match = { class = "^(.virt-manager.*)$" },
 	workspace = 6,
 })
 
@@ -39,19 +39,14 @@ hl.window_rule({
 })
 hl.window_rule({
 	name = "zoom",
-	match = { class = "([Zz]oom)" },
+	match = { class = "zoom" },
 	float = true,
 })
 hl.window_rule({
 	name = "xdg-portal",
-	match = { class = "(xdg-desktop-portal-gtk)" },
+	match = { class = "xdg-desktop-portal-gtk" },
 	float = true,
 	size = { "monitor_w * 0.7", "monitor_h * 0.7" },
-})
-hl.window_rule({
-	name = "image-viewer",
-	match = { class = "^(eog|org.gnome.Loupe)$" },
-	float = true,
 })
 hl.window_rule({
 	name = "files",
@@ -83,23 +78,6 @@ hl.window_rule({
 	match = { class = "^(nm-applet|nm-connection-editor|.blueman-manager-wrapped)$" },
 	float = true,
 	size = { "monitor_w * 0.7", "monitor_h * 0.7" },
-})
-hl.window_rule({
-	name = "system-monitor",
-	match = { class = "^(gnome-system-monitor|org.gnome.SystemMonitor|io.missioncenter.MissionCenter)$" },
-	float = true,
-	size = { "monitor_w * 0.7", "monitor_h * 0.7" },
-})
-hl.window_rule({
-	name = "kvantum-manager",
-	match = { title = "(Kvantum Manager)" },
-	float = true,
-	size = { "monitor_w * 0.6", "monitor_h * 0.7" },
-})
-hl.window_rule({
-	name = "qalculate",
-	match = { class = "^([Qq]alculate-gtk)$" },
-	float = true,
 })
 hl.window_rule({
 	name = "pip",

@@ -13,6 +13,7 @@ _: {
     ../../modules/hm/apps/winapps/default.nix
     ../../modules/hm/apps/zen/default.nix
     ../../modules/hm/apps/mpv.nix
+    ../../modules/hm/apps/discord.nix
     ../../modules/ssh/hm.nix
   ];
 }
