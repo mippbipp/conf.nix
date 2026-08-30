@@ -56,15 +56,31 @@ journalctl -u atticd -u nginx --since today
 curl -fsS https://cache.mippbipp.com/nix-cache-info
 ```
 
-Create the public cache once, using the Attic administration wrapper installed
-by the NixOS module. Choose a stable cache name and record its public signing
-key for future `nix.settings` configuration:
+Create an administrator token with the wrapper installed by the NixOS module.
+The `attic` client, rather than `atticd-atticadm`, creates and inspects caches:
 
 ```bash
-sudo atticd-atticadm cache create fleet --public
-sudo atticd-atticadm cache info fleet
+token=$(sudo atticd-atticadm make-token \
+  --sub admin \
+  --validity '1 year' \
+  --create-cache fleet \
+  --pull fleet \
+  --push fleet)
+attic login cache https://cache.mippbipp.com "$token"
+attic cache create cache:fleet --public
+attic cache info cache:fleet
+unset token
 ```
+
+Record the cache public key from `attic cache info`. It is safe to commit the
+public key to the Build gate configuration; cache tokens remain secret.
 
 The CI write token and Build gate integration belong to issue #202. Keep the
 Attic JWT secret, cache write token, and signing private material out of git
 and out of command output.
+
+Attic uses PostgreSQL for its metadata database. The initial PostgreSQL
+deployment uses `/var/lib/atticd/storage-postgresql`, leaving the original
+SQLite-backed `/var/lib/atticd/storage` untouched until the migration has been
+verified. Recreate or inspect the `fleet` cache after this transition and
+update the Build gate's public cache key if Attic reports a new one.

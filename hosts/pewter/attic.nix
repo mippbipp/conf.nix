@@ -14,9 +14,10 @@
       listen = "127.0.0.1:8080";
       allowed-hosts = [ "cache.mippbipp.com" ];
       api-endpoint = "https://cache.mippbipp.com/";
+      database.url = "postgresql://atticd@localhost/atticd?host=/run/postgresql";
       storage = {
         type = "local";
-        path = "/var/lib/atticd/storage";
+        path = "/var/lib/atticd/storage-postgresql";
       };
       garbage-collection = {
         interval = "12 hours";
@@ -25,7 +26,20 @@
     };
   };
 
-  environment.systemPackages = [ pkgs.attic-client ];
+  environment.systemPackages = with pkgs; [
+    attic-client
+    nginx
+  ];
+  services.postgresql = {
+    enable = true;
+    ensureDatabases = [ "atticd" ];
+    ensureUsers = [
+      {
+        name = "atticd";
+        ensureDBOwnership = true;
+      }
+    ];
+  };
 
   security.acme = {
     acceptTerms = true;
@@ -38,6 +52,7 @@
     virtualHosts."cache.mippbipp.com" = {
       enableACME = true;
       forceSSL = true;
+      extraConfig = "client_max_body_size 0;";
       locations."/".proxyPass = "http://127.0.0.1:8080";
     };
   };
