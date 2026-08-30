@@ -3,7 +3,7 @@
 The old `update-flake-lock` workflow opened a PR and enabled auto-merge unconditionally, so an eval-broken lock bump could land on main overnight. We replace it with a split pipeline whose invariant is: **main is always buildable for every NixOS host** (gram, harpe, warpe, pewter).
 
 - **Updater** (systemd timer on pewter): rebases its clone on origin/main, runs `nix flake update`, exits cleanly when the lock didn't change, otherwise force-pushes the stable `flake-update` branch and creates-or-updates the single accumulating PR.
-- **Build gate** (GitHub Actions, free runners — the repo is public): one job per host builds `nixosConfigurations.<host>.config.system.build.toplevel`; gram/harpe/warpe on x86_64 runners, pewter on `ubuntu-24.04-arm`. These checks are required for merge.
+- **Build gate** (GitHub Actions, free runners — the repo is public): one job per host builds `nixosConfigurations.<host>.config.system.build.toplevel`; gram/harpe/warpe on x86_64 runners, pewter on `ubuntu-24.04-arm`. These checks are required for merge and use the public fleet Attic cache for substitution.
 - **Merge**: GitHub auto-merge fires only once the gate is green; failed days just leave the PR red until a later bump goes green.
 - **Deployer** (systemd timer on pewter): pulls main, `nixos-rebuild switch` (a no-op when nothing changed), then a health gate probes tailscale, t3code, and sshd; on failure it rolls back to the previous generation and comments on the just-merged PR so default GitHub notifications surface it.
 - **Watchdog** (weekly Actions job): fails — and therefore emails — if the last committed lock update is older than ~7 days, covering silent Updater death (expired credentials, dead timer) where no other channel fires.

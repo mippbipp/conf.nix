@@ -29,8 +29,9 @@
       tokei
       repomix
       opentofu
+      attic-client
       (import ./scripts/nrs.nix {
-        inherit pkgs username host lib globals;
+        inherit pkgs username host lib globals sopsSecrets;
       })
     ]
     ++ llms;

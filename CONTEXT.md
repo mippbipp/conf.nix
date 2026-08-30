@@ -26,7 +26,7 @@ _Avoid_: switch to the gpu, gpu switching
 
 ## Build
 
-`nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. See `modules/hm/devenv/scripts/nrs.nix`.
+`nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. It substitutes from the fleet Attic cache; `nrs --push` explicitly publishes the resulting closure. See `modules/hm/devenv/scripts/nrs.nix`.
 
 ## Globals
 
@@ -44,9 +44,16 @@ _Avoid_: feature flag, per-host toggle
 
 ## Flake update pipeline
 
+**Attic cache**:
+The persistent Nix binary cache hosted on pewter at `https://cache.mippbipp.com/fleet`. All NixOS hosts use it for substitution; GitHub-hosted Build gate runners and explicit local `nrs --push` runs publish authenticated closures.
+_Avoid_: build cache (ambiguous), GitHub cache
+
 **Build gate**:
 The required CI check that builds every NixOS host's toplevel before a commit can reach main; the enforcement of "main is always buildable". See ADR 0009.
 _Avoid_: CI (generic), tests
+
+The `main` branch ruleset requires `build gram`, `build harpe`, `build pewter`,
+and `build warpe` to pass before a pull request can merge.
 
 **Updater**:
 The pewter-side automation that bumps flake.lock and maintains the single accumulating update PR.
