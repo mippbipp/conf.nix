@@ -107,12 +107,20 @@ _Avoid_: tunnel, relay
 The one-time token exchange between a client and a t3 server (`t3 pair`); after pairing, access is session-based.
 _Avoid_: login, auth (t3's `t3 auth` manages sessions separately)
 
-## Tailnet
+## Control plane
 
 **Control plane**:
-Tailnet-wide settings that live in the Tailscale coordination server, not on any one device: the tailnet policy file (ACLs), DNS globals, and device approvals. Owned by OpenTofu in `terraform/tailscale/`; devices only carry interface flags.
-_Avoid_: server config, backend config
+Externally owned coordination state that outlives any one device: the tailnet policy and DNS, the Cloudflare zone for `mippbipp.com`, and OpenTofu's migration target for pewter's OCI network/compute/budgets. Each provider has its own local state; devices only carry interface flags.
+_Avoid_: server config, backend config, terraform config (too generic)
 
 **Tailnet policy file**:
 The single JSON policy that defines `tagOwners`, `autoApprovers`, `grants`, `ssh`, and `nodeAttrs` (including `tailscale.com/app-connectors`). Surfaced in Terraform as `tailscale_acl`. Terraform is source of truth; console edits are overwritten.
 _Avoid_: ACL file, rules file
+
+**Cloudflare zone**:
+The DNS zone for `mippbipp.com` that fronts `cache.mippbipp.com` (pewter attic). Owned by OpenTofu in `terraform/cloudflare/`; `cache` is `DNS-only` for `nginx` Let's Encrypt today, future subdomains may be proxied.
+_Avoid_: domain config, DNS config
+
+**External infra**:
+The root-tenancy VCN/security lists/instance/budgets backing pewter. The OpenTofu stack is `terraform/oci/`; until its imports are applied, the existing resources remain manually provisioned. The NixOS device config lives in `hosts/pewter/` and is not managed by tofu.
+_Avoid_: cloud config, oracle config, server infra

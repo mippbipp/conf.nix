@@ -31,15 +31,3 @@ tofu -chdir=terraform/tailscale import tailscale_dns_configuration.global dns_co
 tofu -chdir=terraform/tailscale plan
 tofu -chdir=terraform/tailscale apply
 ```
-
-After `apply`, `https://login.tailscale.com/admin/machines` -> `pewter` -> approve `tag:opencode-connector` if prompted, `Disable key expiry`.
-
-## 5. Verify
-
-```bash
-# check routes
-tailscale appc-routes
-curl -v https://api.opencode.ai
-```
-
-Add domains in `main.tf:nodeAttrs` `domains` then `tofu apply`. Do not edit in console — overwritten.

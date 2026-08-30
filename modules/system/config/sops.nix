@@ -24,6 +24,14 @@
       tailscale_oauth_client_secret.owner = username;
       attic_jwt_secret.owner = "root";
       attic_cache_token.owner = username;
+      cloudflare_api_token.owner = username;
+      cloudflare_account_id.owner = username;
+      oci_tenancy_id.owner = username;
+      oci_user_ocid.owner = username;
+      oci_fingerprint.owner = username;
+      oci_private_key.owner = username;
+      oci_region.owner = username;
+      oci_budget_alert_email.owner = username;
     };
   };
 }
