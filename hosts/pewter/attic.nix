@@ -25,7 +25,10 @@
     };
   };
 
-  environment.systemPackages = [ pkgs.attic-client ];
+  environment.systemPackages = with pkgs; [
+    attic-client
+    nginx
+  ];
 
   security.acme = {
     acceptTerms = true;
