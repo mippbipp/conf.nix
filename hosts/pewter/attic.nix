@@ -14,9 +14,10 @@
       listen = "127.0.0.1:8080";
       allowed-hosts = [ "cache.mippbipp.com" ];
       api-endpoint = "https://cache.mippbipp.com/";
+      database.url = "postgresql:///atticd?host=/run/postgresql";
       storage = {
         type = "local";
-        path = "/var/lib/atticd/storage";
+        path = "/var/lib/atticd/storage-postgresql";
       };
       garbage-collection = {
         interval = "12 hours";
@@ -29,6 +30,16 @@
     attic-client
     nginx
   ];
+  services.postgresql = {
+    enable = true;
+    ensureDatabases = [ "atticd" ];
+    ensureUsers = [
+      {
+        name = "atticd";
+        ensureDBOwnership = true;
+      }
+    ];
+  };
 
   security.acme = {
     acceptTerms = true;

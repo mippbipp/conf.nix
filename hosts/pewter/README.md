@@ -78,3 +78,9 @@ public key to the Build gate configuration; cache tokens remain secret.
 The CI write token and Build gate integration belong to issue #202. Keep the
 Attic JWT secret, cache write token, and signing private material out of git
 and out of command output.
+
+Attic uses PostgreSQL for its metadata database. The initial PostgreSQL
+deployment uses `/var/lib/atticd/storage-postgresql`, leaving the original
+SQLite-backed `/var/lib/atticd/storage` untouched until the migration has been
+verified. Recreate or inspect the `fleet` cache after this transition and
+update the Build gate's public cache key if Attic reports a new one.
