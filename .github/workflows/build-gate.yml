@@ -37,11 +37,22 @@ jobs:
       - name: Install Nix
         uses: DeterminateSystems/determinate-nix-action@main
 
+      - name: Install Attic client
+        run: nix profile install nixpkgs#attic-client
+
       - name: Build system closure
         env:
           NIX_CONFIG: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-            extra-substituters = https://attic.xuyh0120.win/lantian
-            extra-trusted-public-keys = lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc=
+            extra-substituters = https://cache.mippbipp.com/fleet https://attic.xuyh0120.win/lantian
+            extra-trusted-public-keys = fleet:5/994AcGRD2WEkNnr2P0xqe7aks+ck9IB1B98e+4jgY= lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc=
         run: nix build -L ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
+
+      - name: Push closure to Attic
+        if: github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          ATTIC_CACHE_TOKEN: ${{ secrets.ATTIC_CACHE_TOKEN }}
+        run: |
+          attic login cache https://cache.mippbipp.com "$ATTIC_CACHE_TOKEN"
+          attic push cache:fleet result
