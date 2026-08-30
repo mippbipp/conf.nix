@@ -52,6 +52,9 @@ _Avoid_: build cache (ambiguous), GitHub cache
 The required CI check that builds every NixOS host's toplevel before a commit can reach main; the enforcement of "main is always buildable". See ADR 0009.
 _Avoid_: CI (generic), tests
 
+The `main` branch ruleset requires `build gram`, `build harpe`, `build pewter`,
+and `build warpe` to pass before a pull request can merge.
+
 **Updater**:
 The pewter-side automation that bumps flake.lock and maintains the single accumulating update PR.
 _Avoid_: cron job, bot, auto-update
