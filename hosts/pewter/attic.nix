@@ -14,7 +14,7 @@
       listen = "127.0.0.1:8080";
       allowed-hosts = [ "cache.mippbipp.com" ];
       api-endpoint = "https://cache.mippbipp.com/";
-      database.url = "postgresql://atticd@/atticd?host=/run/postgresql";
+      database.url = "postgresql://atticd@localhost/atticd?host=/run/postgresql";
       storage = {
         type = "local";
         path = "/var/lib/atticd/storage-postgresql";
