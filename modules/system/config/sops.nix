@@ -22,6 +22,7 @@
       tailscale_tailnet.owner = username;
       tailscale_oauth_client_id.owner = username;
       tailscale_oauth_client_secret.owner = username;
+      attic_jwt_secret.owner = "root";
     };
   };
 }
