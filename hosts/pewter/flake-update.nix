@@ -26,7 +26,8 @@ let
           esac
       done
 
-      export GH_TOKEN="$(< ${config.sops.secrets.github_token.path})"
+      github_token="$(< ${config.sops.secrets.github_token.path})"
+      export GH_TOKEN="$github_token"
       export GH_REPO="''${GH_REPO:-${repo}}"
       gh auth setup-git --hostname github.com
       mkdir -p "$repo_dir"
@@ -83,7 +84,8 @@ let
     text = ''
       repo_dir="/var/lib/flake-deployer"
       if [ "''${1:-}" = "--repo-dir" ]; then repo_dir="$2"; fi
-      export GH_TOKEN="$(< ${config.sops.secrets.github_token.path})"
+      github_token="$(< ${config.sops.secrets.github_token.path})"
+      export GH_TOKEN="$github_token"
       export GH_REPO="''${GH_REPO:-${repo}}"
       mkdir -p "$repo_dir"
       if [ ! -d "$repo_dir/.git" ]; then
@@ -122,7 +124,7 @@ let
           pr="$(gh api "repos/$GH_REPO/commits/$commit/pulls" --jq '.[0].number // empty' || true)"
           if [ -n "$pr" ]; then
               marker='<!-- deployer-health-gate -->'
-              body="$marker"$'\n'Deployer health gate failed on pewter at "$(date -u +%Y-%m-%dT%H:%M:%SZ)". Rolled back to the previous generation.$'\n\n'"Failed probes: tailscale=$tailscale_state, t3code=$t3code_state, sshd=$sshd_state"
+              body="$(printf '%s\n%s\n\n%s' "$marker" "Deployer health gate failed on pewter at $(date -u +%Y-%m-%dT%H:%M:%SZ). Rolled back to the previous generation." "Failed probes: tailscale=$tailscale_state, t3code=$t3code_state, sshd=$sshd_state")"
               comment="$(gh api "repos/$GH_REPO/issues/$pr/comments" --paginate --jq '.[] | select(.body | startswith("<!-- deployer-health-gate -->")) | .id' | head -n1)"
               if [ -n "$comment" ]; then
                   gh api --method PATCH "repos/$GH_REPO/issues/comments/$comment" -f body="$body" >/dev/null
