@@ -97,6 +97,7 @@ let
           git clone "https://github.com/$GH_REPO.git" "$repo_dir"
       fi
       cd "$repo_dir"
+      git config --local url."https://github.com/".insteadOf "git@github.com:"
       git fetch --prune origin main
       git checkout -B main origin/main
       git submodule update --init --recursive
