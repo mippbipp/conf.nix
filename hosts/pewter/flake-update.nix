@@ -29,8 +29,10 @@ let
       github_token="$(< ${config.sops.secrets.github_token.path})"
       export GH_TOKEN="$github_token"
       export GH_REPO="''${GH_REPO:-${repo}}"
-      gh auth setup-git --hostname github.com
       mkdir -p "$repo_dir"
+      # Keep gh's push credential helper out of the Home Manager-managed config.
+      export GIT_CONFIG_GLOBAL="$repo_dir/gitconfig"
+      gh auth setup-git --hostname github.com
       if [ ! -d "$repo_dir/.git" ]; then
           git clone "https://github.com/$GH_REPO.git" "$repo_dir"
       fi
