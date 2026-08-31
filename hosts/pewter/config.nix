@@ -23,6 +23,7 @@
     ../../modules/system/config/tailscale/t3code-serve.nix
     ../../modules/system/config/syncthing.nix
     ./attic.nix
+    ./flake-update.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;

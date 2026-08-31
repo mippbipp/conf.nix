@@ -1,0 +1,25 @@
+name: update-watchdog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+
+jobs:
+  stale-lock:
+    name: recent flake update
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Fail when updates are stale
+        run: |
+          updated="$(git log -1 --format=%ct -- flake.lock)"
+          now="$(date +%s)"
+          age=$((now - updated))
+          if [ "$age" -gt $((7 * 24 * 60 * 60)) ]; then
+              echo "flake.lock has not changed in $((age / 86400)) days" >&2
+              exit 1
+          fi
+          echo "flake.lock updated $((age / 86400)) days ago"
