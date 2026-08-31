@@ -27,5 +27,6 @@
       isExitNode = true;
       remoteBuilds = true;
     };
+    brick.syncId = "4Q75UQR-3BKJV5G-5DBCANF-FG5OUML-PMWS5XB-LUW2CSK-7RQX6AL-Y7KR4AI";
   };
 }

@@ -143,6 +143,12 @@ _Avoid_: magic dns (generic), quad100
 The `override_local_dns` flag in `tailscale_dns_configuration` (`terraform/tailscale/main.tf:49`). When true, clients that accept DNS replace their local resolver for `~.` with the tailnet global. Required for iOS per ADR 0005 — without it iOS falls back to its local resolver and gets `NXDOMAIN` for `pewter.<tailnet>.ts.net`. `warpe` opts out (`--accept-dns=false`) because company WiFi blocks NextDNS even over DoH.
 _Avoid_: override dns
 
+## Things sync
+
+**things folder**:
+The `~/things` directory on gram and pewter synced via Syncthing (`sendreceive`, tailnet-only); the single source of truth for personal documents. See ADR 0014.
+_Avoid_: synced folder, shared folder
+
 ## Control plane
 
 **Control plane**:

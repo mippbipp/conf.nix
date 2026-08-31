@@ -47,6 +47,13 @@ in
           devices = remotePeerNames;
           type = "sendreceive";
           ignorePerms = true; # Prevents Linux/NTFS/metadata permission loops
+          versioning = {
+            type = "staggered";
+            params = {
+              cleanInterval = "3600";
+              maxAge = "2592000"; # 30 days in seconds
+            };
+          };
         };
       };
     };

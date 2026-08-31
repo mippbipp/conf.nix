@@ -23,7 +23,7 @@
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix
     ../../modules/system/apps/obs.nix
-    ../../modules/system/apps/libreoffice.nix
+    ../../modules/system/apps/onlyoffice.nix
     ../../modules/system/apps/gaming.nix
     ../../modules/de/audio.nix
     ../../modules/de/hyprland/system.nix
