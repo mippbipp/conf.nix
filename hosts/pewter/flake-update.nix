@@ -40,7 +40,7 @@ let
       git -C "$repo_dir" config user.email "mippbipp@users.noreply.github.com"
 
       cd "$repo_dir"
-      git fetch --prune origin main
+      git -c fetch.recurseSubmodules=false fetch --prune origin main
       git checkout -B flake-update origin/main
       git reset --hard origin/main
       git fetch origin flake-update 2>/dev/null || true
@@ -99,7 +99,7 @@ let
       fi
       cd "$repo_dir"
       git config --local url."https://github.com/".insteadOf "git@github.com:"
-      git fetch --prune origin main
+      git -c fetch.recurseSubmodules=false fetch --prune origin main
       git checkout -B main origin/main
       git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
 
