@@ -14,6 +14,10 @@ Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
+When adding a host, read `docs/agents/adding-a-host.md` first. It lists the
+required declaration, Build gate, GitHub ruleset, documentation, and
+conditional infrastructure surfaces.
+
 ## Encrypted secrets
 
 Before editing `secrets.yaml`, set `SOPS_AGE_KEY_FILE=<filepath from modules/system/config/sops.nix>` in the command environment. Verify the encrypted diff afterward and keep decrypted values out of command output.
