@@ -107,6 +107,24 @@ _Avoid_: tunnel, relay
 The one-time token exchange between a client and a t3 server (`t3 pair`); after pairing, access is session-based.
 _Avoid_: login, auth (t3's `t3 auth` manages sessions separately)
 
+## DNS layering
+
+**Host-local resolver**:
+`systemd-resolved` on a NixOS host (`modules/system/config/resolved.nix`) that forwards `~.` via strict `DNSOverTLS=yes` to the shared NextDNS profile `7b9721` with per-host SNI `${host}-7b9721.dns.nextdns.io` (`modules/globals.nix:4`). Survives `tailscaled` being down; only live when `wsl.wslConf.network.generateResolvConf=false` on WSL. Not the same as the tailnet global.
+_Avoid_: local dns, system dns
+
+**Tailnet global nameserver**:
+The `tailscale_dns_configuration.global` (`terraform/tailscale/main.tf:47`) nameservers + `override_local_dns`. Pushed by the coordination server to every tailnet client that accepts DNS (`--accept-dns`). For NextDNS, the only correct transport is DNS-over-HTTPS: the sentinel address is the profile's linked IPv6 (`2a07:a8c0::7b:9721` for `7b9721`) and the Tailnet policy file `nodeAttrs` maps `nextdns:7b9721` to that profile. Bare `45.90.28.0` without the attr is plaintext UDP 53 and is blocked on most networks.
+_Avoid_: global dns, tailnet dns
+
+**MagicDNS**:
+Tailscale's `100.100.100.100` that answers `*.ts.net` / the tailnet's `MagicDNSSuffix`. On `gram`/`pewter` it is wired automatically by `tailscaled`'s `systemd-resolved` integration when `magic_dns=true`; on `warpe` (which sets `isWorkPc -> --accept-dns=false` in `modules/system/config/tailscale/default.nix:38`) it is wired explicitly by `modules/system/config/tailscale/split-dns.nix:21` `resolvectl domain tailscale0 "~ts.net"` + `default-route false` so only `ts.net` goes via the tunnel.
+_Avoid_: magic dns (generic), quad100
+
+**Override local DNS**:
+The `override_local_dns` flag in `tailscale_dns_configuration` (`terraform/tailscale/main.tf:49`). When true, clients that accept DNS replace their local resolver for `~.` with the tailnet global. Required for iOS per ADR 0005 — without it iOS falls back to its local resolver and gets `NXDOMAIN` for `pewter.<tailnet>.ts.net`. `warpe` opts out (`--accept-dns=false`) because company WiFi blocks NextDNS even over DoH.
+_Avoid_: override dns
+
 ## Control plane
 
 **Control plane**:
@@ -114,7 +132,7 @@ Externally owned coordination state that outlives any one device: the tailnet po
 _Avoid_: server config, backend config, terraform config (too generic)
 
 **Tailnet policy file**:
-The single JSON policy that defines `tagOwners`, `autoApprovers`, `grants`, `ssh`, and `nodeAttrs` (including `tailscale.com/app-connectors`). Surfaced in Terraform as `tailscale_acl`. Terraform is source of truth; console edits are overwritten.
+The single JSON policy that defines `tagOwners`, `autoApprovers`, `grants`, `ssh`, and `nodeAttrs` (including `tailscale.com/app-connectors` and `nextdns:<profile>` / `nextdns:no-device-info`). Surfaced in Terraform as `tailscale_acl`. Terraform is source of truth; console edits are overwritten.
 _Avoid_: ACL file, rules file
 
 **Cloudflare zone**:

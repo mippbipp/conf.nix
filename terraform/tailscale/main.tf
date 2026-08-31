@@ -37,31 +37,19 @@ resource "tailscale_acl" "main" {
     nodeAttrs = [
       {
         target = ["*"]
-        attr   = ["nextdns:no-device-info"] # hide device names from NextDNS logs (optional)
+        attr   = ["nextdns:7b9721", "nextdns:no-device-info"] # profile 7b9721 via DoH + hide device names
       },
     ]
   })
 }
 
-# Tailnet DNS — NextDNS globals (ADR-0005/0006). API has no NextDNS ID field; ID 7b9721 expands to 4 IPs below.
+# Tailnet DNS — NextDNS globals (ADR-0005/0006/0012). Profile 7b9721 via DoH (443/TCP) — sentinel is profile-linked IPv6.
+# Tailscale maps the sentinel + nodeAttrs nextdns:7b9721 to DoH https://dns.nextdns.io/7b9721; plaintext 45.90.28.0 is blocked everywhere.
 resource "tailscale_dns_configuration" "global" {
   magic_dns          = true
-  override_local_dns = true # force Globals over local resolvers
-  # keep Globals when exit node selected
+  override_local_dns = true
   nameservers {
-    address            = "45.90.28.0"
-    use_with_exit_node = true
-  }
-  nameservers {
-    address            = "45.90.30.0"
-    use_with_exit_node = true
-  }
-  nameservers {
-    address            = "2a07:a8c0::"
-    use_with_exit_node = true
-  }
-  nameservers {
-    address            = "2a07:a8c1::"
+    address            = "2a07:a8c0::7b:9721" # NextDNS profile 7b9721 linked IPv6
     use_with_exit_node = true
   }
 }
