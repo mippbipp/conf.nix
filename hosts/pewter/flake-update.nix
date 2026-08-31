@@ -83,7 +83,6 @@ let
       git
       gh
       nixos-rebuild
-      sudo
       tailscale
       systemd
     ];
@@ -119,8 +118,8 @@ let
       done
 
       previous="$(readlink -f /run/current-system)"
-      if ! sudo nixos-rebuild switch --flake ".?submodules=1#pewter"; then
-          sudo "$previous/bin/switch-to-configuration" switch || true
+      if ! /run/wrappers/bin/sudo nixos-rebuild switch --flake ".?submodules=1#pewter"; then
+          /run/wrappers/bin/sudo "$previous/bin/switch-to-configuration" switch || true
           exit 1
       fi
 
@@ -133,7 +132,7 @@ let
       [ "$t3code_state" = active ] || health_failed=true
       [ "$sshd_state" = active ] || health_failed=true
       if [ "$health_failed" = true ]; then
-          sudo "$previous/bin/switch-to-configuration" switch || true
+          /run/wrappers/bin/sudo "$previous/bin/switch-to-configuration" switch || true
           if [ -n "$pr" ]; then
               marker='<!-- deployer-health-gate -->'
               body="$(printf '%s\n%s\n\n%s' "$marker" "Deployer health gate failed on pewter at $(date -u +%Y-%m-%dT%H:%M:%SZ). Rolled back to the previous generation." "Failed probes: tailscale=$tailscale_state, t3code=$t3code_state, sshd=$sshd_state")"
