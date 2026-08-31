@@ -100,7 +100,7 @@ let
       git config --local url."https://github.com/".insteadOf "git@github.com:"
       git fetch --prune origin main
       git checkout -B main origin/main
-      git -c url."https://github.com/".insteadOf="git@github.com:" submodule update --init --recursive
+      git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
 
       commit="$(git rev-parse HEAD)"
       pr="$(gh api "repos/$GH_REPO/commits/$commit/pulls" --jq '.[0].number // empty' || true)"
