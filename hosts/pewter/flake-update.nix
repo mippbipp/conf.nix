@@ -100,11 +100,17 @@ let
       git config --local url."https://github.com/".insteadOf "git@github.com:"
       git fetch --prune origin main
       git checkout -B main origin/main
-      git submodule update --init --recursive
+      git -c url."https://github.com/".insteadOf="git@github.com:" submodule update --init --recursive
 
       commit="$(git rev-parse HEAD)"
+      pr="$(gh api "repos/$GH_REPO/commits/$commit/pulls" --jq '.[0].number // empty' || true)"
+      if [ -z "$pr" ]; then
+          echo "main commit has no associated merged PR: $commit" >&2
+          exit 1
+      fi
+      check_commit="$(gh pr view "$pr" --repo "$GH_REPO" --json headRefOid --jq '.headRefOid')"
       for check in "build gram" "build harpe" "build warpe" "build pewter"; do
-          conclusion="$(gh api "repos/$GH_REPO/commits/$commit/check-runs" --jq "[.check_runs[] | select(.name == \"$check\")][0].conclusion // empty" || true)"
+          conclusion="$(gh api "repos/$GH_REPO/commits/$check_commit/check-runs" --jq "[.check_runs[] | select(.name == \"$check\")][0].conclusion // empty" || true)"
           if [ "$conclusion" != success ]; then
               echo "required Build gate check is not successful: $check ($conclusion)" >&2
               exit 1
@@ -127,7 +133,6 @@ let
       [ "$sshd_state" = active ] || health_failed=true
       if [ "$health_failed" = true ]; then
           sudo "$previous/bin/switch-to-configuration" switch || true
-          pr="$(gh api "repos/$GH_REPO/commits/$commit/pulls" --jq '.[0].number // empty' || true)"
           if [ -n "$pr" ]; then
               marker='<!-- deployer-health-gate -->'
               body="$(printf '%s\n%s\n\n%s' "$marker" "Deployer health gate failed on pewter at $(date -u +%Y-%m-%dT%H:%M:%SZ). Rolled back to the previous generation." "Failed probes: tailscale=$tailscale_state, t3code=$t3code_state, sshd=$sshd_state")"
