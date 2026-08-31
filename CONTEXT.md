@@ -24,6 +24,24 @@ _Avoid_: dedicated gpu, nvidia gpu
 Starting an app with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` so it renders on the dGPU while the session stays on the iGPU.
 _Avoid_: switch to the gpu, gpu switching
 
+## Isolation tiers (gram)
+
+**Kept VM**:
+A libvirtd-managed VM with persistent state and a virt-manager entry; survives reboots and supports snapshots/clones.
+_Avoid_: persistent vm, managed vm
+
+**Throwaway VM**:
+A per-user quickemu VM whose lifetime is the directory it lives in; removing the directory removes the VM.
+_Avoid_: ephemeral vm, quickemu vm
+
+**Isolated network**:
+A libvirt `sandbox` network with no `<forward>` element; guests on it cannot reach the host LAN or tailnet.
+_Avoid_: sandbox network, disconnected network
+
+**Container**:
+A podman/distrobox workload sharing the host kernel; for trusted code where kernel sharing is acceptable.
+_Avoid_: docker container, toolbox
+
 ## Build
 
 `nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. It substitutes from the fleet Attic cache; `nrs --push` explicitly publishes the resulting closure. See `modules/hm/devenv/scripts/nrs.nix`.
