@@ -83,6 +83,7 @@ let
       git
       gh
       nixos-rebuild
+      sudo
       tailscale
       systemd
     ];
