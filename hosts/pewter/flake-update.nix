@@ -42,6 +42,7 @@ let
       cd "$repo_dir"
       git fetch --prune origin main
       git checkout -B flake-update origin/main
+      git reset --hard origin/main
       git fetch origin flake-update 2>/dev/null || true
       if git show-ref --verify --quiet refs/remotes/origin/flake-update; then
           git reset --hard origin/flake-update
