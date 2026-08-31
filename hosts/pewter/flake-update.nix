@@ -36,6 +36,8 @@ let
       # Keep gh's push credential helper out of the Home Manager-managed config.
       export GIT_CONFIG_GLOBAL="$repo_dir/.gitconfig"
       gh auth setup-git --hostname github.com
+      git -C "$repo_dir" config user.name "mippbipp"
+      git -C "$repo_dir" config user.email "mippbipp@users.noreply.github.com"
 
       cd "$repo_dir"
       git fetch --prune origin main
