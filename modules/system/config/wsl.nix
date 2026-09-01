@@ -1,5 +1,8 @@
 # NixOS-WSL specific system config, shared by the WSL hosts.
 _: {
+  imports = [
+    ../config/secret.nix
+  ];
   wsl.useWindowsDriver = true;
 
   # Stop WSL from overwriting /etc/resolv.conf on every boot

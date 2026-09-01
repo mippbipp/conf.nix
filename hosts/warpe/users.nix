@@ -4,7 +4,6 @@
   globals,
   ...
 }:
-
 {
   services.userborn.enable = false;
   users = {
@@ -24,7 +23,8 @@
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         packages = with pkgs; [
-          t3code.desktop # see flake.nix
+          t3code.desktop
+          awscli2
         ];
       };
     };
