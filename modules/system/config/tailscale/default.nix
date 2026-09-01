@@ -12,6 +12,7 @@ let
   self = globals.hosts.${host} or { };
   isExitNode = self.isExitNode or false;
   isWorkPc = self.isWorkPc or false;
+  canSsh = self.canSsh or false;
 in
 {
   services.tailscale = lib.mkMerge [
@@ -29,11 +30,13 @@ in
       extraUpFlags = [
         "--netfilter-mode=nodivert"
         "--advertise-exit-node"
-        "--ssh"
       ];
       extraSetFlags = [
         "--operator=${username}"
       ];
+    })
+    (lib.mkIf canSsh {
+      extraUpFlags = [ "--ssh" ];
     })
     (lib.mkIf isWorkPc {
       extraUpFlags = [ "--accept-dns=false" ];

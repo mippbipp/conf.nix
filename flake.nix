@@ -103,7 +103,6 @@
           };
           modules = [
             ./hosts/${host}/config.nix
-            ./modules/system/config/sops.nix
             stylix.nixosModules.stylix
             nix-index-database.nixosModules.nix-index
             home-manager.nixosModules.home-manager
@@ -124,7 +123,7 @@
                       host
                       globals
                       ;
-                    sopsSecrets = config.sops.secrets;
+                    sopsSecrets = if config ? sops then config.sops.secrets else { };
                   };
                   useGlobalPkgs = true;
                   useUserPackages = true;
@@ -214,6 +213,9 @@
         };
         pewter = mkHostConfig {
           host = "pewter";
+        };
+        hector = mkHostConfig {
+          host = "hector";
         };
       };
     };

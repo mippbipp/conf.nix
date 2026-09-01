@@ -31,7 +31,14 @@
       opentofu
       attic-client
       (import ./scripts/nrs.nix {
-        inherit pkgs username host lib globals sopsSecrets;
+        inherit
+          pkgs
+          username
+          host
+          lib
+          globals
+          sopsSecrets
+          ;
       })
     ]
     ++ llms;
@@ -96,10 +103,12 @@
               source $HOME/.zshrc-personal
             fi
 
-            # gh CLI auth from sops-managed token (see modules/sops)
-            if [ -f ${sopsSecrets.github_token.path} ]; then
-              export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
-            fi
+            # gh CLI auth from sops-managed token (see modules/sops) - absent on Work host hector
+            ${lib.optionalString (sopsSecrets ? github_token) ''
+              if [ -f ${sopsSecrets.github_token.path} ]; then
+                export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
+              fi
+            ''}
 
             eval "$(uv generate-shell-completion zsh)"
             eval "$(uvx --generate-shell-completion zsh)"
@@ -113,7 +122,7 @@
         sv = "sudo nvim";
         ncg = "nix-collect-garbage --delete-old && sudo nix-collect-garbage -d && sudo /run/current-system/bin/switch-to-configuration boot";
         cat = "bat";
-        ls = "eza --icons";
+        ls = "eza --icons --";
         ll = "eza -lh --icons --group-directories-first";
         la = "eza -lah --icons --group-directories-first";
         ".." = "cd ..";

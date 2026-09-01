@@ -1,8 +1,5 @@
 # NixOS-WSL specific system config, shared by the WSL hosts.
-_: {
-  imports = [
-    ../config/secret.nix
-  ];
+{ pkgs, ... }: {
   wsl.useWindowsDriver = true;
 
   # Stop WSL from overwriting /etc/resolv.conf on every boot
@@ -13,4 +10,11 @@ _: {
     enable = true;
     settings.Resolve.FallbackDNS = [ "10.255.255.254" ]; # cat /etc/resolv.conf, default for WSL
   };
+
+  imports = [
+    ../config/secret.nix
+  ];
+  environment.systemPackages = with pkgs; [
+    wl-clipboard
+  ];
 }

@@ -14,6 +14,7 @@
 
   imports = [
     ./users.nix
+    ../../modules/system/config/sops.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/wsl.nix
     ../../modules/theme/system.nix

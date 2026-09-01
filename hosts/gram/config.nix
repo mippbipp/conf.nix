@@ -7,6 +7,7 @@
   imports = [
     ./hardware.nix
     ./users.nix
+    ../../modules/system/config/sops.nix
     ../../modules/system/hardware/tools.nix
     ../../modules/system/hardware/nvidia-drivers.nix
     ../../modules/system/hardware/nvidia-prime-drivers.nix

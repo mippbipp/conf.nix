@@ -1,4 +1,5 @@
 {
+  lib,
   globals,
   host,
   sopsSecrets,
@@ -8,7 +9,7 @@
   programs = {
     git = {
       enable = true;
-      includes = [
+      includes = lib.optionals (sopsSecrets ? git_config) [
         { path = sopsSecrets.git_config.path; }
       ];
       lfs.enable = true;

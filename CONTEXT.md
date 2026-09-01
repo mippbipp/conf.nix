@@ -8,7 +8,30 @@ Declarative NixOS/home-manager configuration for the host machines (gram, harpe,
 - **harpe**: the WSL guest on the personal laptop.
 - **warpe**: the WSL guest on the work laptop; carries the company CA trust config in `hosts/warpe/work.nix`.
 - **pewter**: the always-on Oracle ARM server; tailnet exit node and host of the remote workspace.
+- **hector**: the `Work host` - work-account EC2 NixOS dev machine, reachable via tailnet from `warpe` and `gram` via `Tag isolation`; `aarch64-linux` (Graviton) provisioned with `nixos-anywhere` and `disko` on EBS `gp3`, `compromised-by-work-org` (no shared `age` identity, no personal secrets, `Attic` pull-only).
 - **midd**: the Windows host — only `hosts/midd/setup.ps1`, not a NixOS config.
+
+## Hector isolation
+
+**Work host**:
+The single fleet member that lives in the work AWS account (`hector`). Its EBS volume (`/dev/nvme0n1`) and RAM can be snapshotted via `ssm:StartSession`/`ec2:CreateSnapshot` by work org admins, so it is treated as `compromised-by-work-org`: it holds no personal `OCI`/`Cloudflare`/`GitHub` secrets, no shared `age` identity (`/var/lib/sops-nix/keys.txt` at `modules/system/config/sops.nix`); it is provisioned `tailnet-only` and deployed to only via `nrs hector` (`modules/hm/devenv/scripts/nrs.nix` `--target-host`) from `warpe`/`pewter` (`aarch64` `remoteBuilds` `modules/globals.nix:28` avoids `warpe` `x86_64` qemu).
+_Avoid_: work machine, work box
+
+**Personal host**:
+`gram`, `harpe`, `warpe`, `pewter` - members that may hold the shared `age` identity and personal secrets (`secrets.yaml`). `warpe` is a `Personal host` even though it runs on the work laptop (carries `hosts/warpe/work.nix` `company-root.pem` via `sops` `ssl-cert-file` only after bootstrap).
+_Avoid_: personal machine (ambiguous)
+
+**Tag isolation**:
+The `tailscale_acl` (`terraform/tailscale/main.tf`) `tag:work` grants that restrict `hector`: only `warpe`/`gram` `-> work` (for `nrs --target-host`) and `work -> pewter` (public `Attic` pull `cache.mippbipp.com/fleet`) + `work -> autogroup:internet:*` are allowed; denies `work -> personal:22/8384/22000` and `work` `Tailscale SSH` to self only. Replaces the flat `autogroup:member -> member:*` mesh for `hector`.
+_Avoid_: ACL isolation (generic)
+
+**AWS resource namespace**:
+The tag + SG + VPC scope that isolates hector's AWS resources from coworkers' resources (`Owner=<work-username>`, `Project=hector` tags, dedicated SG, no shared VPC mutation).
+_Avoid_: sandbox, namespacing (ambiguous), k8s namespace
+
+**Instance profile**:
+The IAM role attached to hector that grants its AWS API abilities (SSM, EKS cluster management, EC2 describe) without embedded keys; least-privilege scoped per ADR 0015, not `AdministratorAccess`.
+_Avoid_: role profile, instance role (ambiguous), admin role
 
 ## Gram GPU policy
 
@@ -71,7 +94,7 @@ The required CI check that builds every NixOS host's toplevel before a commit ca
 _Avoid_: CI (generic), tests
 
 The `main` branch ruleset requires `build gram`, `build harpe`, `build pewter`,
-and `build warpe` to pass before a pull request can merge.
+`build warpe`, and `build hector` to pass before a pull request can merge.
 
 **Updater**:
 The pewter-side automation that bumps flake.lock and maintains the single accumulating update PR.

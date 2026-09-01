@@ -20,7 +20,6 @@
     serviceConfig = {
       User = username;
       WorkingDirectory = "/home/${username}";
-      # Backend stays loopback-bound; clients reach it via https://pewter.<tailnet>.ts.net/
       ExecStart = "${pkgs.t3code}/bin/t3 serve --mode web --host 127.0.0.1 --tailscale-serve";
       Restart = "always";
       RestartSec = 5;

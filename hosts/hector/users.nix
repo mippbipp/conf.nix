@@ -4,6 +4,7 @@
   globals,
   ...
 }:
+
 {
   services.userborn.enable = false;
   users = {
@@ -15,17 +16,12 @@
         description = globals.user.name;
         extraGroups = [
           "wheel"
-          "scanner"
-          "lp"
-          "input"
-          "uinput"
+          "networkmanager"
         ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
-        packages = with pkgs; [
-          t3code.desktop
-          awscli2
-          ssm-session-manager-plugin
+        openssh.authorizedKeys.keys = [
+          globals.hosts.warpe.pubkey
         ];
       };
     };
