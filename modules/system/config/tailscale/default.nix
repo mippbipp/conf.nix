@@ -4,7 +4,6 @@
   pkgs,
   lib,
   host,
-  username,
   globals,
   ...
 }:
@@ -30,9 +29,6 @@ in
       extraUpFlags = [
         "--netfilter-mode=nodivert"
         "--advertise-exit-node"
-      ];
-      extraSetFlags = [
-        "--operator=${username}"
       ];
     })
     (lib.mkIf canSsh {
