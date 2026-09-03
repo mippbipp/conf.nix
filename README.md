@@ -10,6 +10,7 @@ Declarative NixOS/home-manager configuration for the host machines, one `hosts/{
 | harpe | WSL guest, personal laptop | [hosts/harpe/README.md](./hosts/harpe/README.md) |
 | warpe | WSL guest, work laptop (company CA) | [hosts/warpe/README.md](./hosts/warpe/README.md) |
 | pewter | Oracle ARM server | [hosts/pewter/README.md](./hosts/pewter/README.md) |
+| hector | Work EC2 dev machine (aarch64, tailnet-only) | [hosts/hector/README.md](./hosts/hector/README.md) |
 | midd | Windows host (scripts only) | [hosts/midd/README.md](./hosts/midd/README.md) |
 
 ## WSL setup

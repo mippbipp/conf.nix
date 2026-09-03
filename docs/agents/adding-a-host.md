@@ -41,12 +41,18 @@ hostname and finish every applicable item before considering the host added.
 
 1. Update `terraform/oci/` when the host needs an OCI instance, volume,
     network rule, or budget. Update `terraform/cloudflare/` when it needs a
-    DNS record. Keep provider state and credentials out of the Nix host
-    declaration.
+    DNS record. Update `terraform/aws-hector/` (isolated local state) and
+    `terraform/tailscale/` when the host needs AWS resources or tailnet
+    ACL/DNS. Keep provider state and credentials out of the Nix host
+    declaration. For example, `hector` added `terraform/aws-hector/` and
+    `tag:work` grants in `terraform/tailscale/` (see
+    `hosts/hector/README.md` and `docs/adr/0015-hector-work-ec2-dev-machine.md`).
 2. Update shared docs or an ADR when adding the host changes a fleet-wide
     invariant, a role definition, the Build gate architecture, or the
-    control-plane inventory. A normal host addition does not require editing
-    every document that mentions existing host names.
+    control-plane inventory — e.g., `hector` introduced the `Work host` /
+    `Tag isolation` glossary in `CONTEXT.md` and the `build hector` gate.
+    A normal host addition does not require editing every document that
+    mentions existing host names.
 
 ## Verify
 

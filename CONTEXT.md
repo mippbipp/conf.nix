@@ -1,191 +1,202 @@
 # Configuration Flake
 
-Declarative NixOS/home-manager configuration for the host machines (gram, harpe, warpe, pewter, midd).
+Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 
 ## Hosts
 
-- **gram**: the desktop machine (Secure Boot via lanzaboote).
-- **harpe**: the WSL guest on the personal laptop.
-- **warpe**: the WSL guest on the work laptop; carries the company CA trust config in `hosts/warpe/work.nix`.
-- **pewter**: the always-on Oracle ARM server; tailnet exit node and host of the remote workspace.
-- **hector**: the `Work host` - work-account EC2 NixOS dev machine, reachable via tailnet from `warpe` and `gram` via `Tag isolation`; `aarch64-linux` (Graviton) provisioned with `nixos-anywhere` and `disko` on EBS `gp3`, `compromised-by-work-org` (no shared `age` identity, no personal secrets, `Attic` pull-only).
-- **midd**: the Windows host — only `hosts/midd/setup.ps1`, not a NixOS config.
+- **gram**: desktop machine (Secure Boot via lanzaboote).
+- **harpe**: WSL guest on the personal laptop.
+- **warpe**: WSL guest on the work laptop; carries the company CA trust.
+- **pewter**: always-on Oracle ARM server; tailnet exit node and remote workspace host.
+- **hector**: Work host — EC2 dev machine in the work account, reachable over tailnet.
+- **midd**: Windows host; only `hosts/midd/setup.ps1`, not a NixOS config.
 
 ## Hector isolation
 
 **Work host**:
-The single fleet member that lives in the work AWS account (`hector`). Its EBS volume (`/dev/nvme0n1`) and RAM can be snapshotted via `ssm:StartSession`/`ec2:CreateSnapshot` by work org admins, so it is treated as `compromised-by-work-org`: it holds no personal `OCI`/`Cloudflare`/`GitHub` secrets, no shared `age` identity (`/var/lib/sops-nix/keys.txt` at `modules/system/config/sops.nix`); it is provisioned `tailnet-only` and deployed to only via `nrs hector` (`modules/hm/devenv/scripts/nrs.nix` `--target-host`) from `warpe`/`pewter` (`aarch64` `remoteBuilds` `modules/globals.nix:28` avoids `warpe` `x86_64` qemu).
+The fleet member that lives in the work AWS account. Its disk and RAM can be snapshotted by work admins, so it holds no personal secrets or shared age identity.
 _Avoid_: work machine, work box
 
 **Personal host**:
-`gram`, `harpe`, `warpe`, `pewter` - members that may hold the shared `age` identity and personal secrets (`secrets.yaml`). `warpe` is a `Personal host` even though it runs on the work laptop (carries `hosts/warpe/work.nix` `company-root.pem` via `sops` `ssl-cert-file` only after bootstrap).
+A fleet member that may hold the shared age identity and personal secrets. `warpe` counts as personal even though it runs on the work laptop.
 _Avoid_: personal machine (ambiguous)
 
 **Tag isolation**:
-The `tailscale_acl` (`terraform/tailscale/main.tf`) `tag:work` grants that restrict `hector`: only `warpe`/`gram` `-> work` (for `nrs --target-host`) and `work -> pewter` (public `Attic` pull `cache.mippbipp.com/fleet`) + `work -> autogroup:internet:*` are allowed; denies `work -> personal:22/8384/22000` and `work` `Tailscale SSH` to self only. Replaces the flat `autogroup:member -> member:*` mesh for `hector`.
+The tailnet grants that restrict `hector` to `tag:work`. Only `warpe` and `gram` can reach it, and it can only reach `pewter` and the internet.
 _Avoid_: ACL isolation (generic)
 
 **AWS resource namespace**:
-The tag + SG + VPC scope that isolates hector's AWS resources from coworkers' resources (`Owner=<work-username>`, `Project=hector` tags, dedicated SG, no shared VPC mutation).
-_Avoid_: sandbox, namespacing (ambiguous), k8s namespace
+The tag and network scope that isolates `hector`'s AWS resources from coworkers'.
+_Avoid_: sandbox, k8s namespace
 
 **Instance profile**:
-The IAM role attached to hector that grants its AWS API abilities (SSM, EKS cluster management, EC2 describe) without embedded keys; least-privilege scoped per ADR 0015, not `AdministratorAccess`.
-_Avoid_: role profile, instance role (ambiguous), admin role
+The IAM role attached to `hector` that grants its AWS abilities without embedded keys.
+_Avoid_: role profile, admin role
 
 ## Gram GPU policy
 
 **iGPU**:
-The Intel UHD Graphics in gram (card1); renders everything by default.
+The Intel UHD Graphics that renders everything by default.
 _Avoid_: integrated gpu, intel gpu
 
 **dGPU**:
-The NVIDIA RTX 3060 Mobile in gram (card0); renders only what is explicitly offloaded.
+The NVIDIA RTX 3060 Mobile that renders only explicitly offloaded apps.
 _Avoid_: dedicated gpu, nvidia gpu
 
 **Offload launch**:
-Starting an app with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` so it renders on the dGPU while the session stays on the iGPU.
-_Avoid_: switch to the gpu, gpu switching
+Starting an app with `__NV_PRIME_RENDER_OFFLOAD` so it renders on the dGPU while the session stays on the iGPU.
+_Avoid_: gpu switching
 
 ## Isolation tiers (gram)
 
 **Kept VM**:
-A libvirtd-managed VM with persistent state and a virt-manager entry; survives reboots and supports snapshots/clones.
-_Avoid_: persistent vm, managed vm
+A libvirtd VM with persistent state and a manager entry; survives reboots and supports snapshots.
+_Avoid_: persistent vm
 
 **Throwaway VM**:
-A per-user quickemu VM whose lifetime is the directory it lives in; removing the directory removes the VM.
-_Avoid_: ephemeral vm, quickemu vm
+A quickemu VM whose lifetime is its directory; removing the directory removes the VM.
+_Avoid_: ephemeral vm
 
 **Isolated network**:
-A libvirt `sandbox` network with no `<forward>` element; guests on it cannot reach the host LAN or tailnet.
-_Avoid_: sandbox network, disconnected network
+A libvirt network with no forwarding; guests on it cannot reach the host LAN or tailnet.
+_Avoid_: sandbox network
 
 **Container**:
 A podman/distrobox workload sharing the host kernel; for trusted code where kernel sharing is acceptable.
-_Avoid_: docker container, toolbox
+_Avoid_: docker container
 
 ## Build
 
-`nrs`: rebuilds and switches this machine from this flake — current host by default, `nrs <host>` for another. It substitutes from the fleet Attic cache; `nrs --push` explicitly publishes the resulting closure. See `modules/hm/devenv/scripts/nrs.nix`.
+**nrs**:
+The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes.
+_Avoid_: rebuild, deploy
 
 ## Globals
 
 **Globals**:
-The single source for facts that outlive any one module: the user's identity, the fleet's DNS profile, and a Host record per machine (`modules/globals.nix`). Threaded through the flake as module arguments — modules never import it directly.
-_Avoid_: variables, hardcoded values, constants
+The single source for facts that outlive any one module — identity, DNS profile, and a Host record per machine. Threaded as module arguments, never imported directly.
+_Avoid_: variables, constants
 
 **Host record**:
-A machine's entry in Globals: the endpoints, keys, and identifiers another machine might need about it (SSH port, LUKS endpoint, public key, sync ID) plus its Role flags. Not the machine's own config, which lives in `hosts/<name>/`.
-_Avoid_: host config, machine settings
+A machine's entry in Globals that other machines need about it — endpoints, keys, and Role flags. Not the machine's own config.
+_Avoid_: host config
 
 **Role flag**:
-A boolean capability on a Host record (exit node, remote builder) that shared modules branch on instead of comparing host names. Where an existing NixOS option already carries the fact (wsl.enable), the option wins.
-_Avoid_: feature flag, per-host toggle
+A boolean capability on a Host record that shared modules branch on instead of comparing host names.
+_Avoid_: feature flag
 
 ## Flake update pipeline
 
 **Attic cache**:
-The persistent Nix binary cache hosted on pewter at `https://cache.mippbipp.com/fleet`. All NixOS hosts use it for substitution; GitHub-hosted Build gate runners and explicit local `nrs --push` runs publish authenticated closures.
-_Avoid_: build cache (ambiguous), GitHub cache
+The persistent Nix cache on pewter at `cache.mippbipp.com/fleet`. Hosts substitute from it; the Build gate and `nrs --push` publish to it.
+_Avoid_: build cache (ambiguous)
 
 **Build gate**:
-The required CI check that builds every NixOS host's toplevel before a commit can reach main; the enforcement of "main is always buildable". See ADR 0009.
-_Avoid_: CI (generic), tests
-
-The `main` branch ruleset requires `build gram`, `build harpe`, `build pewter`,
-`build warpe`, and `build hector` to pass before a pull request can merge.
+The required CI check that builds every host's toplevel before main can merge. It enforces "main is always buildable".
+_Avoid_: CI (generic)
 
 **Updater**:
-The pewter-side automation that bumps flake.lock and maintains the single accumulating update PR.
-_Avoid_: cron job, bot, auto-update
+The pewter automation that bumps `flake.lock` and maintains the single accumulating update PR.
+_Avoid_: cron job, bot
 
 **Deployer**:
-The pewter-side automation that pulls main and switches pewter onto it daily.
-_Avoid_: CD, deployment script
+The pewter automation that pulls main and switches pewter onto it.
+_Avoid_: CD
 
 **Health gate**:
-The post-switch probes that decide whether a new generation stays or gets rolled back.
-_Avoid_: smoke test, verification
+Post-switch probes that decide whether a new generation stays or gets rolled back.
+_Avoid_: smoke test
 
 **Watchdog**:
-The weekly stale-lock alarm that fails loudly when updates stop flowing, catching silent Updater death.
-_Avoid_: dead-man switch, heartbeat
+The weekly alarm that fails when updates stop flowing.
+_Avoid_: heartbeat
 
-## Config live-editing
+## Theming
 
-- **out-of-store config**: a config file tracked in this repo that home-manager symlinks into place instead of writing from the store, so edits take effect without a rebuild. Precedent: the nvim submodule, the hyprland Lua root.
-- **hyprland Lua root**: the out-of-store `hyprland.lua` that Hyprland loads as its config (Lua replaced hyprlang in 0.55; hyprlang is deprecated and removed in 0.57).
-- **host bindings**: the small Nix-generated values file that feeds store-dependent paths (built scripts) into the Lua root; the seam between rebuild-owned and live-edited config.
+**Stylix**:
+The Nix theming framework that sets palette, fonts, and cursor and propagates via Home Manager. Targets auto-enable; those with custom theming are disabled.
+_Avoid_: theme manager (generic)
+
+**Base16 scheme**:
+A 16-color palette (`base00`–`base0F`) from `base16-schemes`.
+_Avoid_: color scheme (ambiguous with vim colorscheme)
+
+**Manual sync**:
+Keeping the nvim colorscheme equal to the Stylix `base16Scheme` by hand. Chosen for nvim portability. See ADR 0016.
+_Avoid_: auto sync
+
+**Tinted-nvim**:
+The plugin that provides `base16-*` schemes for LazyVim.
+_Avoid_: base16-nvim (different plugin)
 
 ## AI
 
 **Agent provider**:
-A CLI agent (opencode, codex, claude-code, grok, cursor-agent) that t3code discovers on its PATH and drives.
-_Avoid_: agent (ambiguous), provider (too generic)
+A CLI agent that t3code discovers on its PATH and drives.
+_Avoid_: agent (ambiguous)
 
 **Control surface**:
-t3code's role in this setup — it doesn't run agents itself, it drives agent providers.
+t3code's role — it doesn't run agents itself, it drives providers.
 _Avoid_: GUI, frontend
 
 **Provider flag**:
-An `enable*` toggle on nixpkgs' t3code package that decides which agent providers are wrapped into its PATH.
-_Avoid_: option, switch
+An `enable*` toggle that decides which providers are wrapped into the t3code PATH.
+_Avoid_: option
 
 **Bundled provider**:
-An agent provider shipped in a package's PATH unconditionally; llm-agents' t3code bundles all five, nixpkgs' t3code bundles only flag-enabled ones.
+A provider shipped unconditionally in a package's PATH; llm-agents bundles all five, nixpkgs bundles only flagged ones.
 _Avoid_: built-in provider
 
 **Remote workspace**:
-A t3 server running on a different machine than the client — on this tailnet, pewter's always-on server. Projects, files, git state, terminals, and provider sessions live on the server host; clients are control surfaces.
-_Avoid_: remote agent, remote machine
+A t3 server on a different machine than the client. Projects and sessions live on the server; clients are control surfaces.
+_Avoid_: remote agent
 
 **Tailnet transport**:
-How clients reach the remote workspace — Tailscale Serve HTTPS at `https://pewter.<tailnet>.ts.net/` with the backend loopback-bound, instead of raw HTTP on the tailnet IP.
-_Avoid_: tunnel, relay
+How clients reach the remote workspace — Tailscale Serve HTTPS with the backend loopback-bound.
+_Avoid_: tunnel
 
 **Pairing**:
-The one-time token exchange between a client and a t3 server (`t3 pair`); after pairing, access is session-based.
-_Avoid_: login, auth (t3's `t3 auth` manages sessions separately)
+The one-time token exchange between a client and a t3 server.
+_Avoid_: login, auth
 
 ## DNS layering
 
 **Host-local resolver**:
-`systemd-resolved` on a NixOS host (`modules/system/config/resolved.nix`) that forwards `~.` via strict `DNSOverTLS=yes` to the shared NextDNS profile `7b9721` with per-host SNI `${host}-7b9721.dns.nextdns.io` (`modules/globals.nix:4`). Survives `tailscaled` being down; only live when `wsl.wslConf.network.generateResolvConf=false` on WSL. Not the same as the tailnet global.
+The host's `systemd-resolved` that forwards `~.` to NextDNS over DoT. It survives `tailscaled` being down and is the fallback when the tailnet global is absent.
 _Avoid_: local dns, system dns
 
 **Tailnet global nameserver**:
-The `tailscale_dns_configuration.global` (`terraform/tailscale/main.tf:47`) nameservers + `override_local_dns`. Pushed by the coordination server to every tailnet client that accepts DNS (`--accept-dns`). For NextDNS, the only correct transport is DNS-over-HTTPS: the sentinel address is the profile's linked IPv6 (`2a07:a8c0::7b:9721` for `7b9721`) and the Tailnet policy file `nodeAttrs` maps `nextdns:7b9721` to that profile. Bare `45.90.28.0` without the attr is plaintext UDP 53 and is blocked on most networks.
-_Avoid_: global dns, tailnet dns
+The tailnet-wide nameserver pushed to clients that accept DNS. For NextDNS it maps to the profile via `nodeAttrs` over DoH.
+_Avoid_: global dns
 
 **MagicDNS**:
-Tailscale's `100.100.100.100` that answers `*.ts.net` / the tailnet's `MagicDNSSuffix`. On `gram`/`pewter` it is wired automatically by `tailscaled`'s `systemd-resolved` integration when `magic_dns=true`; on `warpe` (which sets `isWorkPc -> --accept-dns=false` in `modules/system/config/tailscale/default.nix:38`) it is wired explicitly by `modules/system/config/tailscale/split-dns.nix:21` `resolvectl domain tailscale0 "~ts.net"` + `default-route false` so only `ts.net` goes via the tunnel.
-_Avoid_: magic dns (generic), quad100
+Tailscale's `100.100.100.100` that answers `*.ts.net`. Wired automatically on most hosts, split-wired on `warpe`.
+_Avoid_: quad100
 
 **Override local DNS**:
-The `override_local_dns` flag in `tailscale_dns_configuration` (`terraform/tailscale/main.tf:49`). When true, clients that accept DNS replace their local resolver for `~.` with the tailnet global. Required for iOS per ADR 0005 — without it iOS falls back to its local resolver and gets `NXDOMAIN` for `pewter.<tailnet>.ts.net`. `warpe` opts out (`--accept-dns=false`) because company WiFi blocks NextDNS even over DoH.
+The flag that makes clients replace their local resolver with the tailnet global. Required for iOS, disabled on `warpe`.
 _Avoid_: override dns
 
 ## Things sync
 
 **things folder**:
-The `~/things` directory on gram and pewter synced via Syncthing (`sendreceive`, tailnet-only); the single source of truth for personal documents. See ADR 0014.
-_Avoid_: synced folder, shared folder
+The `~/things` directory synced between `gram` and `pewter` via Syncthing; the single source for personal documents. See ADR 0014.
+_Avoid_: synced folder
 
 ## Control plane
 
 **Control plane**:
-Externally owned coordination state that outlives any one device: the tailnet policy and DNS, the Cloudflare zone for `mippbipp.com`, and OpenTofu's migration target for pewter's OCI network/compute/budgets. Each provider has its own local state; devices only carry interface flags.
-_Avoid_: server config, backend config, terraform config (too generic)
+Externally owned coordination state that outlives any device — tailnet policy, DNS, Cloudflare zone, and OCI infra. Devices only carry interface flags.
+_Avoid_: server config, backend config
 
 **Tailnet policy file**:
-The single JSON policy that defines `tagOwners`, `autoApprovers`, `grants`, `ssh`, and `nodeAttrs` (including `tailscale.com/app-connectors` and `nextdns:<profile>` / `nextdns:no-device-info`). Surfaced in Terraform as `tailscale_acl`. Terraform is source of truth; console edits are overwritten.
-_Avoid_: ACL file, rules file
+The single policy that defines tags, grants, and `nodeAttrs`. Terraform is source of truth; console edits are overwritten.
+_Avoid_: ACL file
 
 **Cloudflare zone**:
-The DNS zone for `mippbipp.com` that fronts `cache.mippbipp.com` (pewter attic). Owned by OpenTofu in `terraform/cloudflare/`; `cache` is `DNS-only` for `nginx` Let's Encrypt today, future subdomains may be proxied.
-_Avoid_: domain config, DNS config
+The DNS zone for `mippbipp.com`. Owned by OpenTofu.
+_Avoid_: domain config
 
 **External infra**:
-The root-tenancy VCN/security lists/instance/budgets backing pewter. The OpenTofu stack is `terraform/oci/`; until its imports are applied, the existing resources remain manually provisioned. The NixOS device config lives in `hosts/pewter/` and is not managed by tofu.
-_Avoid_: cloud config, oracle config, server infra
+The OCI network and compute backing pewter.
+_Avoid_: cloud config

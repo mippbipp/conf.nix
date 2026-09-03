@@ -5,7 +5,7 @@ Cheatsheet for the three tiers defined in ADR 0013 and `CONTEXT.md` Isolation ti
 ## Choose the tier
 
 | Need | Tier | Isolation | Lifetime |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | Missing dep, language toolchain, trusted project | Container / distrobox | shares host kernel | seconds |
 | Taste an ISO and throw it away | **Throwaway VM** (`quickemu`) | real KVM VM | minutes |
 | Keep the OS, need snapshots/clones/UI, sketchy GUI app you revisit | **Kept VM** (`libvirtd`) | real KVM VM, hardened | weeks |
