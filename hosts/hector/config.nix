@@ -53,6 +53,5 @@
 
   networking = {
     useDHCP = true;
-    nftables.enable = true;
   };
 }

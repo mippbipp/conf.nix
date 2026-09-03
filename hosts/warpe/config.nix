@@ -17,7 +17,7 @@
     ./work.nix
     ../../modules/system/config/sops.nix
     ../../modules/system/config/common.nix
-    ../../modules/system/config/wsl.nix
+    ../../modules/system/config/wsl
     ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/tailscale/split-dns.nix
     ../../modules/theme/system.nix

@@ -15,31 +15,7 @@ Declarative NixOS/home-manager configuration for the host machines, one `hosts/{
 
 ## WSL setup
 
-Shared bootstrap for a new NixOS-WSL guest (used by harpe and warpe).
-
-* install steps at <https://nix-community.github.io/NixOS-WSL/install.html>
-* `sudo nixos-rebuild edit`:
-
-  ```nix
-  environment.systemPackages = with pkgs; [ git neovim ];
-   nix.settings.extra-experimental-features = [
-     "nix-command"
-     "flakes"
-   ];
-  ```
-
-* follow <https://nix-community.github.io/NixOS-WSL/how-to/change-username.html>
-* set NixOS as default distro to prevent startup errors (`wsl -s NixOS`)
-  * can rm default `nixos` user dir
-* `ssh-keygen -t ed25519` with {host}_ed25519 as the filename, `ssh-add ~/.ssh/{host}_ed25519`, add pubkey to github
-* `nix-shell -p git neovim` -> `git clone --recurse-submodules --remote-submodules git@github.com:mippbipp/conf.nix.git`
-* set username and hostname in `flake.nix` `nixosConfigurations.{hostname}`
-  * if changing hostname, change folder's name in `hosts` folder
-* change variables in `hosts/{hostname}/variables.nix`
-* ensure all changes are tracked in git (e.g. `git add .`)
-  * push, replace https remote with ssh remote in git and `.gitmodules`, etc
-* `cd ~/conf.nix && sudo nixos-rebuild boot --flake .#{hostname}`
-* pwsh: `wsl -t NixOS` -> `wsl -d NixOS --user root exit` -> `wsl -t NixOS` -> open WSL
+Shared bootstrap for the NixOS-WSL guests lives beside the module: [modules/system/config/wsl/README.md](./modules/system/config/wsl/README.md) (used by harpe and warpe).
 
 ## References & Resources
 

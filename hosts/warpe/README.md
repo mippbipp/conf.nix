@@ -1,6 +1,6 @@
 # wsl setup (work laptop)
 
-* follow the shared WSL bootstrap: [WSL setup](../../README.md#wsl-setup)
+* follow the shared WSL bootstrap: [WSL module](../../modules/system/config/wsl/README.md)
 * the declarative CA trust config already lives in [work.nix](./work.nix); it stays inert until `company-root.pem` exists next to it (see step 3)
 * tailscale: `sudo tailscale up --tun=userspace-networking` matching args in [tailscale config](../../modules/system/config/tailscale/default.nix)
 

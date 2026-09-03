@@ -4,4 +4,4 @@ The work laptop runs its own NixOS-WSL guest (`warpe`) built from copies of harp
 
 Considered and rejected: warpe importing `../harpe/config.nix` (couples two physical machines for ~35 lines of config that will diverge in both directions as work vs personal package choices differ), a shared WSL module in `modules/` (revisit only when a third WSL guest appears), and a runtime toggle for the cert config (a host is one physical machine; a toggle would let work certs leak into personal configs, and hostname-based detection breaks since both guests are named after their host folders).
 
-Status: accepted
+Status: accepted, amended — the "shared WSL module" rejection is superseded. Shared topical modules (`modules/system/config/wsl/`, `common.nix`, `secret.nix` via the former) are now standard practice: both guests import them and carry only their deltas locally. What still holds is the substance behind the rejection: warpe does not import harpe's host config, and there are no hostname-based toggles — sharing happens at the module level, never by one host reaching into another's directory.

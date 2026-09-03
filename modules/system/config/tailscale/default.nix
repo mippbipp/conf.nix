@@ -43,7 +43,7 @@ in
   ];
 
   networking = {
-    nftables.enable = lib.mkForce true;
+    nftables.enable = true;
     firewall = {
       enable = true;
       # Always allow traffic from Tailscale network in NixOS firewall

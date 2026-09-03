@@ -16,7 +16,7 @@
         "flakes"
       ];
       substituters = [
-        # "https://cache.mippbipp.com/fleet"
+        "https://cache.mippbipp.com/fleet"
         "https://hyprland.cachix.org"
         "https://winapps.cachix.org/"
         "https://vicinae.cachix.org"
