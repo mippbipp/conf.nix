@@ -178,5 +178,15 @@ before retrying the Deployer.
 
 When adding a host, update the Build gate matrix and the GitHub ruleset's
 required checks in addition to the NixOS host declarations. Follow
-`docs/agents/adding-a-host.md`; the matrix entry and required check are part
-of the verification invariant.
+`docs/agents/adding-a-host.md`; all of these are part of the verification
+invariant:
+
+- One `- host:` row in the `build-closure` matrix, plus `build <host>` in the
+  ruleset's required checks.
+- One `hosts.<host>` record in `modules/fleet.nix`.
+- The `checks (x86_64-linux)` and `checks (aarch64-linux)` jobs need no
+  per-host edits — the wildcard build picks up every check — but both must
+  stay required in the ruleset or the registry and profile checks stop gating.
+
+The `build-matrix-sync` check fails the gate when the matrix rows and the
+`nixosConfigurations` keys drift in either direction.
