@@ -88,7 +88,7 @@ _Avoid_: feature flag
 ## Flake update pipeline
 
 **Attic cache**:
-The persistent Nix cache on pewter at `cache.mippbipp.com/fleet`. Hosts substitute from it; the Build gate and `nrs --push` publish to it.
+The persistent Nix cache on pewter at `cache.mippbipp.com/fleet`. Hosts substitute from it; the Build gate, the Deployer, and `nrs --push` publish to it.
 _Avoid_: build cache (ambiguous)
 
 **Build gate**:
@@ -96,11 +96,11 @@ The required CI check that builds every host's toplevel before main can merge. I
 _Avoid_: CI (generic)
 
 **Updater**:
-The pewter automation that bumps `flake.lock` and maintains the single accumulating update PR.
+The pewter automation that bumps `flake.lock` weekly and maintains the single accumulating update PR.
 _Avoid_: cron job, bot
 
 **Deployer**:
-The pewter automation that pulls main and switches pewter onto it.
+The pewter automation that pulls main weekly and switches pewter onto it after verifying every `build <host>` check.
 _Avoid_: CD
 
 **Health gate**:
@@ -108,7 +108,7 @@ Post-switch probes that decide whether a new generation stays or gets rolled bac
 _Avoid_: smoke test
 
 **Watchdog**:
-The weekly alarm that fails when updates stop flowing.
+The monthly alarm that fails when updates stop flowing.
 _Avoid_: heartbeat
 
 ## Theming

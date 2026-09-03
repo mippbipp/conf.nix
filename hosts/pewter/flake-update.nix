@@ -78,6 +78,7 @@ let
   deployer = pkgs.writeShellApplication {
     name = "flake-deployer";
     runtimeInputs = with pkgs; [
+      attic-client
       coreutils
       curl
       git
@@ -98,9 +99,20 @@ let
       fi
       cd "$repo_dir"
       git config --local url."https://github.com/".insteadOf "git@github.com:"
-      git -c fetch.recurseSubmodules=false fetch --prune origin main
-      git checkout -B main origin/main
-      git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
+      git -c fetch.recurseSubmodules=false -c submodule.recurse=false fetch --prune origin main
+      git -c submodule.recurse=false checkout -B main origin/main
+      # The pinned submodule commit may not be on any upstream branch
+      # (e.g. after an upstream amend/force-push). A plain submodule update
+      # then fails, so fetch the pinned SHA explicitly and retry once.
+      if ! git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive; then
+          git config --file .gitmodules --get-regexp '\.path$' | cut -d' ' -f2 | while read -r sub; do
+              read -r _ _ pinned _ <<< "$(git ls-tree HEAD -- "$sub")"
+              if [ -n "$pinned" ] && { [ -d "$sub/.git" ] || [ -f "$sub/.git" ]; }; then
+                  git -C "$sub" fetch origin "$pinned" || true
+              fi
+          done
+          git -c 'url.https://github.com/.insteadOf=git@github.com:' submodule update --init --recursive
+      fi
 
       commit="$(git rev-parse HEAD)"
       pr="$(gh api "repos/$GH_REPO/commits/$commit/pulls" --jq '.[0].number // empty' || true)"
@@ -109,13 +121,19 @@ let
           exit 1
       fi
       check_commit="$(gh pr view "$pr" --repo "$GH_REPO" --json headRefOid --jq '.headRefOid')"
-      for check in "build gram" "build harpe" "build warpe" "build pewter"; do
-          conclusion="$(gh api "repos/$GH_REPO/commits/$check_commit/check-runs" --jq "[.check_runs[] | select(.name == \"$check\")][0].conclusion // empty" || true)"
-          if [ "$conclusion" != success ]; then
-              echo "required Build gate check is not successful: $check ($conclusion)" >&2
-              exit 1
-          fi
-      done
+      # Generalize over every `build <host>` check so new hosts are covered
+      # without editing the deployer. The Build gate names one job per host.
+      check_runs_url="repos/$GH_REPO/commits/$check_commit/check-runs?per_page=100"
+      build_count="$(gh api "$check_runs_url" --jq '[.check_runs[] | select(.name | startswith("build "))] | length')"
+      if [ -z "$build_count" ] || [ "$build_count" = "0" ]; then
+          echo "no Build gate checks found on $check_commit" >&2
+          exit 1
+      fi
+      failed="$(gh api "$check_runs_url" --jq '[.check_runs[] | select(.name | startswith("build ")) | select(.conclusion != "success")] | map(.name) | join(", ")')"
+      if [ -n "$failed" ]; then
+          echo "required Build gate checks are not successful: $failed" >&2
+          exit 1
+      fi
 
       previous="$(readlink -f /run/current-system)"
       if ! /run/wrappers/bin/sudo nixos-rebuild switch --flake ".?submodules=1#pewter"; then
@@ -145,6 +163,13 @@ let
           fi
           exit 1
       fi
+
+      # Publish the deployed closure so other hosts and future Build gate
+      # runs can substitute it. Push failure must not roll back a healthy
+      # switch, but it should fail the service so the timer goes red.
+      attic_token="$(< ${config.sops.secrets.attic_cache_token.path})"
+      attic login cache https://cache.mippbipp.com "$attic_token"
+      attic push cache:fleet /run/current-system
     '';
   };
 in
@@ -166,7 +191,7 @@ in
     timers.flake-updater = {
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "daily";
+        OnCalendar = "Mon *-*-* 02:00:00";
         Persistent = true;
         RandomizedDelaySec = "30m";
       };
@@ -184,7 +209,7 @@ in
     timers.flake-deployer = {
       wantedBy = [ "timers.target" ];
       timerConfig = {
-        OnCalendar = "03:00";
+        OnCalendar = "Mon *-*-* 06:00:00";
         Persistent = true;
         RandomizedDelaySec = "30m";
       };

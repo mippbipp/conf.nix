@@ -1,30 +1,34 @@
 # Verified Flake Update Pipeline
 
 This repository updates `flake.lock` from pewter and merges only revisions
-that pass the four-host Build gate. The design rationale is in
+that pass the Build gate for every host. The design rationale is in
 `docs/adr/0009-flake-update-pipeline.md`; this document is the operational
-runbook and implementation reference.
+runbook and implementation reference. Host names are intentionally not
+enumerated here: the gate builds every `nixosConfigurations.<host>` entry,
+the Deployer verifies every `build <host>` check, and
+`docs/agents/adding-a-host.md` covers adding a host.
 
 ## Pipeline
 
 The sequence is:
 
-1. `flake-updater.timer` runs daily on pewter with persistence and a 30-minute
+1. `flake-updater.timer` runs Mondays around 02:00 on pewter with persistence and a 30-minute
    randomized delay.
 2. `flake-updater.service` runs as the configured pewter user, updates a
    clone in `/var/lib/flake-updater`, and maintains one `flake-update` branch
    and pull request.
 3. GitHub Actions runs `.github/workflows/build-gate.yml` for every pull
-   request. Its required checks are `build gram`, `build harpe`, `build warpe`,
-   and `build pewter`.
-4. GitHub auto-merge is enabled by the Updater, but merge waits for all four
-   required checks to pass.
-5. `flake-deployer.timer` runs around 03:00 on pewter with persistence and a
+   request. It builds every host's toplevel closure, one `build <host>` check
+   per host.
+4. GitHub auto-merge is enabled by the Updater, but merge waits for all
+   required `build <host>` checks to pass.
+5. `flake-deployer.timer` runs Mondays around 06:00 on pewter with persistence and a
    30-minute randomized delay.
 6. `flake-deployer.service` verifies the merged revision, switches pewter,
-   and runs the health gate.
-7. `.github/workflows/watchdog.yml` runs Mondays at 09:00 UTC and fails when
-   the latest `flake.lock` commit is more than seven days old.
+   runs the health gate, and pushes the deployed closure to the fleet Attic
+   cache.
+7. `.github/workflows/watchdog.yml` runs on the 1st of each month at 09:00 UTC and fails when
+   the latest `flake.lock` commit is more than thirty days old.
 
 ## Updater
 
@@ -64,33 +68,39 @@ The Build gate builds each system's full toplevel closure:
 nix build ".#nixosConfigurations.<host>.config.system.build.toplevel"
 ```
 
-`gram`, `harpe`, and `warpe` use x86_64 runners. `pewter` uses
-`ubuntu-24.04-arm`. The workflow initializes submodules after rewriting
+The matrix in `.github/workflows/build-gate.yml` has one job per host with a
+runner matching the host platform. The workflow initializes submodules after rewriting
 GitHub SSH URLs to HTTPS and uses the public fleet Attic cache for
-substitution. Successful same-repository PR builds may push their closure to
+substitution. Successful same-repository PR builds push their closure to
 that cache.
 
 When a check fails, inspect the specific job log before changing the
-pipeline. A PR must have all four successful checks before it is eligible for
+pipeline. A PR must have every `build <host>` check successful before it is eligible for
 auto-merge.
 
 ## Deployer
 
-The Deployer uses `/var/lib/flake-deployer` and reads the same SOPS GitHub
-token. It fetches `main` with recursive submodule fetching disabled, then
-initializes submodules with this rewrite:
+The Deployer uses `/var/lib/flake-deployer` and reads the SOPS GitHub token
+plus the SOPS Attic cache token. It fetches `main` with submodule recursion
+disabled (the user gitconfig sets `submodule.recurse=true`, so the fetch and
+checkout pass `-c submodule.recurse=false`), then initializes submodules with
+this rewrite:
 
 ```text
 git@github.com: -> https://github.com/
 ```
 
+If the pinned submodule commit is not on any upstream branch (e.g. after an
+upstream amend/force-push), the first submodule update fails; the Deployer
+then fetches each pinned submodule SHA explicitly and retries once.
+
 Before switching, it:
 
 1. Resolves the pull request associated with the current `main` commit.
 2. Reads that PR's `headRefOid`.
-3. Checks the four Build gate conclusions on that head commit.
-4. Stops if the merged commit has no associated PR or any check is absent or
-   unsuccessful.
+3. Checks every `build <host>` check-run on that head commit.
+4. Stops if the merged commit has no associated PR, no `build <host>` checks
+   exist, or any such check is absent or unsuccessful.
 
 The check lookup uses the PR head commit because a rebase merge creates a new
 main commit that may not have its own GitHub check runs.
@@ -113,6 +123,15 @@ requires:
 If any probe fails, it switches back, adds or updates a marked health-gate
 comment on the PR, and exits unsuccessfully.
 
+After the health gate passes, it publishes the deployed closure:
+
+```sh
+attic push cache:fleet /run/current-system
+```
+
+A push failure does not roll back the healthy switch, but it fails the
+service so the timer goes red.
+
 Manual operation:
 
 ```sh
@@ -128,8 +147,8 @@ not sufficient evidence.
 
 ## Watchdog
 
-The Watchdog checks the newest commit touching `flake.lock`. It runs on its
-Monday schedule and can also be dispatched manually:
+The Watchdog checks the newest commit touching `flake.lock`. It runs on the
+1st of each month and can also be dispatched manually:
 
 ```sh
 gh workflow run update-watchdog
@@ -152,7 +171,7 @@ For a failed update or deployment, collect evidence in this order:
 5. Watchdog status and the last `flake.lock` commit age.
 
 Do not bypass the Build gate to deploy an unverified revision. If a service
-change is needed, send it through a pull request and wait for all four checks
+change is needed, send it through a pull request and wait for every `build <host>` check
 before retrying the Deployer.
 
 ## Host Changes

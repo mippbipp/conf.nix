@@ -3,7 +3,7 @@ name: update-watchdog
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 9 * * 1"
+    - cron: "0 9 1 * *"
 
 jobs:
   stale-lock:
@@ -18,7 +18,7 @@ jobs:
           updated="$(git log -1 --format=%ct -- flake.lock)"
           now="$(date +%s)"
           age=$((now - updated))
-          if [ "$age" -gt $((7 * 24 * 60 * 60)) ]; then
+          if [ "$age" -gt $((30 * 24 * 60 * 60)) ]; then
               echo "flake.lock has not changed in $((age / 86400)) days" >&2
               exit 1
           fi
