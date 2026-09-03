@@ -24,10 +24,20 @@ let
         default = false;
         description = "Role flag: sits on the corporate network; refuses the Tailnet global nameserver and routes MagicDNS only.";
       };
-      canSsh = lib.mkOption {
+      acceptsTailnetSsh = lib.mkOption {
         type = lib.types.bool;
         default = false;
-        description = "Role flag: tailnet SSH is enabled toward this host.";
+        description = "Role flag: tailnet SSH (tailscale --ssh) is enabled toward this host.";
+      };
+      acceptsSsh = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: runs a reachable sshd; appears in peers' SSH mesh.";
+      };
+      unlocksPewter = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: may unlock pewter pre-boot; receives the pewter-luks mesh entry and lands in pewter's initrd authorizedKeys.";
       };
       remoteBuilds = lib.mkOption {
         type = lib.types.bool;
@@ -73,6 +83,7 @@ in
     gram = {
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
       syncId = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
+      unlocksPewter = true;
     };
     harpe = { };
     warpe = {
@@ -85,10 +96,12 @@ in
       syncId = "POHLBBF-3AOYWFT-OK46SCB-Z4O4VHV-5NFB5MH-SX2OP5M-GNYZSTT-5VKEPQT";
       isExitNode = true;
       remoteBuilds = true;
-      canSsh = true;
+      acceptsTailnetSsh = true;
+      acceptsSsh = true;
     };
     hector = {
-      canSsh = true;
+      acceptsTailnetSsh = true;
+      acceptsSsh = true;
     };
     brick = {
       external = true;

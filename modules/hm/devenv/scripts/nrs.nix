@@ -8,9 +8,12 @@
 }:
 
 let
-  # Hosts that build for themselves (e.g. ARM boxes) need --build-host when targeted.
+  mesh = import ../../../ssh/mesh.nix { inherit lib; };
+  # Hosts that build for themselves (e.g. ARM boxes) need --build-host when
+  # targeted from elsewhere. Self is excluded: a remote build always means ssh
+  # to another machine, never to self.
   remoteBuildHosts = lib.attrNames (
-    lib.filterAttrs (_: peer: peer.remoteBuilds) globals.hosts
+    lib.filterAttrs (_: peer: peer.remoteBuilds) (mesh.exceptSelf globals.hosts host)
   );
 in
 pkgs.writeShellApplication {

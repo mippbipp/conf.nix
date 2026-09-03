@@ -73,6 +73,12 @@ Do not add a host to these just because it exists:
 
 - `modules/hm/devenv/scripts/nrs.nix` derives remote build hosts from the
   `remoteBuilds` Role flag in the fleet registry.
+- `modules/ssh/hm.nix` derives the SSH mesh from the fleet registry: hosts
+  with the `acceptsSsh` Role flag appear in every other host's mesh, and hosts
+  with `unlocksPewter` receive the `pewter-luks` entry (which also lands them
+  in pewter's initrd `authorizedKeys`).
+- `modules/system/config/syncthing.nix` derives peer devices from the `syncId`
+  presence in the fleet registry.
 - Shared system and Home Manager modules are imported by the host files; they
   do not maintain a host allowlist.
 - Attic substitution applies to all NixOS hosts through the shared Nix module.

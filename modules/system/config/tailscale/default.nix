@@ -9,7 +9,7 @@
 let
   self = config.fleet.hosts.${host};
   isExitNode = self.isExitNode;
-  canSsh = self.canSsh;
+  acceptsTailnetSsh = self.acceptsTailnetSsh;
 in
 {
   services.tailscale = lib.mkMerge [
@@ -29,7 +29,7 @@ in
         "--advertise-exit-node"
       ];
     })
-    (lib.mkIf canSsh {
+    (lib.mkIf acceptsTailnetSsh {
       extraUpFlags = [ "--ssh" ];
     })
   ];

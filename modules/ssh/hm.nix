@@ -6,22 +6,7 @@
   ...
 }:
 let
-  peers = lib.filterAttrs (name: peer: name != host && !peer.external) globals.hosts;
-
-  peerEntries = lib.mapAttrs (name: _: {
-    hostname = name;
-    user = username;
-  }) peers;
-
-  luksEntries = lib.mapAttrs' (
-    name: peer:
-    lib.nameValuePair "${name}-luks" {
-      hostname = peer.luksHostname;
-      user = "root";
-      port = peer.sshPort;
-      userKnownHostsFile = "~/.ssh/known_hosts.initrd";
-    }
-  ) (lib.filterAttrs (_: peer: peer.luksHostname != null) peers);
+  mesh = import ./mesh.nix { inherit lib; };
 in
 {
   programs.ssh = {
@@ -48,7 +33,7 @@ in
         user = "git";
       };
     }
-    // peerEntries
-    // luksEntries;
+    // mesh.peerEntries { hosts = globals.hosts; inherit host username; }
+    // mesh.luksEntries { hosts = globals.hosts; inherit host; };
   };
 }

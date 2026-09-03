@@ -6,8 +6,9 @@
   ...
 }:
 let
+  mesh = import ../../ssh/mesh.nix { inherit lib; };
   # One entry per peer that carries a syncId; addresses derive from the name.
-  remotePeers = lib.filterAttrs (name: peer: name != host && peer.syncId != null) config.fleet.hosts;
+  remotePeers = lib.filterAttrs (_: peer: peer.syncId != null) (mesh.exceptSelf config.fleet.hosts host);
 
   remoteDevices = lib.mapAttrs (name: peer: {
     id = peer.syncId;

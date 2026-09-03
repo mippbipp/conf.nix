@@ -3,6 +3,7 @@
   modulesPath,
   pkgs,
   config,
+  lib,
   ...
 }:
 {
@@ -72,9 +73,10 @@
           enable = true;
           port = config.fleet.hosts.pewter.sshPort;
           hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
-          authorizedKeys = [
-            config.fleet.hosts.gram.pubkey
-          ];
+          # Key holders mirror the mesh's LUKS recipients: one owner, no drift.
+          authorizedKeys = map (name: config.fleet.hosts.${name}.pubkey) (
+            (import ../../modules/ssh/mesh.nix { inherit lib; }).luksUnlockers config.fleet.hosts
+          );
         };
       };
     };
