@@ -16,6 +16,7 @@ This keeps the submodule self-contained. No Nix-generated colors and no `config.
 
 * Stylix auto via `programs.neovim.plugins`. Rejected. It needs a Nix-generated `init.lua` and breaks the out-of-store symlink. It also makes `nvim` unbootable without Home Manager.
 * Nix-templated `colorscheme.lua` via `xdg.configFile.*.text`. Rejected for the same symlink conflict. It would also pull a Nix dependency back into the submodule.
+* Gate check in this flake asserting the Stylix↔tinted pair (e.g. a `theme-sync` flake check in the `dns-profile-sync` pattern). Rejected 2026-09-03: the check would couple this repo's Build gate to `init.lua` edits — renaming the theme there breaks this repo's CI. The submodule stays independently editable; drift stays caught by eye (silent habamax fallback, per Consequences below).
 
 ## Consequences
 
