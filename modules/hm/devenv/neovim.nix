@@ -36,6 +36,7 @@
         lua51Packages.jsregexp # luasnip
         nil
         qt6.qtdeclarative # qmlls
+        clang-tools # clangd (mason has no aarch64 build; see lsp.lua)
 
         # snacks.image
         imagemagick
