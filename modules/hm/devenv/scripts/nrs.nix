@@ -10,7 +10,7 @@
 let
   # Hosts that build for themselves (e.g. ARM boxes) need --build-host when targeted.
   remoteBuildHosts = lib.attrNames (
-    lib.filterAttrs (_: peer: peer.remoteBuilds or false) globals.hosts
+    lib.filterAttrs (_: peer: peer.remoteBuilds) globals.hosts
   );
 in
 pkgs.writeShellApplication {

@@ -9,23 +9,23 @@
 # still matches on both sides of that seam.
 {
   pkgs,
+  config,
+  lib,
   host,
   globals,
   ...
 }:
 let
-  self = globals.hosts.${host} or { };
-  isWorkPc = self.isWorkPc or false;
+  isWorkPc = config.fleet.hosts.${host}.isWorkPc;
   inherit (globals) nextdns;
 in
-if isWorkPc then
-  {
-    services.tailscale = {
+{
+  services.tailscale = lib.mkIf isWorkPc {
       extraUpFlags = [ "--accept-dns=false" ];
       extraSetFlags = [ "--accept-dns=false" ];
     };
 
-    systemd.services.tailscale-magicdns-split = {
+    systemd.services.tailscale-magicdns-split = lib.mkIf isWorkPc {
       description = "Route MagicDNS domains to Tailscale MagicDNS (Quad100)";
       after = [
         "tailscaled.service"
@@ -74,10 +74,7 @@ if isWorkPc then
         '';
       };
     };
-  }
-else
-  {
-    services.resolved = {
+    services.resolved = lib.mkIf (!isWorkPc) {
       enable = true;
       settings = {
         Resolve = {

@@ -6,7 +6,7 @@
   ...
 }:
 let
-  peers = lib.filterAttrs (name: _: name != host) globals.hosts;
+  peers = lib.filterAttrs (name: peer: name != host && !peer.external) globals.hosts;
 
   peerEntries = lib.mapAttrs (name: _: {
     hostname = name;
@@ -18,10 +18,10 @@ let
     lib.nameValuePair "${name}-luks" {
       hostname = peer.luksHostname;
       user = "root";
-      port = peer.sshPort or 22;
+      port = peer.sshPort;
       userKnownHostsFile = "~/.ssh/known_hosts.initrd";
     }
-  ) (lib.filterAttrs (_: peer: peer ? luksHostname) peers);
+  ) (lib.filterAttrs (_: peer: peer.luksHostname != null) peers);
 in
 {
   programs.ssh = {

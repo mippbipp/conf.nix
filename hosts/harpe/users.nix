@@ -1,7 +1,6 @@
 {
   pkgs,
   username,
-  globals,
   ...
 }:
 
@@ -13,7 +12,7 @@
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
-        description = globals.user.name;
+        description = username;
         extraGroups = [
           "wheel"
           "scanner"

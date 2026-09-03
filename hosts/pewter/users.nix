@@ -1,7 +1,7 @@
 {
   pkgs,
   username,
-  globals,
+  config,
   ...
 }:
 
@@ -13,7 +13,7 @@
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
-        description = globals.user.name;
+        description = username;
         extraGroups = [
           "wheel"
           "networkmanager"
@@ -21,7 +21,7 @@
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
-          globals.hosts.gram.pubkey
+          config.fleet.hosts.gram.pubkey
         ];
       };
     };

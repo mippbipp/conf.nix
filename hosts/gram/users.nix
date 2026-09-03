@@ -2,7 +2,6 @@
   pkgs,
   username,
   inputs,
-  globals,
   ...
 }:
 
@@ -14,7 +13,7 @@
       "${username}" = {
         homeMode = "755";
         isNormalUser = true;
-        description = globals.user.name;
+        description = username;
         extraGroups = [
           "networkmanager"
           "wheel"

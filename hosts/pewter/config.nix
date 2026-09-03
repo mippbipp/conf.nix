@@ -2,7 +2,7 @@
   inputs,
   modulesPath,
   pkgs,
-  globals,
+  config,
   ...
 }:
 {
@@ -37,7 +37,7 @@
       settings.PasswordAuthentication = false;
       openFirewall = true;
       ports = [
-        globals.hosts.pewter.sshPort
+        config.fleet.hosts.pewter.sshPort
       ];
     };
   };
@@ -69,10 +69,10 @@
         ssh = {
           # Enable root SSH for LUKS unlocking
           enable = true;
-          port = globals.hosts.pewter.sshPort;
+          port = config.fleet.hosts.pewter.sshPort;
           hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
           authorizedKeys = [
-            globals.hosts.gram.pubkey
+            config.fleet.hosts.gram.pubkey
           ];
         };
       };

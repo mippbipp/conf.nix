@@ -4,13 +4,12 @@
   pkgs,
   lib,
   host,
-  globals,
   ...
 }:
 let
-  self = globals.hosts.${host} or { };
-  isExitNode = self.isExitNode or false;
-  canSsh = self.canSsh or false;
+  self = config.fleet.hosts.${host};
+  isExitNode = self.isExitNode;
+  canSsh = self.canSsh;
 in
 {
   services.tailscale = lib.mkMerge [

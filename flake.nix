@@ -94,6 +94,9 @@
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
+            # Raw globals (user, nextdns) only. Typed fleet records are
+            # read from config.fleet.hosts; Home Manager gets the merged
+            # records via extraSpecialArgs below.
             inherit
               inputs
               host
@@ -102,6 +105,7 @@
             username = globals.user.name;
           };
           modules = [
+            ./modules/fleet.nix
             ./hosts/${host}/config.nix
             stylix.nixosModules.stylix
             nix-index-database.nixosModules.nix-index
@@ -113,6 +117,15 @@
                 username,
                 ...
               }:
+              let
+                # Typed fleet records merged under the existing arg name
+                # for Home Manager consumers (devenv, ssh mesh, nrs).
+                # NixOS modules read config.fleet.hosts directly.
+                hmGlobals = {
+                  inherit (globals) user nextdns;
+                  hosts = config.fleet.hosts;
+                };
+              in
               {
                 home-manager = {
                   extraSpecialArgs = {
@@ -121,8 +134,8 @@
                       username
                       inputs
                       host
-                      globals
                       ;
+                    globals = hmGlobals;
                     sopsSecrets = if config ? sops then config.sops.secrets else { };
                   };
                   useGlobalPkgs = true;
@@ -149,9 +162,7 @@
           ]
           ++ nixosModules;
         };
-    in
-    {
-      nixosConfigurations = {
+    nixosConfigurations = {
         gram = mkHostConfig {
           host = "gram";
           nixosModules = [
@@ -218,6 +229,9 @@
           host = "hector";
         };
       };
+    in
+    {
+      inherit nixosConfigurations;
 
       checks =
         let
@@ -248,6 +262,34 @@
               grep -Fq '"${sentinel}"' "$tf" || (echo "sentinel mismatch: expected profile-linked IPv6 ${sentinel} in Tailnet policy file" >&2; exit 1)
               touch $out
             '';
+            # Every NixOS host has a live fleet record and every live
+            # record names a declared host. External peers (no NixOS
+            # declaration) are exempt on the record side only.
+            fleet-correspondence =
+              let
+                records = (nixpkgs.lib.evalModules { modules = [ ./modules/fleet.nix ]; }).config.fleet.hosts;
+                declared = builtins.attrNames nixosConfigurations;
+                missing = builtins.filter (h: !(records ? ${h}) || records.${h}.external) declared;
+                liveRecords = nixpkgs.lib.filterAttrs (_: r: !r.external) records;
+                phantom = builtins.filter (h: !(builtins.elem h declared)) (builtins.attrNames liveRecords);
+              in
+              if missing == [ ] && phantom == [ ] then
+                pkgs.runCommand "fleet-correspondence" { } ''touch $out''
+              else
+                throw "fleet registry mismatch: missing records for ${builtins.toString missing}; phantom records for ${builtins.toString phantom}";
+            # Locks in strictness: a typo'd Role flag and a mistyped flag
+            # must both fail evaluation, so the registry can never silently
+            # regress to `or false` semantics.
+            fleet-strictness =
+              let
+                evalBad = extra: builtins.tryEval (builtins.deepSeq (nixpkgs.lib.evalModules {
+                  modules = [ ./modules/fleet.nix { fleet.hosts.strictness-probe = extra; } ];
+                }).config.fleet.hosts false);
+              in
+              if !(evalBad { isExitNod = true; }).success && !(evalBad { isExitNode = "yes"; }).success then
+                pkgs.runCommand "fleet-strictness" { } ''touch $out''
+              else
+                throw "fleet registry is not strict: typo'd Role flag or wrong type evaluated successfully";
           }
         );
     };

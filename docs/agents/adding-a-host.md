@@ -15,7 +15,7 @@ hostname and finish every applicable item before considering the host added.
 3. Add a `nixosConfigurations.<host>` declaration to `flake.nix`. Keep the
    attribute name and the `host = "<host>"` argument identical. Add host-only
    flake modules in this declaration, such as `nixos-wsl` or `lanzaboote`.
-4. Add `hosts.<host>` to `modules/globals.nix`. Use an empty record when no
+4. Add `hosts.<host>` to `modules/fleet.nix`. Use an empty record when no
    other machine needs facts about it; add only cross-host facts and Role
    flags that shared modules consume.
 5. Add `<host>` to the matrix in `.github/workflows/build-gate.yml`. The
@@ -34,8 +34,8 @@ hostname and finish every applicable item before considering the host added.
    editing it, set `SOPS_AGE_KEY_FILE` to the key path declared in
    `modules/system/config/sops.nix`, and inspect only the encrypted diff.
 3. Add an SSH alias or other client binding when the host is reached through a
-   non-default address, port, or jump path. Keep machine facts in Globals and
-   consume them from the client configuration.
+   non-default address, port, or jump path. Keep machine facts in the fleet
+   registry (`modules/fleet.nix`) and consume them from the client configuration.
 
 ## Conditional Infrastructure
 
@@ -72,7 +72,7 @@ main ruleset, and the host's bootstrap or deployment procedure is documented.
 Do not add a host to these just because it exists:
 
 - `modules/hm/devenv/scripts/nrs.nix` derives remote build hosts from the
-  `remoteBuilds` Role flag in Globals.
+  `remoteBuilds` Role flag in the fleet registry.
 - Shared system and Home Manager modules are imported by the host files; they
   do not maintain a host allowlist.
 - Attic substitution applies to all NixOS hosts through the shared Nix module.
