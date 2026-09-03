@@ -11,7 +11,43 @@
     ];
   };
 
+  # Attic cache: the single owner for every cache string in the flake.
+  # Structured URL/key pairs (positional lists drift); the fleet entry is
+  # derived from endpoint/cacheName so the three spellings of the own cache
+  # (host, URL, cache:ref) collapse to two strings. Consumers (nix.nix pull
+  # lists, attic.nix serving path, deployer/nrs push) interpolate the derived
+  # values; the attic-cache-sync flake check pins the Build gate YAML.
+  cache = rec {
+    host = "cache.mippbipp.com";
+    endpoint = "https://${host}";
+    cacheName = "fleet";
+    caches = [
+      {
+        url = "${endpoint}/${cacheName}";
+        key = "fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY=";
+      }
+      {
+        url = "https://hyprland.cachix.org";
+        key = "hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc=";
+      }
+      {
+        url = "https://winapps.cachix.org/";
+        key = "winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g=";
+      }
+      {
+        url = "https://vicinae.cachix.org";
+        key = "vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc=";
+      }
+      {
+        url = "https://attic.xuyh0120.win/lantian";
+        key = "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc=";
+      }
+    ];
+    substituters = map (c: c.url) caches;
+    trustedKeys = map (c: c.key) caches;
+  };
+
   # Per-machine records live in modules/fleet.nix (typed Role flags behind the
-  # fleet.hosts interface). This file keeps only identity and DNS profile,
-  # which stay plain data.
+  # fleet.hosts interface). This file keeps only identity, DNS profile, and
+  # cache strings, which stay plain data.
 }

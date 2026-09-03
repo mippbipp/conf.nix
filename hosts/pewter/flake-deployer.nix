@@ -2,6 +2,7 @@
   pkgs,
   username,
   config,
+  globals,
   ...
 }:
 
@@ -96,8 +97,8 @@ let
       # runs can substitute it. Push failure must not roll back a healthy
       # switch, but it should fail the service so the timer goes red.
       attic_token="$(< ${config.sops.secrets.attic_cache_token.path})"
-      attic login cache https://cache.mippbipp.com "$attic_token"
-      attic push cache:fleet /run/current-system
+      attic login cache ${globals.cache.endpoint} "$attic_token"
+      attic push cache:${globals.cache.cacheName} /run/current-system
     '';
   };
 in

@@ -94,7 +94,7 @@
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
-            # Raw globals (user, nextdns) only. Typed fleet records are
+            # Raw globals (user, nextdns, cache) only. Typed fleet records are
             # read from config.fleet.hosts; Home Manager gets the merged
             # records via extraSpecialArgs below.
             inherit
@@ -122,7 +122,7 @@
                 # for Home Manager consumers (devenv, ssh mesh, nrs).
                 # NixOS modules read config.fleet.hosts directly.
                 hmGlobals = {
-                  inherit (globals) user nextdns;
+                  inherit (globals) user nextdns cache;
                   hosts = config.fleet.hosts;
                 };
               in

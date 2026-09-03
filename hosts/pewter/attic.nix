@@ -1,6 +1,7 @@
 {
   config,
   pkgs,
+  globals,
   ...
 }:
 {
@@ -12,8 +13,8 @@
       environmentFile = config.sops.secrets.attic_jwt_secret.path;
       settings = {
         listen = "127.0.0.1:8080";
-        allowed-hosts = [ "cache.mippbipp.com" ];
-        api-endpoint = "https://cache.mippbipp.com/";
+        allowed-hosts = [ globals.cache.host ];
+        api-endpoint = "${globals.cache.endpoint}/";
         database.url = "postgresql://atticd@localhost/atticd?host=/run/postgresql";
         storage = {
           type = "local";

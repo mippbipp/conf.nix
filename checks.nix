@@ -81,5 +81,42 @@ nixpkgs.lib.genAttrs systems (
         pkgs.runCommand "build-matrix-sync" { } ''touch $out''
       else
         throw "build gate matrix mismatch: missing rows for ${builtins.toString missing}; phantom rows for ${builtins.toString phantom}";
+    # The Build gate YAML is control-plane-adjacent text outside this flake's
+    # references, so pin it by parsing instead: every extra-substituters /
+    # extra-trusted-public-keys row must equal the globals.cache derivation in
+    # order (substituter order is a performance decision), and the push step
+    # must reference the same endpoint and cache name. Nix-side consumers
+    # (nix.nix, attic.nix, deployer, nrs) interpolate globals.cache directly
+    # and are correct by construction, so only YAML is asserted here.
+    attic-cache-sync =
+      let
+        cache = globals.cache;
+        gate = builtins.readFile ./.github/workflows/build-gate.yml;
+        lines = nixpkgs.lib.splitString "\n" gate;
+        collect = prefix: nixpkgs.lib.concatMap (
+          line:
+          let
+            m = builtins.match "^ *${prefix} =(.*)$" line;
+          in
+          if m == null then [ ] else m
+        ) lines;
+        splitWords = s: builtins.filter (w: w != "") (nixpkgs.lib.splitString " " s);
+        subRows = map splitWords (collect "extra-substituters");
+        keyRows = map splitWords (collect "extra-trusted-public-keys");
+        # Word-exact (not substring): a suffixed typo like cache:fleets must fail.
+        # Scoped to the push-step lines so a stray mention in a YAML comment
+        # cannot satisfy the check while the real step drifts.
+        pushLines = builtins.filter (
+          line: builtins.match "^ *attic (login|push) .*" line != null
+        ) lines;
+        pushWords = nixpkgs.lib.concatMap splitWords pushLines;
+        subsOk = subRows != [ ] && builtins.all (row: row == cache.substituters) subRows;
+        keysOk = keyRows != [ ] && builtins.all (row: row == cache.trustedKeys) keyRows;
+        pushOk = pushLines != [ ] && builtins.elem cache.endpoint pushWords && builtins.elem "cache:${cache.cacheName}" pushWords;
+      in
+      if subsOk && keysOk && pushOk then
+        pkgs.runCommand "attic-cache-sync" { } ''touch $out''
+      else
+        throw "attic cache sync mismatch: extra-substituters rows ${builtins.toJSON subRows} (expected ${builtins.toJSON cache.substituters}); extra-trusted-public-keys rows match=${builtins.toString keysOk}; push endpoint+cache ref present=${builtins.toString pushOk}";
   }
 )

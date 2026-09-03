@@ -54,8 +54,8 @@ pkgs.writeShellApplication {
 
     if [ "$push_cache" = true ]; then
         ${if sopsSecrets ? attic_cache_token then ''
-          attic login cache https://cache.mippbipp.com "$(< ${sopsSecrets.attic_cache_token.path})"
-          attic push cache:fleet result
+          attic login cache ${globals.cache.endpoint} "$(< ${sopsSecrets.attic_cache_token.path})"
+          attic push cache:${globals.cache.cacheName} result
         '' else ''
           echo "attic push skipped: no attic_cache_token on ${host} (Work host pull-only, push from pewter/warpe)" >&2
           exit 1

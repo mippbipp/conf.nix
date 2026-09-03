@@ -50,7 +50,7 @@ _Avoid_: rebuild, deploy
 ## Globals
 
 **Globals**:
-The single source for facts that outlive any one module — identity, DNS profile, and a per-machine record. Records are typed Role flags declared in `modules/fleet.nix`: NixOS modules read `config.fleet.hosts`, Home Manager receives the merged records as the `globals` argument; never imported directly.
+The single source for facts that outlive any one module — identity, DNS profile, cache endpoints, and a per-machine record. Records are typed Role flags declared in `modules/fleet.nix`: NixOS modules read `config.fleet.hosts`, Home Manager receives the merged records as the `globals` argument; never imported directly.
 _Avoid_: variables, constants
 
 **Role flag**:
