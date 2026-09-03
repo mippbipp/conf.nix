@@ -218,5 +218,37 @@
           host = "hector";
         };
       };
+
+      checks =
+        let
+          systems = [
+            "x86_64-linux"
+            "aarch64-linux"
+          ];
+        in
+        nixpkgs.lib.genAttrs systems (
+          system:
+          let
+            pkgs = nixpkgs.legacyPackages.${system};
+            profile = globals.nextdns.id;
+            profHi = builtins.substring 0 2 profile;
+            profLo = builtins.substring 2 4 profile;
+            sentinel = "2a07:a8c0::${profHi}:${profLo}";
+          in
+          {
+            # The Tailnet policy file is control-plane state outside this
+            # flake's evaluation, so the NextDNS profile cannot be shared by
+            # reference. Fail the gate instead when the two sides drift.
+            # Patterns are quoted HCL strings so prose comments mentioning
+            # the profile cannot satisfy them; the sentinel pins the full
+            # NextDNS linked address (prefix is NextDNS address space).
+            dns-profile-sync = pkgs.runCommand "dns-profile-sync" { } ''
+              tf=${./terraform/tailscale/main.tf}
+              grep -Fq '"nextdns:${profile}"' "$tf" || (echo "nodeAttrs profile mismatch: globals.nextdns.id ${profile} absent from Tailnet policy file" >&2; exit 1)
+              grep -Fq '"${sentinel}"' "$tf" || (echo "sentinel mismatch: expected profile-linked IPv6 ${sentinel} in Tailnet policy file" >&2; exit 1)
+              touch $out
+            '';
+          }
+        );
     };
 }

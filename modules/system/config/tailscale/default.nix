@@ -10,7 +10,6 @@
 let
   self = globals.hosts.${host} or { };
   isExitNode = self.isExitNode or false;
-  isWorkPc = self.isWorkPc or false;
   canSsh = self.canSsh or false;
 in
 {
@@ -33,12 +32,6 @@ in
     })
     (lib.mkIf canSsh {
       extraUpFlags = [ "--ssh" ];
-    })
-    (lib.mkIf isWorkPc {
-      extraUpFlags = [ "--accept-dns=false" ];
-      extraSetFlags = [
-        "--accept-dns=false"
-      ];
     })
   ];
 
