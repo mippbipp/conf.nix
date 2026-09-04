@@ -1,5 +1,9 @@
 .qmlls.ini
 
+# nixos-rebuild build (nrs --push) leaves a ./result symlink
+result
+result-*
+
 # OpenTofu local state - never commit, secrets adjacent (per-stack, see ADR-0011)
 terraform/**/*.tfstate
 terraform/**/*.tfstate.backup
