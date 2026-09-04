@@ -14,6 +14,7 @@
       llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
       llms = [
         llm.opencode2
+        llm.agent-browser
       ];
     in
     with pkgs;
