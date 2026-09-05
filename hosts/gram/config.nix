@@ -30,6 +30,7 @@
     ../../modules/de/hyprland/system.nix
     ../../modules/de/greetd/login.nix
     ../../modules/de/thunar/system.nix
+    ../../modules/de/computer-use-linux/system.nix
     ../../modules/ssh/system.nix
   ];
 
