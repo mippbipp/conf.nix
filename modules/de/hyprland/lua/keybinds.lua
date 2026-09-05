@@ -14,7 +14,7 @@ hl.bind("CTRL + ALT + Delete", hl.dsp.exit())
 hl.bind(mod .. " + B", hl.dsp.exec_cmd("caelestia shell drawers toggle bar"))
 
 hl.bind(mod .. " + Q", hl.dsp.window.close())
-hl.bind(mod .. " + SHIFT + F", hl.dsp.window.fullscreen())
+hl.bind("F11", hl.dsp.window.fullscreen())
 hl.bind(mod .. " + CTRL + F", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + F", function()
 	local ws = hl.get_active_workspace()
