@@ -1,5 +1,4 @@
 {
-  inputs,
   pkgs,
   username,
   host,
@@ -9,41 +8,33 @@
   ...
 }:
 {
-  home.packages =
-    let
-      llm = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system};
-      llms = [
-        llm.opencode2
-      ];
-    in
-    with pkgs;
-    [
-      eza
-      sccache
-      pnpm
-      nodejs
-      python312
-      rust-bin.stable.latest.default
-      uv
-      go
-      tokei
-      repomix
-      opentofu
-      attic-client
-      (import ./scripts/nrs.nix {
-        inherit
-          pkgs
-          username
-          host
-          lib
-          globals
-          sopsSecrets
-          ;
-      })
-    ]
-    ++ llms;
+  home.packages = with pkgs; [
+    eza
+    sccache
+    pnpm
+    nodejs
+    python312
+    rust-bin.stable.latest.default
+    uv
+    go
+    tokei
+    repomix
+    opentofu
+    attic-client
+    (import ./scripts/nrs.nix {
+      inherit
+        pkgs
+        username
+        host
+        lib
+        globals
+        sopsSecrets
+        ;
+    })
+  ];
 
   imports = [
+    ../../llm/hm.nix
     ./git.nix
     ./skills-sync.nix
     ./neovim.nix

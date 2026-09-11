@@ -15,13 +15,12 @@
 # a second server as this user (e.g. `opencode2 service start`); local TUIs
 # attach to this unit automatically via service discovery.
 {
-  inputs,
   pkgs,
   username,
   ...
 }:
 let
-  opencode2 = inputs.llm-agents.packages.${pkgs.stdenv.hostPlatform.system}.opencode2;
+  inherit (pkgs) opencode2;
   backend = "http://127.0.0.1:4096";
 in
 {

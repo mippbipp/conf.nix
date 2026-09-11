@@ -2,8 +2,6 @@
 # compositor window targeting, screenshots, input synthesis).
 # Upstream: https://github.com/agent-sh/computer-use-linux
 # No flake.nix upstream and not in nixpkgs, so fetch the release binaries.
-# Gram-only: the other hosts are WSL guests or headless servers with no
-# desktop to control.
 {
   pkgs,
   lib,

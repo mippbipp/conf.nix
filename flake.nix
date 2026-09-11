@@ -106,6 +106,7 @@
           };
           modules = [
             ./modules/fleet.nix
+            ./modules/llm/overlay.nix
             ./hosts/${host}/config.nix
             stylix.nixosModules.stylix
             nix-index-database.nixosModules.nix-index
@@ -146,16 +147,6 @@
 
                 nixpkgs.overlays = [
                   inputs.rust-overlay.overlays.default
-                  (final: prev: {
-                    t3code =
-                      let
-                        llm = inputs.llm-agents.packages.${final.stdenv.hostPlatform.system};
-                      in
-                      llm.t3code.override {
-                        providerPackages = with llm; [ opencode ];
-                      };
-                  })
-
                 ];
               }
             )

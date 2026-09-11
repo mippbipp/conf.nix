@@ -87,6 +87,10 @@ _Avoid_: remote agent
 The one-time `t3 pair` token exchange that enrolls a client with the pewter remote workspace.
 _Avoid_: login, auth
 
+**Harness**:
+The versioned LLM CLIs shared across hosts and their shared configuration.
+_Avoid_: llm setup
+
 ## DNS layering
 
 **Host-local resolver**:
