@@ -58,6 +58,9 @@ pkgs.writeShellApplication {
         # so build in the temp dir to keep the repo clean.
         ( cd "$workdir" && rebuild build )
     fi
+    if [ -n "$(git -C "/home/${username}/conf.nix" status --porcelain 2>/dev/null || true)" ]; then
+        echo "nrs: working tree dirty -- eval cache is skipped for dirty git trees, so expect a full eval; commit first to warm it" >&2
+    fi
     rebuild switch
 
     if [ "$push_cache" = true ]; then
