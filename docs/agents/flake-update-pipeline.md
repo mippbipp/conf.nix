@@ -37,11 +37,13 @@ The Updater reads the GitHub token from the SOPS secret
 `.gitconfig`, rather than changing the user's Home Manager-managed global Git
 configuration. It also sets the commit identity explicitly.
 
-Each run resets the local branch to `origin/main`, rebases an existing
-`origin/flake-update` branch onto it, and runs `nix flake update`. If
-`flake.lock` is unchanged, it exits successfully without pushing. Otherwise
-it commits `flake.lock`, force-pushes `flake-update` with lease protection,
-creates the PR if absent, and requests rebase auto-merge.
+Each run discards any previous `flake-update` state, resets the local branch
+to `origin/main`, and runs `nix flake update`. (The old branch is never
+rebased: replaying a stale generated lock diff onto a `main` that also moved
+`flake.lock` conflicts, and the update regenerates the lock from scratch
+anyway.) If `flake.lock` is unchanged, it exits successfully without pushing.
+Otherwise it commits `flake.lock`, force-pushes `flake-update` with lease
+protection, creates the PR if absent, and requests rebase auto-merge.
 
 The updater disables recursive submodule fetching during `git fetch`. This is
 required because the repository's submodule URL uses GitHub SSH syntax while

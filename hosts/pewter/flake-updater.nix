@@ -36,14 +36,17 @@ let
       git -C "$repo_dir" config user.email "mippbipp@users.noreply.github.com"
 
       cd "$repo_dir"
-      git -c fetch.recurseSubmodules=false fetch --prune origin main
+      # A previous run may have died mid-rebase and left the checkout wedged;
+      # abort it so the reset below always starts clean.
+      git rebase --abort 2>/dev/null || true
+      # Fetch everything with prune: --force-with-lease below
+      # compares against the origin/flake-update tracking ref, so a remote
+      # branch that moved, or merged and deleted, must be reflected
+      # locally first, or the push is rejected as stale.
+      git -c fetch.recurseSubmodules=false fetch --prune origin
+      # Start fresh from origin/main every run.
       git checkout -B flake-update origin/main
       git reset --hard origin/main
-      git fetch origin flake-update 2>/dev/null || true
-      if git show-ref --verify --quiet refs/remotes/origin/flake-update; then
-          git reset --hard origin/flake-update
-          git rebase origin/main
-      fi
       nix flake update
       if git diff --quiet -- flake.lock; then
           echo "flake.lock is already current"
