@@ -102,7 +102,7 @@
     };
 
     tmpfiles.rules = [
-      "d /tmp 1777 root root 7d"
+      "d /tmp 1777 root root mM:7d"
     ];
   };
 
