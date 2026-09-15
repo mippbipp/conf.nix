@@ -9,7 +9,7 @@ Source of truth for tailnet policy file + DNS. Nix owns devices.
 ## 2. Add secrets (sops)
 
 ```bash
-SOPS_AGE_KEY_FILE=/var/lib/sops-nix/keys.txt sudo -E sops secrets.yaml
+sudo SOPS_AGE_KEY_FILE=/var/lib/sops-nix/keys.txt sudo -E sops secrets.yaml
 # add:
 tailscale_tailnet: your-tailnet.ts.net
 tailscale_oauth_client_id: ENC[...]

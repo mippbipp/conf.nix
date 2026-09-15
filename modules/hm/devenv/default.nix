@@ -96,6 +96,12 @@
           "fzf"
         ];
       };
+      # make envs accessible in all types of shells (login, interactive, non-interactive)
+      envExtra = lib.mkIf (sopsSecrets ? github_token) ''
+        if [ -f "${sopsSecrets.github_token.path}" ]; then
+          export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
+        fi
+      '';
       initContent =
         let
           zshConfig = ''
@@ -103,13 +109,6 @@
             if [ -f $HOME/.zshrc-personal ]; then
               source $HOME/.zshrc-personal
             fi
-
-            # gh CLI auth from sops-managed token (see modules/sops) - absent on Work host hector
-            ${lib.optionalString (sopsSecrets ? github_token) ''
-              if [ -f ${sopsSecrets.github_token.path} ]; then
-                export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
-              fi
-            ''}
 
             eval "$(uv generate-shell-completion zsh)"
             eval "$(uvx --generate-shell-completion zsh)"
