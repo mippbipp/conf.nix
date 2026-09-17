@@ -6,7 +6,7 @@
 }:
 {
   environment.systemPackages = [
-    pkgs.t3code # see flake.nix
+    pkgs.t3code
   ];
 
   # Operator grant (`tailscale set --operator` via `tailscaled-set`) lives in
