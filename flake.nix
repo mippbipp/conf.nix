@@ -35,10 +35,6 @@
         home-manager.follows = "home-manager";
       };
     };
-    oskars-dotfiles = {
-      url = "github:oskardotglobal/.dotfiles/nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     nixos-wsl = {
       url = "github:nix-community/NixOS-WSL/main";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -171,7 +167,6 @@
               { pkgs, lib, ... }:
               {
                 nixpkgs.overlays = [
-                  inputs.oskars-dotfiles.overlays.spotx
                   inputs.nix-cachyos-kernel.overlays.pinned
                 ];
 

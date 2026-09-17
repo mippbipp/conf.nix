@@ -30,7 +30,6 @@
           rclone
           google-chrome
           qbittorrent
-          spotify
           lunar-client
           yt-dlp
           gptfdisk
