@@ -1,6 +1,6 @@
-{ pkgs, ... }:
+{ inputs, pkgs, ... }:
 {
-  environment.systemPackages = with pkgs; [
-    onlyoffice-desktopeditors
+  environment.systemPackages = [
+    inputs.onlyoffice.packages.${pkgs.stdenv.hostPlatform.system}.onlyoffice-desktopeditors
   ];
 }

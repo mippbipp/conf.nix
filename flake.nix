@@ -78,6 +78,10 @@
         rust-overlay.follows = "rust-overlay";
       };
     };
+    onlyoffice = {
+      url = "github:emmanuelrosa/onlyoffice4nixos";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
