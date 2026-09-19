@@ -18,6 +18,7 @@ in
       window-padding-x = 4;
       keybind = "ctrl+enter=ignore";
       shell-integration-features = "sudo,title,ssh-env,ssh-terminfo";
+      app-notifications = false;
     };
   };
   xdg.mimeApps = {
