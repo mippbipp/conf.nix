@@ -6,7 +6,7 @@ Declarative NixOS/home-manager configuration for the host machines, one `hosts/{
 
 | host | role | setup |
 |---|---|---|
-| gram | desktop | [hosts/gram/README.md](./hosts/gram/README.md) |
+| gram | personal laptop | [hosts/gram/README.md](./hosts/gram/README.md) |
 | harpe | WSL guest, personal laptop | [hosts/harpe/README.md](./hosts/harpe/README.md) |
 | warpe | WSL guest, work laptop (company CA) | [hosts/warpe/README.md](./hosts/warpe/README.md) |
 | pewter | Oracle ARM server | [hosts/pewter/README.md](./hosts/pewter/README.md) |
