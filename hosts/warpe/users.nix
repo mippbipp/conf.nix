@@ -12,13 +12,6 @@
         homeMode = "755";
         isNormalUser = true;
         description = username;
-        extraGroups = [
-          "wheel"
-          "scanner"
-          "lp"
-          "input"
-          "uinput"
-        ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         packages = with pkgs; [

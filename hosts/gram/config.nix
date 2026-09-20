@@ -12,7 +12,6 @@
     ../../modules/system/hardware/nvidia-drivers.nix
     ../../modules/system/hardware/nvidia-prime-drivers.nix
     ../../modules/system/hardware/intel-drivers.nix
-    ../../modules/system/hardware/mouse.nix
     ../../modules/system/config/virtualization.nix
     ../../modules/system/config/common.nix
     ../../modules/theme/system.nix
@@ -23,13 +22,13 @@
     ../../modules/system/config/tailscale/default.nix
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix
-    ../../modules/system/apps/obs.nix
-    ../../modules/system/apps/onlyoffice.nix
-    ../../modules/system/apps/gaming.nix
-    ../../modules/de/audio.nix
+    ../../modules/de/apps/system/obs.nix
+    ../../modules/de/apps/system/onlyoffice.nix
+    ../../modules/de/apps/system/gaming.nix
+    ../../modules/de/system/default.nix
     ../../modules/de/hyprland/system.nix
     ../../modules/de/greetd/login.nix
-    ../../modules/de/thunar/system.nix
+    ../../modules/de/apps/thunar/system.nix
     ../../modules/de/computer-use-linux/system.nix
     ../../modules/ssh/system.nix
   ];
@@ -46,10 +45,6 @@
 
       "pci=noaer" # disable AER for non-fatal errors
     ];
-    kernelModules = [
-      "uinput"
-    ];
-    # Bootloader
     loader = {
       systemd-boot = {
         enable = true;
@@ -78,7 +73,6 @@
 
   # Enable networking
   networking = {
-    networkmanager.enable = true;
     timeServers = options.networking.timeServers.default ++ [ "pool.ntp.org" ];
     firewall = {
       enable = true;
@@ -102,33 +96,19 @@
   };
 
   environment = {
-    etc = {
-      "libinput/local-overrides.quirks".text = ''
-        [Never Debounce]
-        MatchUdevType=mouse
-        ModelBouncingKeys=1
-      '';
-    };
     shells = [
       pkgs.zsh # add to /etc/shells
     ];
     systemPackages = with pkgs; [
       lz4 # for zswap
       appimage-run
-      networkmanagerapplet
       playerctl
       imv
     ];
   };
 
   services = {
-    libinput.enable = true;
     fstrim.enable = true;
-  };
-  hardware.sane = {
-    enable = true;
-    extraBackends = [ pkgs.sane-airscan ];
-    disabledDefaultBackends = [ "escl" ];
   };
 
   # This value determines the NixOS release from which the default

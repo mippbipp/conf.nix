@@ -30,7 +30,7 @@ Shared bootstrap and runtime notes for the NixOS-WSL guests. Both hosts import t
 
 ## Secret store
 
-gnome-keyring comes in via the shared module; after first launch open `seahorse` and set the Default keyring password blank so t3code connects without prompting (see [ADR 0017](../../../docs/adr/0017-wsl-secret-store-blank-keyring.md)).
+gnome-keyring comes in via the shared module; after first launch open `seahorse` and set the Default keyring password blank so t3code connects without prompting (see [ADR 0017](../../../../docs/adr/0017-wsl-secret-store-blank-keyring.md)).
 
 ## Cold boot
 

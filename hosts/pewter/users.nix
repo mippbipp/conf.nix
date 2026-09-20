@@ -16,7 +16,6 @@
         description = username;
         extraGroups = [
           "wheel"
-          "networkmanager"
         ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;

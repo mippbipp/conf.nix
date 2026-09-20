@@ -5,6 +5,7 @@
 {
   pkgs,
   lib,
+  username,
   ...
 }:
 let
@@ -63,6 +64,10 @@ in
     # Deterministic fallback; daemon runs per-user below.
     pkgs.ydotool
   ];
+
+  # ydotool fallback needs /dev/uinput: kernel module + group + udev rule.
+  hardware.uinput.enable = true;
+  users.users."${username}".extraGroups = [ "uinput" ]; # user joins created group
 
   # Per-user ydotoold, mirroring upstream install.sh. Never system-wide:
   # doctor only trusts sockets under $XDG_RUNTIME_DIR or /tmp.

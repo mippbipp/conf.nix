@@ -1,4 +1,9 @@
-_: {
+{
+  pkgs,
+  username,
+  ...
+}:
+{
   services = {
     printing = {
       enable = true;
@@ -11,4 +16,15 @@ _: {
       openFirewall = true;
     };
   };
+
+  hardware.sane = {
+    enable = true;
+    extraBackends = [ pkgs.sane-airscan ];
+    disabledDefaultBackends = [ "escl" ];
+  };
+
+  users.users."${username}".extraGroups = [
+    "scanner"
+    "lp"
+  ];
 }

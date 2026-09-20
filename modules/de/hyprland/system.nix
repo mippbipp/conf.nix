@@ -1,23 +1,16 @@
 { pkgs, ... }:
 {
   imports = [
-    ./lock/system.nix
+    ./quickshell/lock.nix
   ];
 
   environment.systemPackages = with pkgs; [
-    libnotify
-    i2c-tools
-    pavucontrol
-    pulseaudio
-    alsa-utils
     wev
 
     normcap
     grim # wayland support for normcap
 
     wl-clipboard
-    ifuse
-    libimobiledevice
     hyprpicker
     hyprland-qtutils
     wl-mirror
@@ -46,20 +39,4 @@
     ];
   };
 
-  services = {
-    usbmuxd = {
-      enable = true;
-      package = pkgs.usbmuxd2;
-    };
-  };
-
-  # ddcutil
-  hardware.i2c.enable = true;
-
-  # Bluetooth Support
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = false;
-  };
-  services.blueman.enable = true;
 }

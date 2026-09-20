@@ -9,9 +9,13 @@ let
   luaConfig = "${hyprConfig}/lua";
 in
 {
+  imports = [
+    ./quickshell/hm.nix
+    ./env.nix
+  ];
+
   services = {
     hyprpolkitagent.enable = true;
-    network-manager-applet.enable = true;
   };
   wayland.windowManager.hyprland = {
     enable = true;
@@ -36,8 +40,4 @@ in
       }
     '';
   };
-
-  imports = [
-    ./env.nix
-  ];
 }

@@ -33,7 +33,13 @@ in
         user = "git";
       };
     }
-    // mesh.peerEntries { hosts = globals.hosts; inherit host username; }
-    // mesh.luksEntries { hosts = globals.hosts; inherit host; };
+    // mesh.peerEntries {
+      inherit (globals) hosts;
+      inherit host username;
+    }
+    // mesh.luksEntries {
+      inherit (globals) hosts;
+      inherit host;
+    };
   };
 }

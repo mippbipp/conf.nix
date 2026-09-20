@@ -15,14 +15,7 @@
         isNormalUser = true;
         description = username;
         extraGroups = [
-          "networkmanager"
           "wheel"
-          "scanner"
-          "lp"
-          "input"
-          "uinput"
-          "i2c"
-          "dialout"
         ];
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;

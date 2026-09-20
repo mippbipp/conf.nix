@@ -8,13 +8,14 @@ _: {
     ../../modules/theme/hm.nix
     ../../modules/hm/devenv/default.nix
     ../../modules/de/hm.nix
-    ../../modules/de/thunar/hm.nix
+    ../../modules/de/hyprland/hm.nix
+    ../../modules/de/apps/thunar/hm.nix
     ../../modules/de/computer-use-linux/hm.nix
-    ../../modules/hm/apps/ghostty.nix
-    ../../modules/hm/apps/winapps/default.nix
-    ../../modules/hm/apps/zen/default.nix
-    ../../modules/hm/apps/mpv.nix
-    ../../modules/hm/apps/discord.nix
+    ../../modules/de/apps/hm/ghostty.nix
+    ../../modules/de/apps/hm/winapps/default.nix
+    ../../modules/de/apps/hm/zen/default.nix
+    ../../modules/de/apps/hm/mpv.nix
+    ../../modules/de/apps/hm/discord.nix
     ../../modules/ssh/hm.nix
   ];
 }

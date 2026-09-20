@@ -1,9 +1,8 @@
 _: {
   imports = [
-    ./vicinae.nix
-    ./hyprland/hm.nix
-    ./quickshell.nix
-    ../hm/apps/flameshot.nix
+    ./apps/hm/vicinae.nix
+    ./apps/hm/flameshot.nix
+    ./apps/networkmanager/hm.nix
   ];
 
   home.file."Pictures/Wallpapers" = {
