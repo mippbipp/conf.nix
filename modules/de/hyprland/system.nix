@@ -35,6 +35,7 @@
   xdg.portal = {
     enable = true;
     extraPortals = [
+      # for file picker (XDPH doesn't have it)
       pkgs.xdg-desktop-portal-gtk
     ];
   };

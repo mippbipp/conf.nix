@@ -118,7 +118,7 @@
             ./modules/llm/overlay.nix
             ./hosts/${host}/config.nix
             stylix.nixosModules.stylix
-            nix-index-database.nixosModules.nix-index
+            nix-index-database.nixosModules.default
             home-manager.nixosModules.home-manager
             (
               {
