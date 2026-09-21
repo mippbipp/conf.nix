@@ -42,8 +42,8 @@ adding a host of a covered arch touches zero CI files.
   Separate decision, not a substitute.
 - **Synthetic per-host check-runs** fanned out from the arch job via the
   Checks API: preserves `build <host>` names in the GitHub UI, but buys a
-  bespoke reporting shim the deployer and `build-matrix-sync` must then
-  trust. The shim is more code than the dedup it serves. Rejected.
+  bespoke reporting shim the `build-matrix-sync` must then trust. The shim
+  is more code than the dedup it serves. Rejected.
 
 ## Consequences
 
@@ -55,7 +55,5 @@ adding a host of a covered arch touches zero CI files.
   arch needs one `- system:` matrix row plus its ruleset entry.
   `build-matrix-sync` enforces coverage (every declared host's system has a
   job; no job covers zero hosts) instead of the old host-row pinning.
-- The Deployer needs no logic change: its `startswith("build ")` lookup
-  matches the arch check names, and per-host coverage is enforced pre-merge.
 - Failure attribution moves from check names to grouped log sections; the
   recovery runbook points at the arch job log first.

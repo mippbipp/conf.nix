@@ -4,8 +4,7 @@ This repository updates `flake.lock` from pewter and merges only revisions
 that pass the Build gate for every host. The design rationale is in
 `docs/adr/0009-flake-update-pipeline.md`; this document is the operational
 runbook and implementation reference. Host names are intentionally not
-enumerated here: the gate builds every `nixosConfigurations.<host>` entry,
-the Deployer verifies every `build <system>` check, and
+enumerated here: the gate builds every `nixosConfigurations.<host>` entry, and
 `docs/agents/adding-a-host.md` covers adding a host.
 
 ## Pipeline
@@ -25,12 +24,7 @@ The sequence is:
    as `build <host>` sections in that arch's job log.
 4. GitHub auto-merge is enabled by the Updater, but merge waits for all
    required `build <system>` checks to pass.
-5. `flake-deployer.timer` runs Mondays around 06:00 on pewter with persistence and a
-   30-minute randomized delay.
-6. `flake-deployer.service` verifies the merged revision, switches pewter,
-   runs the health gate, and pushes the deployed closure to the fleet Attic
-   cache.
-7. `.github/workflows/watchdog.yml` runs on the 1st of each month at 09:00 UTC and fails when
+5. `.github/workflows/watchdog.yml` runs on the 1st of each month at 09:00 UTC and fails when
    the latest `flake.lock` commit is more than thirty days old.
 
 ## Updater
@@ -88,75 +82,6 @@ section for the failing host before changing the
 pipeline. A PR must have every `build <system>` check successful before it is eligible for
 auto-merge.
 
-## Deployer
-
-The Deployer uses `/var/lib/flake-deployer` and reads the SOPS GitHub token
-plus the SOPS Attic cache token. It fetches `main` with submodule recursion
-disabled (the user gitconfig sets `submodule.recurse=true`, so the fetch and
-checkout pass `-c submodule.recurse=false`), then initializes submodules with
-this rewrite:
-
-```text
-git@github.com: -> https://github.com/
-```
-
-If the pinned submodule commit is not on any upstream branch (e.g. after an
-upstream amend/force-push), the first submodule update fails; the Deployer
-then fetches each pinned submodule SHA explicitly and retries once.
-
-Before switching, it:
-
-1. Resolves the pull request associated with the current `main` commit.
-2. Reads that PR's `headRefOid`.
-3. Checks every `build <system>` check-run on that head commit.
-4. Stops if the merged commit has no associated PR, no `build <system>` checks
-   exist, or any such check is absent or unsuccessful. Per-host coverage is
-   enforced pre-merge by the `build-matrix-sync` gate check, which fails when
-   a declared host's system has no arch job covering it.
-
-The check lookup uses the PR head commit because a rebase merge creates a new
-main commit that may not have its own GitHub check runs.
-
-The switch uses NixOS's setuid wrapper, not the unprivileged `sudo` binary in
-the Nix store:
-
-```sh
-/run/wrappers/bin/sudo nixos-rebuild switch --flake ".?submodules=1#pewter"
-```
-
-The service records `/run/current-system` before switching. If the rebuild
-fails, it switches back to that generation. After a successful switch it
-requires:
-
-- `tailscale status` to succeed
-- `t3code.service` to be active
-- `sshd.service` to be active
-
-If any probe fails, it switches back, adds or updates a marked health-gate
-comment on the PR, and exits unsuccessfully.
-
-After the health gate passes, it publishes the deployed closure:
-
-```sh
-attic push cache:fleet /run/current-system
-```
-
-A push failure does not roll back the healthy switch, but it fails the
-service so the timer goes red.
-
-Manual operation:
-
-```sh
-ssh pewter 'sudo systemctl status flake-deployer.timer'
-ssh pewter 'sudo systemctl start flake-deployer.service'
-ssh pewter 'sudo systemctl status flake-deployer.service --no-pager'
-ssh pewter 'sudo journalctl -u flake-deployer.service -n 100 --no-pager'
-```
-
-Completion requires `status=0/SUCCESS`, an active timer, and successful
-health probes in the service journal. A successful `nixos-rebuild` alone is
-not sufficient evidence.
-
 ## Watchdog
 
 The Watchdog checks the newest commit touching `flake.lock`. It runs on the
@@ -169,22 +94,20 @@ gh run watch <run-id> --exit-status
 ```
 
 The required evidence is a completed run with conclusion `success` and a
-recent-lock message. A failure means the Updater may be stale even if both
-systemd timers still exist.
+recent-lock message. A failure means the Updater may be stale even if the
+systemd timer still exists.
 
 ## Recovery And Evidence
 
-For a failed update or deployment, collect evidence in this order:
+For a failed update, collect evidence in this order:
 
 1. `gh pr view <number>` and `gh pr checks <number>`.
 2. The failed Build gate job log, if applicable.
-3. `systemctl status` and `journalctl` for the relevant pewter service.
-4. The current and previous NixOS generations if a switch occurred.
-5. Watchdog status and the last `flake.lock` commit age.
+3. `systemctl status` and `journalctl` for the updater service on pewter.
+4. Watchdog status and the last `flake.lock` commit age.
 
-Do not bypass the Build gate to deploy an unverified revision. If a service
-change is needed, send it through a pull request and wait for every `build <system>` check
-before retrying the Deployer.
+Do not bypass the Build gate to land an unverified revision. If a service
+change is needed, send it through a pull request and wait for every `build <system>` check.
 
 ## Host Changes
 

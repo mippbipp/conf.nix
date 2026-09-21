@@ -15,7 +15,7 @@
   # Structured URL/key pairs (positional lists drift); the fleet entry is
   # derived from endpoint/cacheName so the three spellings of the own cache
   # (host, URL, cache:ref) collapse to two strings. Consumers (nix.nix pull
-  # lists, attic.nix serving path, deployer/nrs push) interpolate the derived
+  # lists, attic.nix serving path, nrs push) interpolate the derived
   # values; the attic-cache-sync flake check pins the Build gate YAML.
   cache = rec {
     host = "cache.mippbipp.com";

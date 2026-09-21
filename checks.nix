@@ -83,13 +83,15 @@ nixpkgs.lib.genAttrs systems (
         # Scope to the build-closure job: the checks job below has its own
         # `- system:` rows over the same systems.
         closureSection = builtins.head (nixpkgs.lib.splitString "\n  checks:" gate);
-        matrixSystems = nixpkgs.lib.unique (nixpkgs.lib.concatMap (
-          line:
-          let
-            m = builtins.match " *- system: ([a-z0-9_.-]+) *" line;
-          in
-          if m == null then [ ] else m
-        ) (nixpkgs.lib.splitString "\n" closureSection));
+        matrixSystems = nixpkgs.lib.unique (
+          nixpkgs.lib.concatMap (
+            line:
+            let
+              m = builtins.match " *- system: ([a-z0-9_.-]+) *" line;
+            in
+            if m == null then [ ] else m
+          ) (nixpkgs.lib.splitString "\n" closureSection)
+        );
         hostSystems = nixpkgs.lib.mapAttrs (_: c: c.config.nixpkgs.hostPlatform.system) nixosConfigurations;
         declared = builtins.attrNames nixosConfigurations;
         uncovered = builtins.filter (h: !(builtins.elem hostSystems.${h} matrixSystems)) declared;
@@ -105,7 +107,7 @@ nixpkgs.lib.genAttrs systems (
     # extra-trusted-public-keys row must equal the globals.cache derivation in
     # order (substituter order is a performance decision), and the push step
     # must reference the same endpoint and cache name. Nix-side consumers
-    # (nix.nix, attic.nix, deployer, nrs) interpolate globals.cache directly
+    # (nix.nix, attic.nix, nrs) interpolate globals.cache directly
     # and are correct by construction, so only YAML is asserted here.
     attic-cache-sync =
       let

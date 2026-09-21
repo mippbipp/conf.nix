@@ -2,7 +2,7 @@
 
 The verified flake update pipeline is documented in
 [`docs/agents/flake-update-pipeline.md`](../../docs/agents/flake-update-pipeline.md).
-Use that runbook for service status, manual updater/deployer runs, Build gate
+Use that runbook for service status, manual updater runs, Build gate
 verification, watchdog checks, and rollback evidence.
 
 - set LUKS password in `/tmp/pewter-luks.key`

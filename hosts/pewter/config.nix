@@ -28,7 +28,6 @@
     ./attic.nix
     ./karakeep.nix
     ./flake-updater.nix
-    ./flake-deployer.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;

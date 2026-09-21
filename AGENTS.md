@@ -20,7 +20,7 @@ conditional infrastructure surfaces.
 
 When changing, diagnosing, or operating the flake update pipeline, read
 `docs/agents/flake-update-pipeline.md`. It defines the updater, Build gate,
-deployer, watchdog, state directories, and recovery evidence to collect.
+watchdog, state directories, and recovery evidence to collect.
 
 ## Encrypted secrets
 

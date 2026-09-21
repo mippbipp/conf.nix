@@ -1,10 +1,9 @@
-# Internal seam for the Updater and Deployer modules on pewter.
+# Internal seam for the Updater module on pewter.
 #
 # Interface: a function of the sops GitHub token path, returning the shell
-# prelude both tasks share (auth export plus state-checkout bootstrap).
+# prelude the updater needs (auth export plus state-checkout bootstrap).
 # The prelude expects the caller's `$repo_dir` to be set. Imported by
-# flake-updater.nix and flake-deployer.nix only; never by a host config
-# directly.
+# flake-updater.nix only; never by a host config directly.
 { githubTokenPath }:
 let
   repo = "mippbipp/conf.nix";
