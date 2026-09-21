@@ -72,26 +72,34 @@ nixpkgs.lib.genAttrs systems (
         throw "fleet registry is not strict: typo'd Role flag or wrong type evaluated successfully";
     # The Build gate matrix is control-plane-adjacent YAML outside this
     # flake's references, so pin it by parsing instead: every declared
-    # host needs one `- host:` matrix row and vice versa. Fail the gate
-    # when a host addition forgets either side.
+    # host's system must be covered by exactly one per-arch `build <system>`
+    # job, and every arch job must have at least one host. Hosts are
+    # enumerated from the flake at CI time, so adding a host of an
+    # already-covered arch needs no workflow edit — this check fails the
+    # gate when a host's arch has no job (or a job covers nothing).
     build-matrix-sync =
       let
         gate = builtins.readFile ./.github/workflows/build-gate.yml;
-        matrixHosts = nixpkgs.lib.concatMap (
+        # Scope to the build-closure job: the checks job below has its own
+        # `- system:` rows over the same systems.
+        closureSection = builtins.head (nixpkgs.lib.splitString "\n  checks:" gate);
+        matrixSystems = nixpkgs.lib.unique (nixpkgs.lib.concatMap (
           line:
           let
-            m = builtins.match " *- host: ([a-z0-9-]+) *" line;
+            m = builtins.match " *- system: ([a-z0-9_.-]+) *" line;
           in
           if m == null then [ ] else m
-        ) (nixpkgs.lib.splitString "\n" gate);
+        ) (nixpkgs.lib.splitString "\n" closureSection));
+        hostSystems = nixpkgs.lib.mapAttrs (_: c: c.config.nixpkgs.hostPlatform.system) nixosConfigurations;
         declared = builtins.attrNames nixosConfigurations;
-        missing = builtins.filter (h: !(builtins.elem h matrixHosts)) declared;
-        phantom = builtins.filter (h: !(builtins.elem h declared)) matrixHosts;
+        uncovered = builtins.filter (h: !(builtins.elem hostSystems.${h} matrixSystems)) declared;
+        usedSystems = nixpkgs.lib.unique (builtins.attrValues hostSystems);
+        phantom = builtins.filter (s: !(builtins.elem s usedSystems)) matrixSystems;
       in
-      if missing == [ ] && phantom == [ ] then
+      if uncovered == [ ] && phantom == [ ] then
         pkgs.runCommand "build-matrix-sync" { } "touch $out"
       else
-        throw "build gate matrix mismatch: missing rows for ${builtins.toString missing}; phantom rows for ${builtins.toString phantom}";
+        throw "build gate matrix mismatch: hosts without an arch job ${builtins.toJSON uncovered}; arch jobs without hosts ${builtins.toJSON phantom}";
     # The Build gate YAML is control-plane-adjacent text outside this flake's
     # references, so pin it by parsing instead: every extra-substituters /
     # extra-trusted-public-keys row must equal the globals.cache derivation in

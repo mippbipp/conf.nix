@@ -50,8 +50,10 @@ let
           exit 1
       fi
       check_commit="$(gh pr view "$pr" --repo "$GH_REPO" --json headRefOid --jq '.headRefOid')"
-      # Generalize over every `build <host>` check so new hosts are covered
-      # without editing the deployer. The Build gate names one job per host.
+      # Generalize over every `build <system>` check so new hosts are covered
+      # without editing the deployer. The Build gate names one job per arch,
+      # each building every host of that arch; per-host coverage is enforced
+      # by the build-matrix-sync gate check, not here.
       check_runs_url="repos/$GH_REPO/commits/$check_commit/check-runs?per_page=100"
       build_count="$(gh api "$check_runs_url" --jq '[.check_runs[] | select(.name | startswith("build "))] | length')"
       if [ -z "$build_count" ] || [ "$build_count" = "0" ]; then

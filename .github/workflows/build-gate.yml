@@ -9,22 +9,16 @@ concurrency:
 
 jobs:
   build-closure:
-    name: build ${{ matrix.host }}
+    name: build ${{ matrix.system }}
     runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 350
     strategy:
       fail-fast: false
       matrix:
         include:
-          - host: gram
+          - system: x86_64-linux
             runs-on: ubuntu-latest
-          - host: harpe
-            runs-on: ubuntu-latest
-          - host: warpe
-            runs-on: ubuntu-latest
-          - host: pewter
-            runs-on: ubuntu-24.04-arm
-          - host: hector
+          - system: aarch64-linux
             runs-on: ubuntu-24.04-arm
     steps:
       - name: Rewrite submodule SSH URLs
@@ -42,22 +36,48 @@ jobs:
       - name: Install Attic client
         run: nix profile install nixpkgs#attic-client
 
-      - name: Build system closure
+      - name: Build system closures
         env:
           NIX_CONFIG: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
             extra-substituters = https://cache.mippbipp.com/fleet https://hyprland.cachix.org https://winapps.cachix.org/ https://vicinae.cachix.org https://attic.xuyh0120.win/lantian https://cache.numtide.com
             extra-trusted-public-keys = fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g= vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc= lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc= niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
-        run: nix build -L ".#nixosConfigurations.${{ matrix.host }}.config.system.build.toplevel"
+        # One job per arch builds every host of that arch in a single
+        # /nix/store, so shared derivations compile once and hit locally 
+        # for the rest. Hosts are enumerated from the flake, so adding a 
+        # host of an already-covered arch needs no workflow edit. The 
+        # loop keeps going after a failure via the `fail-fast: false` signal across hosts.
+        run: |
+          hosts_json="$(nix eval --json '.#nixosConfigurations' --apply 'cfgs: builtins.mapAttrs (h: c: c.config.nixpkgs.hostPlatform.system) cfgs')"
+          hosts="$(echo "$hosts_json" | jq -r --arg sys "${{ matrix.system }}" 'to_entries[] | select(.value == $sys) | .key')"
+          if [ -z "$hosts" ]; then
+            echo "no hosts found for system ${{ matrix.system }}: $hosts_json" >&2
+            exit 1
+          fi
+          echo "building hosts for ${{ matrix.system }}: $hosts"
+          status=0
+          for host in $hosts; do
+            echo "::group::build $host"
+            if ! nix build -L ".#nixosConfigurations.$host.config.system.build.toplevel" -o "result-$host"; then
+              status=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $status
 
-      - name: Push closure to Attic
+      - name: Push closures to Attic
         if: github.event.pull_request.head.repo.full_name == github.repository
         env:
           ATTIC_CACHE_TOKEN: ${{ secrets.ATTIC_CACHE_TOKEN }}
         run: |
           attic login cache https://cache.mippbipp.com "$ATTIC_CACHE_TOKEN"
-          attic push cache:fleet result
+          status=0
+          for r in result-*; do
+            [ -e "$r" ] || continue
+            attic push cache:fleet "$r" || status=1
+          done
+          exit $status
 
   checks:
     name: checks ${{ matrix.system }}

@@ -18,11 +18,14 @@ hostname and finish every applicable item before considering the host added.
 4. Add `hosts.<host>` to `modules/fleet.nix`. Use an empty record when no
    other machine needs facts about it; add only cross-host facts and Role
    flags that shared modules consume.
-5. Add `<host>` to the matrix in `.github/workflows/build-gate.yml`. The
-   runner must match the host platform. The resulting `build <host>` check is
+5. Check whether the host's arch is already covered by the `build-closure`
+   matrix in `.github/workflows/build-gate.yml` (one `- system:` row per
+   arch). A host of an already-covered arch is picked up automatically —
+   no workflow edit. Only a new arch needs a matrix row with a runner
+   matching the host platform. The resulting `build <system>` check is
    part of the Build gate.
-6. Add `build <host>` to the repository ruleset's required status checks on
-   GitHub. This is control-plane state, not a Nix file, and must be updated
+6. Add `build <system>` to the repository ruleset's required status checks on
+   GitHub when step 5 added a new arch. This is control-plane state, not a Nix file, and must be updated
    after the first workflow run creates the check.
 
 ## Host Surface
@@ -50,7 +53,8 @@ hostname and finish every applicable item before considering the host added.
 2. Update shared docs or an ADR when adding the host changes a fleet-wide
     invariant, a role definition, the Build gate architecture, or the
     control-plane inventory — e.g., `hector` introduced the `Work host` /
-    `Tag isolation` glossary in `CONTEXT.md` and the `build hector` gate.
+    `Tag isolation` glossary in `CONTEXT.md` and the `build aarch64-linux`
+    gate coverage for its arch.
     A normal host addition does not require editing every document that
     mentions existing host names.
 
@@ -64,7 +68,8 @@ nix build ".#nixosConfigurations.<host>.config.system.build.toplevel"
 ```
 
 Then confirm all of these are true: the host evaluates and builds, the
-`build <host>` check passes on a pull request, the check is required by the
+`build <system>` check for its arch passes on a pull request (with a
+grouped `build <host>` section for the new host in that job's log), the check is required by the
 main ruleset, and the host's bootstrap or deployment procedure is documented.
 
 ## Derived Surfaces

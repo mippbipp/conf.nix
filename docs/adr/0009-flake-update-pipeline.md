@@ -23,3 +23,5 @@ Why this shape: verification needs native x86_64 *and* aarch64 compute; GitHub p
 - Branch protection requiring the gate checks also blocks direct pushes to main; deliberate local work goes through PRs (or admin bypass stays enabled knowingly).
 - Bootstrap circularity: the Updater config lives in the repo it pushes to; first install is a manual `nrs pewter`.
 - WSL hosts are built but never booted by CI — runtime breakage there still surfaces on next interactive use.
+
+Status: accepted, partially superseded by 0018 (gate architecture only — one job per host became one job per arch).
