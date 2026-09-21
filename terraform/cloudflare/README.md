@@ -6,7 +6,7 @@ Upstream `nginx` on pewter terminates TLS (`hosts/pewter/attic.nix` `enableACME`
 
 ## Credentials
 
-`CLOUDFLARE_API_TOKEN` and `cloudflare_account_id` are in `secrets.yaml` via `sops.nix` (`modules/system/config/sops.nix`). Export before tofu:
+`CLOUDFLARE_API_TOKEN` and `cloudflare_account_id` are in `secrets/me.yaml` via `sops.nix` (`modules/system/config/sops.nix`). Export before tofu:
 
 ```bash
 export CLOUDFLARE_API_TOKEN="$(sudo cat /run/secrets/cloudflare_api_token)"

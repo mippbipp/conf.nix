@@ -6,7 +6,7 @@ into local state.
 
 ## Credentials
 
-`secrets.yaml` contains the OCI tenancy ID, API user OCID, fingerprint, private
+`secrets/me.yaml` contains the OCI tenancy ID, API user OCID, fingerprint, private
 key, region, and budget alert recipient. `sops.nix` exposes them under
 `/run/secrets/` after the host configuration has been deployed. Export only for
 the current OpenTofu shell:

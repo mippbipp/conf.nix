@@ -30,6 +30,16 @@ let
         default = false;
         description = "Role flag: runs a reachable sshd; appears in peers' SSH mesh.";
       };
+      usesWorkGit = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: carries the work GitLab identity (directory-gated ~/work/); reads the work-only sops file.";
+      };
+      hasRepoCheckout = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Role flag: carries a ~/conf.nix checkout; repo-gated home files resolve out-of-store.";
+      };
       unlocksPewter = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -84,6 +94,7 @@ in
     harpe = { };
     warpe = {
       isWorkPc = true;
+      usesWorkGit = true;
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJFlGnfX0uWipIXc1rpZap0ZxEdGTi4s+QhxriJ5bBcM mippbipp@warpe";
     };
     pewter = {
@@ -94,10 +105,15 @@ in
       remoteBuilds = true;
       acceptsTailnetSsh = true;
       acceptsSsh = true;
+      usesWorkGit = true;
     };
     hector = {
       acceptsTailnetSsh = true;
       acceptsSsh = true;
+      usesWorkGit = true;
+      # No repo checkout by design (receives deployments via pewter);
+      # repo-gated home files ship from the store instead.
+      hasRepoCheckout = false;
     };
     brick = {
       external = true;

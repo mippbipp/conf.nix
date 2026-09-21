@@ -26,7 +26,7 @@ state. Migration proceeded in this order:
 1. Inventory all root-tenancy pewter resources and their dependencies.
 2. Add the provider configuration and resource declarations without applying
    them. The initial plan declared 11 imports.
-3. Add OCI credentials to `secrets.yaml`, expose them through `sops.nix`, and
+3. Add OCI credentials to `secrets/me.yaml`, expose them through `sops.nix`, and
    export them only for OpenTofu commands.
 4. Import every live resource into local OpenTofu state.
 5. Require a reviewed plan with no unexpected creates, replacements, or

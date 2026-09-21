@@ -24,4 +24,4 @@ watchdog, state directories, and recovery evidence to collect.
 
 ## Encrypted secrets
 
-Before editing `secrets.yaml`, set `SOPS_AGE_KEY_FILE=<filepath from modules/system/config/sops.nix>` in the command environment. Verify the encrypted diff afterward and keep decrypted values out of command output.
+Before editing `secrets/me.yaml`, set `SOPS_AGE_KEY_FILE=<filepath from modules/system/config/sops.nix>` in the command environment. Verify the encrypted diff afterward and keep decrypted values out of command output.

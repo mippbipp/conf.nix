@@ -1,9 +1,20 @@
 {
   pkgs,
   config,
+  lib,
+  host,
+  globals,
   ...
 }:
+let
+  outOfStore = globals.hosts.${host}.hasRepoCheckout;
+in
 {
+  assertions = lib.optional (!outOfStore) {
+    assertion = builtins.pathExists ./nvim/init.lua;
+    message = "nvim submodule content is missing from the flake source: run git submodule update --init and evaluate with ?submodules=1";
+  };
+
   home = {
     packages = with pkgs; [
       clang # cc for nvim-treesitter
@@ -51,6 +62,13 @@
 
   # Prevent home-manager's neovim module from creating init.lua to symlink the whole directory.
   xdg.configFile."nvim/init.lua".enable = pkgs.lib.mkForce false;
+
+  # Checkout hosts symlink out-of-store for live-edit without rebuilds.
+  # Checkout-free hosts ship the same files from the store, always in
+  # sync with the deployed system; plugin updates ride along with nrs.
   xdg.configFile."nvim".source =
-    config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/hm/devenv/nvim";
+    if outOfStore then
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/hm/devenv/nvim"
+    else
+      ./nvim;
 }

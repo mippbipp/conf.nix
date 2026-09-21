@@ -68,7 +68,7 @@ unset token
 Record the `Public Key` from `attic cache info` in
 `modules/system/config/nix.nix` and the Build gate workflow. The private
 signing material stays in Attic's database; client write tokens belong in
-`secrets.yaml` and must never be committed in plaintext.
+`secrets/me.yaml` and must never be committed in plaintext.
 
 Deploy configuration changes with `nrs pewter`, then check:
 

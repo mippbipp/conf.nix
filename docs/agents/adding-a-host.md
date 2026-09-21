@@ -33,7 +33,7 @@ hostname and finish every applicable item before considering the host added.
 1. Add `hosts/<host>/README.md` when bootstrap, disk, firmware, secrets,
    networking, or first-deploy steps are not obvious from the shared README.
    Update the host table and any shared bootstrap instructions in `README.md`.
-2. Add host-specific secrets to `secrets.yaml` only when required. Before
+2. Add host-specific secrets to `secrets/me.yaml` only when required. Before
    editing it, set `SOPS_AGE_KEY_FILE` to the key path declared in
    `modules/system/config/sops.nix`, and inspect only the encrypted diff.
 3. Add an SSH alias or other client binding when the host is reached through a

@@ -39,14 +39,20 @@ aws ec2 authorize-security-group-ingress --group-id $(tofu -chdir=terraform/aws-
 
 **Done when** `aws ec2 describe-security-groups --group-ids $(tofu -chdir=terraform/aws-hector output -raw sg_id)` shows your `/32` on `22`.
 
-### 4. Extra-files (tailscale auth)
+### 4. Extra-files (tailscale auth + work sops key)
 
 ```bash
 mkdir -p /tmp/hector-extra-files/var/lib/tailscale
 echo "tskey-auth-..." > /tmp/hector-extra-files/var/lib/tailscale/authkey; chmod 600 $_
 ```
 
-**Done when** `authkey` is `600` under `/tmp/hector-extra-files`.
+```bash
+# work recipient only (.sops.yaml: secrets/work.yaml -> admin_wob)
+mkdir -p /tmp/hector-extra-files/var/lib/sops-nix
+install -Dm400 /path/to/work-age-key.txt /tmp/hector-extra-files/var/lib/sops-nix/keys.txt
+```
+
+**Done when** `authkey` is `600` and `keys.txt` is `400` under `/tmp/hector-extra-files`.
 
 ### 5. Install
 
@@ -97,17 +103,20 @@ aws ec2 describe-instances --instance-ids $(tofu -chdir=$HOME/conf.nix/terraform
 aws ec2 modify-volume --volume-id vol-xxx --size 120 && ssh hector -- sudo btrfs filesystem resize max /
 
 # add hector to current machine's ssh:
-nrs
+nrs --push
 
 # build hector
-nrs --push hector
+nrs hector
 ```
 
 **Done when** SG has no `22` ingress, `stop` keeps volume, `btrfs resize` reflects new size.
+
+## Agent skills on hector
+
+hector has no personal GitHub access, so it syncs `~/.agents/skills` through its own read-only deploy key. Follow `modules/hm/devenv/skills-sync/README.md` to set it up.
 
 ## Reference
 
 - **Cost:** `m7g.medium $0.0408/h` (`$29.78/mo` 24/7, `~$7.2/mo` 8h×22d + `~$6.4/mo` 80 GB gp3). `terraform/aws-hector/main.tf:194` is source for type/size.
 - **IAM:** least-priv profile (`AmazonSSMManagedInstanceCore` + `eks:Describe/*` + `eks:Create/Delete` on `Owner` tag + `ec2:Describe*` + `iam:Get/List` + `ssm:StartSession` + `iam:PassRole` → `eks.amazonaws.com`), not `AdministratorAccess`. Source `terraform/aws-hector/main.tf:119`.
-- **Verify host:** `nix flake check; nix build ".#nixosConfigurations.hector.config.system.build.toplevel"` (`docs/agents/adding-a-host.md:55`).
-
+- **Verify host:** `nix flake check; nix build "git+file://$PWD?submodules=1#nixosConfigurations.hector.config.system.build.toplevel"` (`docs/agents/adding-a-host.md:55`).

@@ -17,6 +17,7 @@
     ./disko.nix
     ./users.nix
     ../../modules/system/config/sops.nix
+    ../../modules/system/config/sops-work.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix

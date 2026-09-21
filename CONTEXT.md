@@ -25,6 +25,20 @@ _Avoid_: personal machine (ambiguous)
 The tailnet grants that restrict `hector` to `tag:work`. Only `warpe` and `gram` can reach it, and it can only reach `pewter` and the internet.
 _Avoid_: ACL isolation (generic)
 
+## Work identity
+
+**Work identity**:
+The work git name, email, and SSH key applied on dual-use hosts for checkouts under `~/work/` via a conditional git include. Personal identity stays the global default everywhere.
+_Avoid_: work account
+
+**Work secret file**:
+The work-only sops file decryptable solely on `warpe` and `hector` with the work age identity. The shared personal file never lands on a Work host.
+_Avoid_: work secrets
+
+**Conditional identity**:
+Directory-gated git identity selection (`includeIf gitdir:`) instead of per-repo configuration.
+_Avoid_: per-repo config
+
 ## Gram GPU policy
 
 **Offload launch**:

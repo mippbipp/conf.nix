@@ -36,7 +36,7 @@
   imports = [
     ../../llm/hm.nix
     ./git.nix
-    ./skills-sync.nix
+    ./skills-sync
     ./neovim.nix
     ./starship.nix
     ./superfile/default.nix
