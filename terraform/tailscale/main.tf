@@ -28,7 +28,7 @@ resource "tailscale_acl" "main" {
     grants = [
       # Allow personal members exit-node / internet egress
       { src = ["autogroup:member"], dst = ["autogroup:internet"], ip = ["*"] },
-      # Personal -> Work host (hector tag:work) for nrs --target-host and ssh (22 only)
+      # Personal -> Work host (hector tag:work) for nrs --target-host and ssh (22)
       { src = ["autogroup:member"], dst = ["tag:work"], ip = ["tcp:22"] },
       # Work host -> personal cache pull (Attic pewter 443, public pull-only) and internet egress
       { src = ["tag:work"], dst = ["autogroup:member"], ip = ["tcp:443"] },

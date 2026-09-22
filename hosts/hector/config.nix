@@ -20,7 +20,6 @@
     ../../modules/system/config/programs.nix
     ../../modules/system/config/dns.nix
     ../../modules/system/config/tailscale
-    ../../modules/system/config/tailscale/t3code-serve.nix
   ];
 
   security.sudo.wheelNeedsPassword = false;
