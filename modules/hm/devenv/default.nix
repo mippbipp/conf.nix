@@ -39,8 +39,8 @@
     ./skills-sync
     ./neovim.nix
     ./starship.nix
-    ./superfile/default.nix
-    ./herdr/default.nix
+    ./superfile
+    ./herdr
   ];
 
   home.sessionVariables = {

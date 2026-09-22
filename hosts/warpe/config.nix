@@ -19,7 +19,7 @@
     ../../modules/system/config/sops-work.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/wsl
-    ../../modules/system/config/tailscale/default.nix
+    ../../modules/system/config/tailscale
     ../../modules/system/config/dns.nix
     ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix

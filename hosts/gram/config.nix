@@ -19,13 +19,13 @@
     ../../modules/system/config/secret.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/dns.nix
-    ../../modules/system/config/tailscale/default.nix
+    ../../modules/system/config/tailscale
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix
     ../../modules/de/apps/system/obs.nix
     ../../modules/de/apps/system/onlyoffice.nix
     ../../modules/de/apps/system/gaming.nix
-    ../../modules/de/system/default.nix
+    ../../modules/de/system
     ../../modules/de/hyprland/system.nix
     ../../modules/de/greetd/login.nix
     ../../modules/de/apps/thunar/system.nix

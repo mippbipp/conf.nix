@@ -17,7 +17,7 @@
     ../../modules/system/config/sops.nix
     ../../modules/system/config/common.nix
     ../../modules/system/config/wsl
-    ../../modules/system/config/tailscale/default.nix
+    ../../modules/system/config/tailscale
     ../../modules/theme/system.nix
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix

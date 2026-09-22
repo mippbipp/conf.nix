@@ -6,6 +6,6 @@ _:
     ../../modules/hm/config.nix
     ../../modules/ssh/hm.nix
     ../../modules/theme/hm.nix
-    ../../modules/hm/devenv/default.nix
+    ../../modules/hm/devenv
   ];
 }

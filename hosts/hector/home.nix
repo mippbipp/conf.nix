@@ -5,7 +5,7 @@ _:
   imports = [
     ../../modules/hm/config.nix
     ../../modules/ssh/hm.nix
-    ../../modules/hm/devenv/default.nix
+    ../../modules/hm/devenv
     ../../modules/hm/devenv/work-git.nix
   ];
 }

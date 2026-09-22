@@ -22,7 +22,7 @@
     ../../modules/system/config/nix.nix
     ../../modules/system/config/programs.nix
     ../../modules/system/config/dns.nix
-    ../../modules/system/config/tailscale/default.nix
+    ../../modules/system/config/tailscale
     ../../modules/system/config/tailscale/t3code-serve.nix
     ../../modules/system/config/tailscale/opencode2-serve.nix
     ../../modules/system/config/syncthing.nix
