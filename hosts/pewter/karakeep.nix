@@ -6,8 +6,9 @@
   ...
 }:
 let
-  port = 3434;
-  url = "https://${host}.${globals.tailnet.suffix}:${toString port}";
+  karakeep_port = "3000";
+  tail_port = "3434";
+  url = "https://${host}.${globals.tailnet.suffix}:${toString tail_port}";
 in
 {
   # AI tagging via free OpenRouter models. OPENAI_API_KEY in SOPS
@@ -25,7 +26,7 @@ in
     browser.enable = true;
     environmentFile = config.sops.secrets.karakeep_openrouter_env.path;
     extraEnvironment = {
-      PORT = "3000";
+      PORT = karakeep_port;
       NEXTAUTH_URL = url;
       DISABLE_SIGNUPS = "true"; # disabled after first user signup
       DISABLE_NEW_RELEASE_CHECK = "true";
@@ -38,26 +39,31 @@ in
     };
   };
 
-  # tailscaled terminates tailnet TLS on :3434 and proxies
+  # tailscaled terminates tailnet TLS on :{port} and proxies
   # to the loopback backend. `--bg` is load-bearing (without it serve stays in
   # the foreground and the oneshot times out). Mapping persists in tailscaled
-  # state until `tailscale serve --https=3434 off`.
+  # state until `tailscale serve --https={port} off`.
   systemd.services.karakeep-serve = {
-    description = "Karakeep via Tailscale Serve HTTPS :${toString port}";
+    description = "Karakeep via Tailscale Serve HTTPS :${tail_port}";
     wantedBy = [ "multi-user.target" ];
     after = [
       "tailscaled.service"
       "tailscaled-set.service"
-      "karakeep-web.service"
+      "karakeep-web.service" # nixos service
     ];
     partOf = [ "tailscaled.service" ];
     path = [ pkgs.tailscale ];
+    # tailscaled is systemd-active before its backend reaches Running, so the
+    # first serve call can transiently fail with NoState. Retry indefinitely.
+    unitConfig.StartLimitIntervalSec = 0;
     script = ''
-      tailscale serve --yes --bg --https=${toString port} http://127.0.0.1:3000
+      tailscale serve --yes --bg --https=${tail_port} http://127.0.0.1:${karakeep_port}
     '';
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
+      Restart = "on-failure";
+      RestartSec = 2;
     };
   };
 }
