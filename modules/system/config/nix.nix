@@ -1,4 +1,8 @@
-{ username, globals, ... }:
+{
+  username,
+  globals,
+  ...
+}:
 {
   nixpkgs.config = {
     allowUnfree = true;
@@ -26,5 +30,4 @@
       options = "--delete-older-than 7d";
     };
   };
-
 }

@@ -24,7 +24,6 @@ in
       lua51Packages.luarocks
 
       statix
-      nixfmt
       oxfmt
     ];
 

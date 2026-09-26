@@ -1,5 +1,4 @@
-_:
-{
+_: {
   programs.mpv = {
     enable = true;
     # https://wiki.nixos.org/wiki/Accelerated_Video_Playback#MPV

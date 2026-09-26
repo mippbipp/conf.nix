@@ -25,7 +25,11 @@ in
   # Mesh entries for dialable peers: reachable sshd, user defaults attached.
   # External records stay excluded by code, not just by default-false.
   peerEntries =
-    { hosts, host, username }:
+    {
+      hosts,
+      host,
+      username,
+    }:
     lib.mapAttrs (name: _: {
       hostname = name;
       user = username;
@@ -40,13 +44,15 @@ in
       unlockers = luksUnlockers hosts;
       luksHosts = lib.filterAttrs (_: peer: peer.luksHostname != null) (exceptSelf hosts host);
     in
-    lib.optionalAttrs (builtins.elem host unlockers) (lib.mapAttrs' (
-      name: peer:
-      lib.nameValuePair "${name}-luks" {
-        hostname = peer.luksHostname;
-        user = "root";
-        port = peer.sshPort;
-        userKnownHostsFile = "~/.ssh/known_hosts.initrd";
-      }
-    ) luksHosts);
+    lib.optionalAttrs (builtins.elem host unlockers) (
+      lib.mapAttrs' (
+        name: peer:
+        lib.nameValuePair "${name}-luks" {
+          hostname = peer.luksHostname;
+          user = "root";
+          port = peer.sshPort;
+          userKnownHostsFile = "~/.ssh/known_hosts.initrd";
+        }
+      ) luksHosts
+    );
 }

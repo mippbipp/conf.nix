@@ -1,5 +1,4 @@
-_:
-{
+_: {
   programs.obs-studio = {
     enable = false;
   };

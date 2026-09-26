@@ -9,6 +9,7 @@
     ./mouse.nix
     ./ddcutil.nix
     ./ios.nix
+    ./ly.nix
     ../apps/networkmanager/system.nix
   ];
 

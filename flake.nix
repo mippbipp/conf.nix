@@ -235,5 +235,13 @@
       checks = import ./checks.nix {
         inherit nixpkgs nixosConfigurations globals;
       };
+
+      formatter =
+        let
+          systems = nixpkgs.lib.unique (
+            nixpkgs.lib.mapAttrsToList (_: cfg: cfg.config.nixpkgs.hostPlatform.system) nixosConfigurations
+          );
+        in
+        nixpkgs.lib.genAttrs systems (system: nixpkgs.legacyPackages.${system}.nixfmt-tree);
     };
 }

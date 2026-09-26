@@ -10,11 +10,12 @@ let
 in
 {
   exportAuth = ''
-      github_token="$(< ${githubTokenPath})"
-      export GH_TOKEN="$github_token"
-      export GH_REPO="''${GH_REPO:-${repo}}"
-      mkdir -p "$repo_dir"
-      if [ ! -d "$repo_dir/.git" ]; then
-          git clone "https://github.com/$GH_REPO.git" "$repo_dir"
-      fi'';
+    github_token="$(< ${githubTokenPath})"
+    export GH_TOKEN="$github_token"
+    export GH_REPO="''${GH_REPO:-${repo}}"
+    mkdir -p "$repo_dir"
+    if [ ! -d "$repo_dir/.git" ]; then
+        git clone "https://github.com/$GH_REPO.git" "$repo_dir"
+    fi
+  '';
 }
