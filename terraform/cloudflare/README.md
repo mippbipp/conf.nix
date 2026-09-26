@@ -21,13 +21,13 @@ export TF_VAR_cloudflare_account_id="$(sudo cat /run/secrets/cloudflare_account_
 tofu -chdir=terraform/cloudflare init -upgrade  # pins cloudflare ~>5.0 (5.24.0)
 tofu -chdir=terraform/cloudflare plan            # 0 add / 0 destroy expected; 1 moved (record rename) or 0-1 in-place
 tofu -chdir=terraform/cloudflare apply
-dig cache.mippbipp.com +short                     # 129.146.202.171 (modules/globals.nix)
+dig cache.mippbipp.com +short                     # 129.146.202.171 (modules/fleet.nix)
 curl -fsS https://cache.mippbipp.com/fleet/nix-cache-info
 ```
 
 ## Why these values remain explicit
 
 - `mippbipp.com` `type=full` — fresh domain, single zone, DNS hosted with Cloudflare.
-- `cache` `A 129.146.202.171` — Oracle reserved IP for pewter; must stay in sync with `modules/globals.nix` `luksHostname` and `hosts/pewter/attic.nix` `allowed-hosts`. The Cloudflare provider cannot read Nix module values, so no codegen is used (ADR-0011).
+- `cache` `A 129.146.202.171` — Oracle reserved IP for pewter; must stay in sync with `modules/fleet.nix` `luksHostname` and the Oracle reservation. The served hostname comes from `modules/globals.nix` `cache.host` via `hosts/pewter/attic.nix` `allowed-hosts`. The Cloudflare provider cannot read Nix module values, so no codegen is used (ADR-0011).
 - `ttl=300` — 5 min propagation; was `1` (auto) before tofu.
 - `proxied=false` — DNS-only so `nginx` can complete Let's Encrypt HTTP-01 (`hosts/pewter/attic.nix`); proxied would hide the origin and break `attic` TLS. Future subdomains may use `proxied=true`.

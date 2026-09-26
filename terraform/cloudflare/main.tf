@@ -19,7 +19,7 @@ resource "cloudflare_zone" "mippbipp" {
 }
 
 variable "pewter_ip" {
-  description = "Pewter public IP; must stay in sync with modules/globals.nix luksHostname and Oracle reserved IP"
+  description = "Pewter public IP; must stay in sync with modules/fleet.nix luksHostname and Oracle reserved IP"
   type        = string
   default     = "129.146.202.171" # Oracle reserved IP for pewter
 }

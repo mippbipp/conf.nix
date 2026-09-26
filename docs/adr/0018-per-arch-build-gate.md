@@ -1,6 +1,6 @@
 # Per-arch Build gate jobs share one store per runner
 
-Supersedes the gate-architecture portion of 0009; the rest of that ADR still holds.
+Status: accepted. Supersedes the gate-architecture portion of 0009; the rest of that ADR still holds.
 
 The Build gate (ADR 0009) ran one job per host. Each job has an isolated
 `/nix/store` and all jobs in a PR run in parallel, so two hosts of the same

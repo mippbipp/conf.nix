@@ -151,7 +151,7 @@
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   backupFileExtension = "backup";
-                  users.${username}.imports = [ ./hosts/${host}/home.nix ];
+                  users.${username} = import ./hosts/${host}/home.nix;
                 };
 
                 nixpkgs.overlays = [

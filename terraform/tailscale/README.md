@@ -18,7 +18,7 @@ tailscale_oauth_client_secret: ENC[...]
 
 `sops.nix` already exposes them as `/run/secrets/tailscale_*` (`modules/system/config/sops.nix:22`).
 
-## 4. Init + import existing tailnet
+## 3. Init + import existing tailnet
 
 ```bash
 export TAILSCALE_TAILNET="$(cat /run/secrets/tailscale_tailnet)"

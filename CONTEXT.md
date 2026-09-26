@@ -4,7 +4,7 @@ Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 
 ## Hosts
 
-- **gram**: desktop machine (Secure Boot via lanzaboote).
+- **gram**: laptop (Secure Boot via lanzaboote).
 - **harpe**: WSL guest on the personal laptop.
 - **warpe**: WSL guest on the work laptop; carries the company CA trust.
 - **pewter**: always-on Oracle ARM server; tailnet exit node and remote workspace host.
@@ -32,7 +32,7 @@ The work git name, email, and SSH key applied on dual-use hosts for checkouts un
 _Avoid_: work account
 
 **Work secret file**:
-The work-only sops file decryptable solely on `warpe` and `hector` with the work age identity. The shared personal file never lands on a Work host.
+The work-only sops file decryptable on hosts with the work age identity. The shared personal file never lands on a Work host.
 _Avoid_: work secrets
 
 **Conditional identity**:
