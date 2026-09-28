@@ -48,8 +48,14 @@ jobs:
         # for the rest. Hosts are enumerated from the flake, so adding a 
         # host of an already-covered arch needs no workflow edit. The 
         # loop keeps going after a failure via the `fail-fast: false` signal across hosts.
+        # The flake source must include submodules: checkout-free hosts
+        # (hector) ship ./nvim from the store, and a plain `.` ref drops
+        # submodule files from the evaluated source, tripping the
+        # neovim.nix assertion. Same form as the documented local verify
+        # (hosts/hector/README.md).
         run: |
-          hosts_json="$(nix eval --json '.#nixosConfigurations' --apply 'cfgs: builtins.mapAttrs (h: c: c.config.nixpkgs.hostPlatform.system) cfgs')"
+          flake="git+file://$PWD?submodules=1"
+          hosts_json="$(nix eval --json "$flake#nixosConfigurations" --apply 'cfgs: builtins.mapAttrs (h: c: c.config.nixpkgs.hostPlatform.system) cfgs')"
           hosts="$(echo "$hosts_json" | jq -r --arg sys "${{ matrix.system }}" 'to_entries[] | select(.value == $sys) | .key')"
           if [ -z "$hosts" ]; then
             echo "no hosts found for system ${{ matrix.system }}: $hosts_json" >&2
@@ -59,7 +65,7 @@ jobs:
           status=0
           for host in $hosts; do
             echo "::group::build $host"
-            if ! nix build -L ".#nixosConfigurations.$host.config.system.build.toplevel" -o "result-$host"; then
+            if ! nix build -L "$flake#nixosConfigurations.$host.config.system.build.toplevel" -o "result-$host"; then
               status=1
             fi
             echo "::endgroup::"
