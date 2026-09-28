@@ -40,7 +40,9 @@ rebased: replaying a stale generated lock diff onto a `main` that also moved
 `flake.lock` conflicts, and the update regenerates the lock from scratch
 anyway.) If `flake.lock` is unchanged, it exits successfully without pushing.
 Otherwise it commits `flake.lock`, force-pushes `flake-update` with lease
-protection, creates the PR if absent, and requests rebase auto-merge.
+protection, creates the PR if absent, and requests squash auto-merge (one
+commit per update on `main`, even when the branch carries pipeline
+fix-ups next to the lock bump).
 
 The updater disables recursive submodule fetching during `git fetch`. This is
 required because the repository's submodule URL uses GitHub SSH syntax while
@@ -72,8 +74,13 @@ runner matching the platform. Each job enumerates the flake's hosts for its
 system (`nixosConfigurations` filtered by `config.nixpkgs.hostPlatform.system`)
 and builds them sequentially with per-host `--out-link result-<host>` files,
 keeping a failure accumulator so one broken host does not mask another.
-The workflow initializes submodules after rewriting
-GitHub SSH URLs to HTTPS and uses the public fleet Attic cache for
+The workflow initializes submodules with full history (`fetch-depth: 0`)
+after rewriting GitHub SSH URLs to HTTPS, then evaluates
+`git+file://$PWD?submodules=1`: checkout-free hosts ship submodule files
+from the store, and a plain `.` ref drops them from the flake source. The
+full history matters because that evaluation fetches each submodule as a
+git input and needs `revCount`, which shallow clones cannot provide.
+The workflow uses the public fleet Attic cache for
 substitution. Successful same-repository PR builds push every per-host closure to
 that cache; Attic dedups paths shared across hosts server-side.
 

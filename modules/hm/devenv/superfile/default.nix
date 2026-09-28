@@ -20,19 +20,10 @@
         auto_check_update = false;
         cd_on_quit = false; # configured in zsh
         zoxide_support = true;
-
-        # plugins
         metadata = true;
       };
 
-      /*
-        hotkeys = builtins.fromTOML (
-          builtins.readFile "${inputs.superfile}/src/superfile_config/vimHotkeys.toml"
-        );
-      */
-
       firstUseCheck = false;
-
       pinnedFolders = [
         {
           name = "Projects";

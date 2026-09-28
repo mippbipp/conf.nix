@@ -115,8 +115,7 @@
         ncg = "nix-collect-garbage --delete-old && sudo nix-collect-garbage -d && sudo /run/current-system/bin/switch-to-configuration boot";
         cat = "bat";
         ls = "eza";
-        ll = "eza -lh --icons --group-directories-first";
-        la = "eza -lah --icons --group-directories-first";
+        la = "eza --icons --group-directories-first -Hhail";
         ".." = "cd ..";
       };
     };
