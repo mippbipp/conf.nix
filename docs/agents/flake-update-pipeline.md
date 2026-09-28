@@ -72,8 +72,13 @@ runner matching the platform. Each job enumerates the flake's hosts for its
 system (`nixosConfigurations` filtered by `config.nixpkgs.hostPlatform.system`)
 and builds them sequentially with per-host `--out-link result-<host>` files,
 keeping a failure accumulator so one broken host does not mask another.
-The workflow initializes submodules after rewriting
-GitHub SSH URLs to HTTPS and uses the public fleet Attic cache for
+The workflow initializes submodules with full history (`fetch-depth: 0`)
+after rewriting GitHub SSH URLs to HTTPS, then evaluates
+`git+file://$PWD?submodules=1`: checkout-free hosts ship submodule files
+from the store, and a plain `.` ref drops them from the flake source. The
+full history matters because that evaluation fetches each submodule as a
+git input and needs `revCount`, which shallow clones cannot provide.
+The workflow uses the public fleet Attic cache for
 substitution. Successful same-repository PR builds push every per-host closure to
 that cache; Attic dedups paths shared across hosts server-side.
 
