@@ -28,6 +28,11 @@ jobs:
         uses: actions/checkout@v6
         with:
           submodules: true
+          # Full history: the build below evaluates
+          # git+file://$PWD?submodules=1, which fetches each submodule as
+          # a git input and needs revCount — unavailable in the default
+          # shallow (--depth=1) clone.
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Nix
