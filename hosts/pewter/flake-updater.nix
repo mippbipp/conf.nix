@@ -70,7 +70,9 @@ let
           pr="$(gh pr list --repo "$GH_REPO" --state open --head flake-update --json number --jq '.[0].number')"
       fi
       # Auto-merge is requested here, but GitHub still waits for every required gate check.
-      gh pr merge "$pr" --repo "$GH_REPO" --auto --rebase
+      # Squash keeps main to one commit per update even when the branch
+      # carries pipeline fix-ups alongside the lock bump.
+      gh pr merge "$pr" --repo "$GH_REPO" --auto --squash
     '';
   };
 in

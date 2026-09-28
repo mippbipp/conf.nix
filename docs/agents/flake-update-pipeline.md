@@ -40,7 +40,9 @@ rebased: replaying a stale generated lock diff onto a `main` that also moved
 `flake.lock` conflicts, and the update regenerates the lock from scratch
 anyway.) If `flake.lock` is unchanged, it exits successfully without pushing.
 Otherwise it commits `flake.lock`, force-pushes `flake-update` with lease
-protection, creates the PR if absent, and requests rebase auto-merge.
+protection, creates the PR if absent, and requests squash auto-merge (one
+commit per update on `main`, even when the branch carries pipeline
+fix-ups next to the lock bump).
 
 The updater disables recursive submodule fetching during `git fetch`. This is
 required because the repository's submodule URL uses GitHub SSH syntax while
