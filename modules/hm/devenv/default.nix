@@ -18,7 +18,7 @@
     uv
     go
     tokei
-    repomix
+    agent-browser
     opentofu
     attic-client
     (import ./scripts/nrs.nix {
