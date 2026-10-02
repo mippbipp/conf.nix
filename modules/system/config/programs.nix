@@ -38,6 +38,8 @@
     dig
     openssl
     traceroute
+    lsof
+    psmisc
   ];
 
   services = {
