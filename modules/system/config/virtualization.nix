@@ -1,4 +1,5 @@
 {
+  lib,
   pkgs,
   username,
   ...
@@ -40,40 +41,52 @@
   };
   programs.virt-manager.enable = true;
 
-  systemd.services.libvirt-sandbox-net = {
-    description = "Apply isolated libvirt network 'sandbox'";
-    after = [
-      "libvirtd.service"
-      "libvirtd.socket"
-    ];
-    wants = [ "libvirtd.service" ];
-    wantedBy = [ "multi-user.target" ];
-    environment.LIBVIRT_DEFAULT_URI = "qemu:///system";
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    path = [
-      pkgs.libvirt
-      pkgs.gnugrep
-      pkgs.coreutils
-    ];
-    script = ''
-      # Wait for libvirtd to be ready (socket activation can lag)
-      for i in {1..30}; do
-        if virsh --connect qemu:///system uri >/dev/null 2>&1; then
-          break
+  systemd.services = {
+    # libvirtd.socket is WantedBy=sockets.target, so the socket is already
+    # listening at boot and nixpkgs' own multi-user.target membership is
+    # redundant. Dropping it hands the daemon start to whoever first
+    # connects — virt-manager, virsh, or quickemu.
+    libvirtd.wantedBy = lib.mkForce [ ];
+    libvirt-sandbox-net = {
+      description = "Apply isolated libvirt network 'sandbox'";
+      after = [
+        "libvirtd.service"
+        "libvirtd.socket"
+      ];
+      # Ride along with libvirtd instead of pulling it in. This unit used to
+      # Wants= libvirtd.service while itself being WantedBy= multi-user.target,
+      # which put an daemon start on the critical path to
+      # graphical.target for a network only Throwaway VMs need. Keying it off
+      # libvirtd.service keeps the network defined before any guest can need it,
+      # because anything that talks to libvirt starts the daemon first.
+      wantedBy = [ "libvirtd.service" ];
+      environment.LIBVIRT_DEFAULT_URI = "qemu:///system";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      path = [
+        pkgs.libvirt
+        pkgs.gnugrep
+        pkgs.coreutils
+      ];
+      script = ''
+        # Wait for libvirtd to be ready (socket activation can lag)
+        for i in {1..30}; do
+          if virsh --connect qemu:///system uri >/dev/null 2>&1; then
+            break
+          fi
+          sleep 1
+        done
+        if ! virsh --connect qemu:///system net-info sandbox >/dev/null 2>&1; then
+          virsh --connect qemu:///system net-define /etc/libvirt/qemu/networks/sandbox.xml
+          virsh --connect qemu:///system net-autostart sandbox || true
         fi
-        sleep 1
-      done
-      if ! virsh --connect qemu:///system net-info sandbox >/dev/null 2>&1; then
-        virsh --connect qemu:///system net-define /etc/libvirt/qemu/networks/sandbox.xml
-        virsh --connect qemu:///system net-autostart sandbox || true
-      fi
-      if ! virsh --connect qemu:///system net-info sandbox | grep -q "Active:.*yes"; then
-        virsh --connect qemu:///system net-start sandbox || true
-      fi
-    '';
+        if ! virsh --connect qemu:///system net-info sandbox | grep -q "Active:.*yes"; then
+          virsh --connect qemu:///system net-start sandbox || true
+        fi
+      '';
+    };
   };
 
   virtualisation = {
@@ -104,4 +117,10 @@
   ];
 
   hardware.nvidia-container-toolkit.enable = true; # for podman
+
+  # Generating the CDI spec costs boot time and blocks on
+  # `udevadm settle` waiting for GPU device nodes that are usually not needed
+  # yet. The unit is already `requiredBy podman.service`, so dropping it from
+  # multi-user.target leaves it running on first container start instead.
+  systemd.services.nvidia-container-toolkit-cdi-generator.wantedBy = lib.mkForce [ ];
 }

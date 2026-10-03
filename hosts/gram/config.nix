@@ -1,6 +1,7 @@
 {
-  pkgs,
+  lib,
   options,
+  pkgs,
   ...
 }:
 {
@@ -50,6 +51,17 @@
         configurationLimit = 5;
       };
       efi.canTouchEfiVariables = true;
+    };
+    initrd.systemd = {
+      # Root is plain ext4 — no LUKS, no network in the initrd — so the
+      # systemd initrd buys nothing on this host. Measured with it enabled:
+      # 3.155s initrd, of which initrd-nixos-activation was 1.053s rebuilding
+      # /etc and initrd-switch-root.service was 1.369s of complete silence
+      # between "Switching root" and stage-2 systemd's first log line.
+      enable = lib.mkForce false;
+      # No consumer of PCR measurements on this host, and systemd.tpm2 is
+      # already off. Belt-and-braces if the initrd is put back.
+      tpm2.enable = false;
     };
     # Appimage Support
     binfmt.registrations.appimage = {
@@ -107,6 +119,18 @@
 
   services = {
     fstrim.enable = true;
+  };
+
+  systemd.tpm2 = {
+    # Nothing on this host consumes TPM PCR measurements. Root is plain ext4
+    # (no cryptenroll auto-unlock), /etc/credstore.encrypted is empty, and
+    # lanzaboote's measuredBoot is off, so systemd-pcrlock seals nothing.
+    # Secure Boot signature verification is firmware-side and unaffected.
+    #
+    # NixOS defaults this on. Left enabled it costs ~0.9s at boot plus ~0.7s
+    # on every login via systemd-pcrlogin@.service, and both units fail anyway
+    # with TPM_RC_NV_SPACE ("NV index space is exhausted").
+    enable = false;
   };
 
   # This value determines the NixOS release from which the default

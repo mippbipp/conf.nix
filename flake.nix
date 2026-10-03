@@ -188,6 +188,7 @@
                 boot.lanzaboote = {
                   enable = true;
                   pkiBundle = "/var/lib/sbctl";
+                  settings.timeout = 1;
                 };
               }
             )

@@ -61,4 +61,7 @@ in
       };
     };
   };
+
+  # don't need to block book until network-online.target starts it
+  systemd.services.syncthing-init.wantedBy = lib.mkForce [ "network-online.target" ];
 }

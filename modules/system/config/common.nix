@@ -1,4 +1,8 @@
-{ host, lib, ... }:
+{
+  host,
+  lib,
+  ...
+}:
 {
   boot = {
     loader.timeout = 1;
@@ -87,6 +91,7 @@
       avahi-daemon.wantedBy = lib.mkForce [ ]; # socket activation
       bluetooth.wantedBy = lib.mkForce [ ]; # blueman
       upower.wantedBy = lib.mkForce [ ]; # starts when battery status queried
+      NetworkManager-wait-online.wantedBy = lib.mkForce [ ];
     };
     network.wait-online.enable = false; # Don't wait for network before considering boot complete
     sockets.avahi-daemon.wantedBy = [ "sockets.target" ]; # Will start automatically when needed via socket activation
