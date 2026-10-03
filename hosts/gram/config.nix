@@ -28,7 +28,6 @@
     ../../modules/de/system
     ../../modules/de/hyprland/system.nix
     ../../modules/de/apps/thunar/system.nix
-    ../../modules/de/computer-use-linux/system.nix
     ../../modules/ssh/system.nix
   ];
 

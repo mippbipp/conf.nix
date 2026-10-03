@@ -10,7 +10,6 @@ _: {
     ../../modules/de/hm.nix
     ../../modules/de/hyprland/hm.nix
     ../../modules/de/apps/thunar/hm.nix
-    ../../modules/de/computer-use-linux/hm.nix
     ../../modules/de/apps/hm/ghostty.nix
     ../../modules/de/apps/hm/winapps
     ../../modules/de/apps/hm/zen
