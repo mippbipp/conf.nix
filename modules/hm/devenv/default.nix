@@ -8,30 +8,36 @@
   ...
 }:
 {
-  home.packages = with pkgs; [
-    eza
-    sccache
-    pnpm
-    nodejs
-    python312
-    rust-bin.stable.latest.default
-    uv
-    go
-    tokei
-    agent-browser
-    opentofu
-    attic-client
-    (import ./scripts/nrs.nix {
-      inherit
-        pkgs
-        username
-        host
-        lib
-        globals
-        sopsSecrets
-        ;
-    })
-  ];
+  home.packages =
+    with pkgs;
+    [
+      eza
+      sccache
+      pnpm
+      nodejs
+      python312
+      rust-bin.stable.latest.default
+      uv
+      go
+      tokei
+      agent-browser
+      opentofu
+      attic-client
+    ]
+    # nrs builds from the ~/conf.nix checkout, so a host without one gets no
+    # command rather than one pointed at a directory that does not exist.
+    ++ lib.optional globals.hosts.${host}.hasRepoCheckout (
+      import ./scripts/nrs.nix {
+        inherit
+          pkgs
+          username
+          host
+          lib
+          globals
+          sopsSecrets
+          ;
+      }
+    );
 
   imports = [
     ../../llm/hm.nix

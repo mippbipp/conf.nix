@@ -15,6 +15,30 @@ nixpkgs.lib.genAttrs systems (
   system:
   let
     pkgs = nixpkgs.legacyPackages.${system};
+    username = globals.user.name;
+    # Evaluated alone, so Role flags stay readable without building a host.
+    records =
+      (nixpkgs.lib.evalModules { modules = [ ./modules/fleet/registry.nix ]; }).config.fleet.hosts;
+    hosts = builtins.filter (h: !(records ? ${h}) || !records.${h}.external) (
+      builtins.attrNames nixosConfigurations
+    );
+    cfgOf = host: nixosConfigurations.${host}.config;
+    hmOf = host: (cfgOf host).home-manager.users.${username};
+    assertRole =
+      {
+        name,
+        flag,
+        present,
+        subject,
+      }:
+      let
+        offenders = builtins.filter (h: present h != records.${h}.${flag}) hosts;
+        summarise = builtins.map (h: "${h}: ${subject}=${builtins.toJSON (present h)}") offenders;
+      in
+      if offenders == [ ] then
+        pkgs.runCommand name { } "touch $out"
+      else
+        throw "${flag} mismatch on ${builtins.toJSON offenders}: ${builtins.concatStringsSep ", " summarise}";
     profile = globals.nextdns.id;
     profHi = builtins.substring 0 2 profile;
     profLo = builtins.substring 2 4 profile;
@@ -38,7 +62,8 @@ nixpkgs.lib.genAttrs systems (
     # declaration) are exempt on the record side only.
     fleet-correspondence =
       let
-        records = (nixpkgs.lib.evalModules { modules = [ ./modules/fleet.nix ]; }).config.fleet.hosts;
+        records =
+          (nixpkgs.lib.evalModules { modules = [ ./modules/fleet/registry.nix ]; }).config.fleet.hosts;
         declared = builtins.attrNames nixosConfigurations;
         missing = builtins.filter (h: !(records ? ${h}) || records.${h}.external) declared;
         liveRecords = nixpkgs.lib.filterAttrs (_: r: !r.external) records;
@@ -59,7 +84,7 @@ nixpkgs.lib.genAttrs systems (
             builtins.deepSeq
               (nixpkgs.lib.evalModules {
                 modules = [
-                  ./modules/fleet.nix
+                  ./modules/fleet/registry.nix
                   { fleet.hosts.strictness-probe = extra; }
                 ];
               }).config.fleet.hosts
@@ -75,7 +100,7 @@ nixpkgs.lib.genAttrs systems (
     # host's system must be covered by exactly one per-arch `build <system>`
     # job, and every arch job must have at least one host. Hosts are
     # enumerated from the flake at CI time, so adding a host of an
-    # already-covered arch needs no workflow edit — this check fails the
+    # already-covered arch needs no workflow edit. This check fails the
     # gate when a host's arch has no job (or a job covers nothing).
     build-matrix-sync =
       let
@@ -102,6 +127,55 @@ nixpkgs.lib.genAttrs systems (
         pkgs.runCommand "build-matrix-sync" { } "touch $out"
       else
         throw "build gate matrix mismatch: hosts without an arch job ${builtins.toJSON uncovered}; arch jobs without hosts ${builtins.toJSON phantom}";
+    # A flag set without its implementation builds fine and fails at runtime, so
+    # each one is checked against the built config.
+    work-identity-wiring = assertRole {
+      name = "work-identity-wiring";
+      flag = "usesWorkGit";
+      subject = "work git include";
+      # Probed on the Home Manager side: NixOS sops.secrets stays empty until
+      # secrets/work.yaml is provisioned, so it cannot tell "flag off" from
+      # "file missing". Both transports are asserted so neither drops alone.
+      present =
+        h:
+        let
+          hm = hmOf h;
+        in
+        (builtins.any (i: i.condition == "gitdir:~/work/") hm.programs.git.includes)
+        && builtins.length hm.programs.ssh.includes > 0;
+    };
+    sshd-wiring =
+      let
+        # Port too: the firewall and the listen port both come from sshPort, so a
+        # host setting services.openssh.ports locally would otherwise pass.
+        present =
+          h:
+          let
+            o = (cfgOf h).services.openssh;
+          in
+          o.enable && o.ports == [ records.${h}.sshPort ];
+      in
+      assertRole {
+        name = "sshd-wiring";
+        flag = "acceptsSsh";
+        subject = "sshd enabled on the record's port";
+        inherit present;
+      };
+    personal-secrets-wiring = assertRole {
+      name = "personal-secrets-wiring";
+      flag = "isPersonalHost";
+      subject = "personal secrets";
+      # git_config is the oldest personal secret.
+      present = h: (cfgOf h).sops.secrets ? git_config;
+    };
+    checkout-wiring = assertRole {
+      name = "checkout-wiring";
+      flag = "hasRepoCheckout";
+      subject = "nrs installed";
+      # nrs builds from ~/conf.nix, so a host without one must not carry a command
+      # pointing at a directory that does not exist.
+      present = h: builtins.any (p: (p.name or "") == "nrs") (hmOf h).home.packages;
+    };
     # The Build gate YAML is control-plane-adjacent text outside this flake's
     # references, so pin it by parsing instead: every extra-substituters /
     # extra-trusted-public-keys row must equal the globals.cache derivation in

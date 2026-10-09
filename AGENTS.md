@@ -12,7 +12,7 @@ Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 ## Domain docs
 
-Single-context repo — one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+Single-context repo, one `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
 
 When adding a host, read `docs/agents/adding-a-host.md` first. It lists the
 required declaration, Build gate, GitHub ruleset, documentation, and

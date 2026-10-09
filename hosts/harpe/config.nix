@@ -14,13 +14,7 @@
 
   imports = [
     ./users.nix
-    ../../modules/system/config/sops.nix
-    ../../modules/system/config/common.nix
     ../../modules/system/config/wsl
-    ../../modules/system/config/tailscale
     ../../modules/theme/system.nix
-    ../../modules/system/config/nix.nix
-    ../../modules/system/config/programs.nix
-    ../../modules/system/config/dns.nix
   ];
 }

@@ -1,4 +1,4 @@
-# Configuration Flake
+# Configuration flake
 
 Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 
@@ -11,14 +11,14 @@ Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 - **hector**: Work host — EC2 dev machine in the work account, reachable over tailnet.
 - **midd**: Windows host; only `hosts/midd/setup.ps1`, not a NixOS config.
 
-## Hector isolation
+## Host isolation
 
 **Work host**:
 The fleet member that lives in the work AWS account. Its disk and RAM can be snapshotted by work admins, so it holds no personal secrets or shared age identity.
 _Avoid_: work machine, work box
 
 **Personal host**:
-A fleet member that may hold the shared age identity and personal secrets. `warpe` counts as personal even though it runs on the work laptop.
+A fleet member that may hold the shared age identity and personal secrets. The `isPersonalHost` Role flag keeps a Work host from declaring personal secrets; installing the shared age key is a deploy-time step, not part of the flag.
 _Avoid_: personal machine (ambiguous)
 
 **Tag isolation**:
@@ -58,17 +58,17 @@ _Avoid_: ephemeral vm
 ## Build
 
 **nrs**:
-The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes.
+The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes. Installed only on hosts with a `hasRepoCheckout` Role flag, since it builds from `~/conf.nix`; a host without a checkout is deployed from `pewter`. See ADR 0020.
 _Avoid_: rebuild, deploy
 
 ## Globals
 
 **Globals**:
-The single source for facts that outlive any one module — identity, DNS profile, cache endpoints, and a per-machine record. Records are typed Role flags declared in `modules/fleet.nix`: NixOS modules read `config.fleet.hosts`, Home Manager receives the merged records as the `globals` argument; never imported directly.
+The single source for facts that outlive any one module: identity, DNS profile, cache endpoints, and a per-machine record. Records are typed Role flags declared in `modules/fleet/registry.nix`: NixOS modules read `config.fleet.hosts`, Home Manager receives the merged records as the `globals` argument; never imported directly.
 _Avoid_: variables, constants
 
 **Role flag**:
-A boolean capability on a Globals record that shared modules branch on instead of comparing host names.
+A boolean capability on a Globals record that shared modules branch on instead of comparing host names. Setting one is enough to get its implementation; `modules/fleet/` selects it, so host files carry no role imports. See ADR 0020.
 _Avoid_: feature flag
 
 ## Flake update pipeline

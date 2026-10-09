@@ -45,7 +45,7 @@
     # libvirtd.socket is WantedBy=sockets.target, so the socket is already
     # listening at boot and nixpkgs' own multi-user.target membership is
     # redundant. Dropping it hands the daemon start to whoever first
-    # connects — virt-manager, virsh, or quickemu.
+    # connects (virt-manager, virsh, or quickemu).
     libvirtd.wantedBy = lib.mkForce [ ];
     libvirt-sandbox-net = {
       description = "Apply isolated libvirt network 'sandbox'";

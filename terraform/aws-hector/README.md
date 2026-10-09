@@ -1,6 +1,6 @@
 # terraform/aws-hector
 
-Isolated local state for `hector`'s work-AWS resources — separate from `terraform/oci/` (`docs/adr/0015-hector-work-ec2-dev-machine.md`). Tailnet-only; `terraform/aws-hector/main.tf` is source for type/size/tags/policy — this file is only the credential + init pointer.
+Isolated local state for `hector`'s work-AWS resources, separate from `terraform/oci/` (`docs/adr/0015-hector-work-ec2-dev-machine.md`). Tailnet-only; `terraform/aws-hector/main.tf` is source for type/size/tags/policy. This file is only the credential + init pointer.
 
 ## Steps
 

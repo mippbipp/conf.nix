@@ -5,8 +5,8 @@ Status: accepted. Supersedes the gate-architecture portion of 0009; the rest of 
 The Build gate (ADR 0009) ran one job per host. Each job has an isolated
 `/nix/store` and all jobs in a PR run in parallel, so two hosts of the same
 arch wanting the same derivation both miss the Attic cache and both compile
-it. Today only `gram` uses the CachyOS kernel, so nothing duplicates yet —
-but a second DE host cloning `gram`'s config (kernel included) would rebuild
+it. Today only `gram` uses the CachyOS kernel, so nothing duplicates yet.
+But a second DE host cloning `gram`'s config (kernel included) would rebuild
 that kernel from scratch in its own job while `gram` builds it next door.
 
 One job per arch builds every host of that arch in a single `/nix/store`:
@@ -23,7 +23,7 @@ Operational details live in `docs/agents/flake-update-pipeline.md`; this ADR
 records the rationale for the per-arch shape.
 
 Why this shape: the duplicate-work unit is the derivation, and the sharing
-scope is the runner's store — so the fix is structural (share the store),
+scope is the runner's store, so the fix is structural (share the store),
 not ordering (`needs:` chains serialize the long pole) and not source
 policy (constraining kernel choice to dodge a CI race). Enumeration keeps
 the invariant "everything used by every host builds" without per-host YAML:

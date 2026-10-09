@@ -69,7 +69,7 @@ pkgs.writeShellApplication {
             ''
           else
             ''
-              echo "attic push skipped: no attic_cache_token on ${host} (Work host pull-only, push from pewter/warpe)" >&2
+              echo "attic push skipped: no attic_cache_token on ${host} (Work host pull-only)" >&2
               exit 1
             ''
         }

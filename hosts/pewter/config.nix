@@ -16,13 +16,6 @@
     inputs.disko.nixosModules.disko
     ./disko.nix
     ./users.nix
-    ../../modules/system/config/sops.nix
-    ../../modules/system/config/sops-work.nix
-    ../../modules/system/config/common.nix
-    ../../modules/system/config/nix.nix
-    ../../modules/system/config/programs.nix
-    ../../modules/system/config/dns.nix
-    ../../modules/system/config/tailscale
     ../../modules/system/config/tailscale/t3code-serve.nix
     ../../modules/system/config/tailscale/opencode2-serve.nix
     ../../modules/system/config/syncthing.nix
@@ -32,19 +25,7 @@
   ];
 
   security.sudo.wheelNeedsPassword = false;
-  services = {
-    fstrim.enable = false; # managed by Oracle's underlying SAN
-    openssh = {
-      # Enable root SSH explicitly
-      enable = true;
-      settings.PermitRootLogin = "prohibit-password";
-      settings.PasswordAuthentication = false;
-      openFirewall = true;
-      ports = [
-        config.fleet.hosts.pewter.sshPort
-      ];
-    };
-  };
+  services.fstrim.enable = false; # managed by Oracle's underlying SAN
 
   # Standard bootloader configuration for UEFI on Oracle ARM
   boot = {

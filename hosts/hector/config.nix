@@ -5,7 +5,7 @@
   ...
 }:
 {
-  # Graviton (m7g.medium) is aarch64 — matches pewter's arch
+  # Graviton (m7g.medium) is aarch64, matches pewter's arch
   nixpkgs.hostPlatform = "aarch64-linux";
   system.stateVersion = "26.05";
 
@@ -14,24 +14,14 @@
     inputs.disko.nixosModules.disko
     ./disko.nix
     ./users.nix
-    ../../modules/system/config/sops-work.nix
-    ../../modules/system/config/common.nix
-    ../../modules/system/config/nix.nix
-    ../../modules/system/config/programs.nix
-    ../../modules/system/config/dns.nix
-    ../../modules/system/config/tailscale
   ];
 
   security.sudo.wheelNeedsPassword = false;
 
   services = {
     amazon-ssm-agent.enable = true;
-    openssh = {
-      enable = true;
-      settings.PermitRootLogin = "prohibit-password";
-      settings.PasswordAuthentication = false;
-      openFirewall = true;
-    };
+    # openssh: reachable for the Work host, hardened and port-derived by
+    # modules/ssh/system.nix off the acceptsSsh Role flag.
   };
 
   boot = {

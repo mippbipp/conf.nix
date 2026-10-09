@@ -1,5 +1,5 @@
 # Work laptop CA bundle. company-root.pem is exported from Windows (see
-# hosts/warpe/README.md) and committed — a CA root is public material.
+# hosts/warpe/README.md) and committed. A CA root is public material.
 # The guard keeps this flake evaluable on machines without the pem.
 {
   lib,

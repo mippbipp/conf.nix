@@ -20,7 +20,7 @@ in
       useRoutingFeatures = "client";
       # Single source for the operator grant: lets $username manage
       # `tailscale serve` without sudo via the module's `tailscaled-set`
-      # oneshot. Keep it here only — extraSetFlags lists concatenate across
+      # oneshot. Keep it here only: extraSetFlags lists concatenate across
       # modules, so defining it in each *-serve.nix duplicates --operator
       # and breaks tailscaled-set ("flag provided multiple times").
       extraSetFlags = [ "--operator=${username}" ];

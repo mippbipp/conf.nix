@@ -1,4 +1,4 @@
-# Verified Flake Update Pipeline
+# Verified flake update pipeline
 
 This repository updates `flake.lock` from pewter and merges only revisions
 that pass the Build gate for every host. The design rationale is in
@@ -61,7 +61,7 @@ ssh pewter 'sudo journalctl -u flake-updater.service -n 100 --no-pager'
 Use `--dry-run` before investigating an unexpected update. It prints the
 `flake.lock` diff and does not push, create a PR, or enable auto-merge.
 
-## Build Gate
+## Build gate
 
 The Build gate builds each system's full toplevel closure:
 
@@ -104,7 +104,7 @@ The required evidence is a completed run with conclusion `success` and a
 recent-lock message. A failure means the Updater may be stale even if the
 systemd timer still exists.
 
-## Recovery And Evidence
+## Recovery and evidence
 
 For a failed update, collect evidence in this order:
 
@@ -116,7 +116,7 @@ For a failed update, collect evidence in this order:
 Do not bypass the Build gate to land an unverified revision. If a service
 change is needed, send it through a pull request and wait for every `build <system>` check.
 
-## Host Changes
+## Host changes
 
 When adding a host, update the GitHub ruleset's required checks only when the
 host introduces a new arch, in addition to the NixOS host declarations. Follow
@@ -127,10 +127,11 @@ invariant:
   enumerates it from the flake automatically. A new arch needs one
   `- system:` row in the `build-closure` matrix, plus `build <system>` in the
   ruleset's required checks.
-- One `hosts.<host>` record in `modules/fleet.nix`.
+- One `hosts.<host>` record in `modules/fleet/registry.nix`.
 - The `checks (x86_64-linux)` and `checks (aarch64-linux)` jobs need no
-  per-host edits — the step enumerates every check via `nix eval ... --apply builtins.attrNames` — but both must
-  stay required in the ruleset or the registry and profile checks stop gating.
+  per-host edits. The step enumerates every check via
+  `nix eval ... --apply builtins.attrNames`. Both must stay required in the
+  ruleset or the registry and profile checks stop gating.
 
 The `build-matrix-sync` check fails the gate when the matrix rows and the
 `nixosConfigurations` keys drift in either direction.

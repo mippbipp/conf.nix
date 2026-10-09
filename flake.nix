@@ -114,7 +114,7 @@
             username = globals.user.name;
           };
           modules = [
-            ./modules/fleet.nix
+            ./modules/fleet/system.nix
             ./modules/llm/overlay.nix
             ./hosts/${host}/config.nix
             stylix.nixosModules.stylix
@@ -151,7 +151,14 @@
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   backupFileExtension = "backup";
-                  users.${username} = import ./hosts/${host}/home.nix;
+                  # fleet/hm.nix selects the Home Manager side of the Role
+                  # flags, so host files carry no role imports.
+                  users.${username} = {
+                    imports = [
+                      ./hosts/${host}/home.nix
+                      ./modules/fleet/hm.nix
+                    ];
+                  };
                 };
 
                 nixpkgs.overlays = [

@@ -5,7 +5,7 @@
 # plain ssh-config entry attrsets; `hm.nix` merges them into
 # programs.ssh.settings, and pewter's initrd reads `luksUnlockers` for its
 # authorizedKeys so recipients and keys share one owner (the unlocksPewter
-# Role flag). Shared thinly — imported by hm.nix, syncthing.nix, nrs.nix, and
+# Role flag). Shared thinly: imported by hm.nix, syncthing.nix, nrs.nix, and
 # pewter config only: syncthing and nrs reuse `exceptSelf` with their own
 # predicates (`syncId != null`, `remoteBuilds`); nrs targets exclude self, so
 # a remote build always means ssh to another machine, never to self.
@@ -15,7 +15,7 @@ let
   exceptSelf = hosts: host: lib.filterAttrs (name: _: name != host) hosts;
 
   # Single owner of the pewter-LUKS recipients: the unlocksPewter Role flag.
-  # One flag, two readers (mesh entries here, initrd keys on pewter) — no list
+  # One flag, two readers (mesh entries here, initrd keys on pewter), so no list
   # to drift. attrNames forces every record, so evaluation touches the flag.
   luksUnlockers = hosts: lib.attrNames (lib.filterAttrs (_: peer: peer.unlocksPewter) hosts);
 in

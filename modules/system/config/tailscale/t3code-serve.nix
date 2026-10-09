@@ -10,7 +10,7 @@
   ];
 
   # Operator grant (`tailscale set --operator` via `tailscaled-set`) lives in
-  # ./default.nix — kept there singly so hosts importing multiple *-serve
+  # ./default.nix, kept there singly so hosts importing multiple *-serve
   # modules don't concatenate duplicate --operator flags.
 
   systemd.services.t3code = {

@@ -8,7 +8,7 @@
 #
 # Note: `serve --service` makes this unit THE registered background service
 # (same `~/.local/state/opencode/service.json` local CLIs discover), with the
-# persistent password from `~/.config/opencode/service.json` — so `opencode2
+# persistent password from `~/.config/opencode/service.json`, so `opencode2
 # pair`, plain `opencode2`, and `--server` clients all work with stable creds.
 # Plain `serve` instead mints an ephemeral password per start (printed once on
 # stdout), which would break remote clients on every unit restart. Do not run
@@ -29,7 +29,7 @@ in
   ];
 
   # Operator grant (`tailscale set --operator` via `tailscaled-set`) lives in
-  # ./default.nix — kept there singly so hosts importing multiple *-serve
+  # ./default.nix, kept there singly so hosts importing multiple *-serve
   # modules don't concatenate duplicate --operator flags.
 
   systemd.services.opencode2-serve = {

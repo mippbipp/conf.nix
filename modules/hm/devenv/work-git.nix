@@ -42,7 +42,7 @@ in
         ssh.includes = [ sopsSecrets.work_ssh_config.path ];
 
         zsh.initContent = ''
-          # glab auth for the work instance — guarded so first-boot shells still start.
+          # glab auth for the work instance, guarded so first-boot shells still start.
           # Note: `glab auth status` cannot see env-only auth (it only lists
           # hosts stored via `glab auth login`); verify with `glab api user`.
           if [ -f ${sopsSecrets.work_gitlab_token.path} ]; then

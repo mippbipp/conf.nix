@@ -29,7 +29,7 @@ work_gitlab_host: https://<company-gitlab-host>
 # API token for glab (GITLAB_TOKEN). Fine-grained preferred over legacy:
 # grant it read/write on Merge requests and Issues, read on Repository,
 # Pipelines, and User, scoped to the work group/project. Permissions are
-# immutable — rotation keeps them — so if a glab command 403s (GitLab's error
+# immutable (rotation keeps them) so if a glab command 403s (GitLab's error
 # names the missing permission), create a new token with it, swap it in here,
 # rebuild, verify, then revoke the old one.
 work_gitlab_token: <token>

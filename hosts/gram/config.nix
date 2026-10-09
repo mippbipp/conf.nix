@@ -7,19 +7,13 @@
   imports = [
     ./hardware.nix
     ./users.nix
-    ../../modules/system/config/sops.nix
     ../../modules/system/hardware/tools.nix
     ../../modules/system/hardware/nvidia-drivers.nix
     ../../modules/system/hardware/nvidia-prime-drivers.nix
     ../../modules/system/hardware/intel-drivers.nix
     ../../modules/system/config/virtualization.nix
-    ../../modules/system/config/common.nix
     ../../modules/theme/system.nix
-    ../../modules/system/config/nix.nix
     ../../modules/system/config/secret.nix
-    ../../modules/system/config/programs.nix
-    ../../modules/system/config/dns.nix
-    ../../modules/system/config/tailscale
     ../../modules/system/config/syncthing.nix
     ../../modules/system/config/printing.nix
     ../../modules/de/apps/system/obs.nix
@@ -28,7 +22,6 @@
     ../../modules/de/system
     ../../modules/de/hyprland/system.nix
     ../../modules/de/apps/thunar/system.nix
-    ../../modules/ssh/system.nix
   ];
 
   boot = {

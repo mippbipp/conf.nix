@@ -1,4 +1,4 @@
-# Gram runs three isolation tiers — containers, throwaway VMs, kept VMs
+# Gram runs three isolation tiers: containers, throwaway VMs, kept VMs
 
 Gram is the machine for tasting distros and running untrusted binaries. Containers share the kernel and are wrong for that, VMs don't, and lifetime matters: throwaways should be deletable by removing a directory, keepers need a manager and snapshots. We keep all three, each in its tier.
 

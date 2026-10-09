@@ -34,7 +34,7 @@
   # user@UID at boot regardless, so user units, the dbus session, and
   # gnome-keyring work even then. This does not prevent the warning
   # itself (linger gives a `manager` session, WSL wants a `user`
-  # login session) — initTimeout above is the actual fix.
+  # login session); initTimeout above is the actual fix.
   users.users.${username}.linger = true;
 
   networking = {
@@ -44,8 +44,8 @@
     # serializes boot (nftables -> network-pre -> tailscaled, ~6s cold) for
     # no coverage: no sshd, loopback-bound services, verified identical
     # `tailscale status/ping` with nixos-fw flushed. Drop the whole unit.
-    # (This also retires the old rpfilter workaround — Microsoft's WSL2
-    # kernel lacks CONFIG_NFT_FIB_IPV6 — since there is no ruleset left.)
+    # (This also retires the old rpfilter workaround: Microsoft's WSL2
+    # kernel lacks CONFIG_NFT_FIB_IPV6, and there is no ruleset left.)
     # mkForce wins over common.nix and the tailscale module's plain `true`.
     firewall.enable = lib.mkForce false;
     nftables.enable = lib.mkForce false;

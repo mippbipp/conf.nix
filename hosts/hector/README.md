@@ -1,4 +1,4 @@
-# hector — work EC2 NixOS dev machine
+# hector, work EC2 NixOS dev machine
 
 `aarch64-linux` Graviton `m7g.medium` `80 GB gp3` `us-east-1`, tailnet-only after bootstrap. `disko` on `/dev/nvme0n1` → `512M ESP /boot` + `btrfs @/@home/@nix`. Isolated `terraform/aws-hector/` local state. See `docs/adr/0015-hector-work-ec2-dev-machine.md`.
 
@@ -12,7 +12,7 @@ aws sts get-caller-identity
 export TF_VAR_owner=$(aws sts get-caller-identity --query Arn --output text | rev | cut -d/ -f1 | rev)
 export TF_VAR_project=hector
 export TF_VAR_aws_region=us-east-1
-# optional: TF_VAR_vpc_id / TF_VAR_subnet_id — else default VPC first subnet (terraform/aws-hector/main.tf:44)
+# optional: TF_VAR_vpc_id / TF_VAR_subnet_id, else default VPC first subnet (terraform/aws-hector/main.tf:44)
 ```
 
 **Done when** `aws sts get-caller-identity` shows work account and `TF_VAR_owner` matches `Owner` on existing `hector` resources.

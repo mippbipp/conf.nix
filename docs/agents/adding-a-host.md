@@ -15,12 +15,15 @@ hostname and finish every applicable item before considering the host added.
 3. Add a `nixosConfigurations.<host>` declaration to `flake.nix`. Keep the
    attribute name and the `host = "<host>"` argument identical. Add host-only
    flake modules in this declaration, such as `nixos-wsl` or `lanzaboote`.
-4. Add `hosts.<host>` to `modules/fleet.nix`. Use an empty record when no
-   other machine needs facts about it; add only cross-host facts and Role
-   flags that shared modules consume.
+4. Add `hosts.<host>` to `modules/fleet/registry.nix`. Use an empty record when
+   no other machine needs facts about it; add only cross-host facts and Role
+   flags that shared modules consume. A Role flag selects its own
+   implementation: `modules/fleet/system.nix` and `modules/fleet/hm.nix` are
+   imported for every host, so a flag needs no import in the host files
+   (ADR-0020). Wire a new Role flag's implementation into those two adapters.
 5. Check whether the host's arch is already covered by the `build-closure`
    matrix in `.github/workflows/build-gate.yml` (one `- system:` row per
-   arch). A host of an already-covered arch is picked up automatically —
+   arch). A host of an already-covered arch is picked up automatically, with
    no workflow edit. Only a new arch needs a matrix row with a runner
    matching the host platform. The resulting `build <system>` check is
    part of the Build gate.
@@ -28,7 +31,7 @@ hostname and finish every applicable item before considering the host added.
    GitHub when step 5 added a new arch. This is control-plane state, not a Nix file, and must be updated
    after the first workflow run creates the check.
 
-## Host Surface
+## Host surface
 
 1. Add `hosts/<host>/README.md` when bootstrap, disk, firmware, secrets,
    networking, or first-deploy steps are not obvious from the shared README.
@@ -38,9 +41,9 @@ hostname and finish every applicable item before considering the host added.
    `modules/system/config/sops.nix`, and inspect only the encrypted diff.
 3. Add an SSH alias or other client binding when the host is reached through a
    non-default address, port, or jump path. Keep machine facts in the fleet
-   registry (`modules/fleet.nix`) and consume them from the client configuration.
+   registry (`modules/fleet/registry.nix`) and consume them from the client configuration.
 
-## Conditional Infrastructure
+## Conditional infrastructure
 
 1. Update `terraform/oci/` when the host needs an OCI instance, volume,
     network rule, or budget. Update `terraform/cloudflare/` when it needs a
@@ -52,7 +55,7 @@ hostname and finish every applicable item before considering the host added.
     `hosts/hector/README.md` and `docs/adr/0015-hector-work-ec2-dev-machine.md`).
 2. Update shared docs or an ADR when adding the host changes a fleet-wide
     invariant, a role definition, the Build gate architecture, or the
-    control-plane inventory — e.g., `hector` introduced the `Work host` /
+    control-plane inventory. `hector` introduced the `Work host` /
     `Tag isolation` glossary in `CONTEXT.md` and the `build aarch64-linux`
     gate coverage for its arch.
     A normal host addition does not require editing every document that
@@ -72,12 +75,13 @@ Then confirm all of these are true: the host evaluates and builds, the
 grouped `build <host>` section for the new host in that job's log), the check is required by the
 main ruleset, and the host's bootstrap or deployment procedure is documented.
 
-## Derived Surfaces
+## Derived surfaces
 
 Do not add a host to these just because it exists:
 
 - `modules/hm/devenv/scripts/nrs.nix` derives remote build hosts from the
-  `remoteBuilds` Role flag in the fleet registry.
+  `remoteBuilds` Role flag in the fleet registry, and is installed only where
+  `hasRepoCheckout` is set.
 - `modules/ssh/hm.nix` derives the SSH mesh from the fleet registry: hosts
   with the `acceptsSsh` Role flag appear in every other host's mesh, and hosts
   with `unlocksPewter` receive the `pewter-luks` entry (which also lands them

@@ -1,9 +1,17 @@
 {
+  config,
+  host,
   inputs,
+  lib,
   pkgs,
   username,
   ...
 }:
+let
+  # Personal secrets need the shared age identity. Work hosts read the
+  # work-only file instead (ADR-0015), but still need the key path below.
+  isPersonalHost = config.fleet.hosts.${host}.isPersonalHost;
+in
 {
   imports = [ inputs.sops-nix.nixosModules.sops ];
 
@@ -16,7 +24,7 @@
     defaultSopsFile = ../../../secrets/me.yaml;
     defaultSopsFormat = "yaml";
     age.keyFile = "/var/lib/sops-nix/keys.txt";
-    secrets = {
+    secrets = lib.mkIf isPersonalHost {
       git_config.owner = username;
       github_token.owner = username;
       tailscale_tailnet.owner = username;

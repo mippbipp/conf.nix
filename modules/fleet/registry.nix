@@ -30,6 +30,11 @@ let
         default = false;
         description = "Role flag: runs a reachable sshd; appears in peers' SSH mesh.";
       };
+      isPersonalHost = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: may hold the shared age identity and personal secrets. Not isWorkPc, which is a DNS role; warpe is both.";
+      };
       usesWorkGit = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -90,11 +95,15 @@ in
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIyaPm21KDiQAXbzoG0IS7KO8rwcrP2ZqwJjW6uvh29A wovw@gram";
       syncId = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
       unlocksPewter = true;
+      isPersonalHost = true;
     };
-    harpe = { };
+    harpe = {
+      isPersonalHost = true;
+    };
     warpe = {
       isWorkPc = true;
       usesWorkGit = true;
+      isPersonalHost = true;
       pubkey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJFlGnfX0uWipIXc1rpZap0ZxEdGTi4s+QhxriJ5bBcM mippbipp@warpe";
     };
     pewter = {
@@ -106,6 +115,7 @@ in
       acceptsTailnetSsh = true;
       acceptsSsh = true;
       usesWorkGit = true;
+      isPersonalHost = true;
     };
     hector = {
       acceptsTailnetSsh = true;
