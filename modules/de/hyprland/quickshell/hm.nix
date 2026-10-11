@@ -44,6 +44,7 @@
         showOverFullscreen = true;
         apps.terminal = [ terminal ];
         idle = {
+          inhibitWhenCharging = true;
           timeouts = [
             {
               timeout = 300;
