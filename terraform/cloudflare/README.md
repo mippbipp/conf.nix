@@ -1,6 +1,6 @@
 # terraform/cloudflare
 
-Source of truth for `mippbipp.com` zone and `cache.mippbipp.com -> 129.146.202.171` as **Control plane** (`CONTEXT.md`, ADR-0011). Zone and `cache` were imported from the prior manual DNS; tofu now owns them. Do not edit in the Cloudflare console.
+Source of truth for `mippbipp.com` zone and `cache.mippbipp.com -> 129.146.202.171` as **Control plane** (`GLOSSARY.md`, ADR-0011). Zone and `cache` were imported from the prior manual DNS; tofu now owns them. Do not edit in the Cloudflare console.
 
 Upstream `nginx` on pewter terminates TLS (`hosts/pewter/attic.nix` `enableACME`).
 

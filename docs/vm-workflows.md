@@ -1,6 +1,6 @@
 # VM workflows on gram: which tier, which command
 
-Cheatsheet for the three tiers defined in ADR 0013 and `CONTEXT.md` Isolation tiers.
+Cheatsheet for the three tiers defined in ADR 0013 and `GLOSSARY.md` Isolation tiers.
 
 ## Choose the tier
 

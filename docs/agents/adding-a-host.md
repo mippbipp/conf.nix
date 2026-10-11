@@ -56,7 +56,7 @@ hostname and finish every applicable item before considering the host added.
 2. Update shared docs or an ADR when adding the host changes a fleet-wide
     invariant, a role definition, the Build gate architecture, or the
     control-plane inventory. `hector` introduced the `Work host` /
-    `Tag isolation` glossary in `CONTEXT.md` and the `build aarch64-linux`
+    `Tag isolation` glossary in `GLOSSARY.md` and the `build aarch64-linux`
     gate coverage for its arch.
     A normal host addition does not require editing every document that
     mentions existing host names.
