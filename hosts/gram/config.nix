@@ -25,7 +25,10 @@
   ];
 
   boot = {
-    kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-bore-lto;
+    # This Comet Lake i5-10500H has avx2/bmi1/bmi2/fma/movbe, i.e. x86-64-v3
+    # Verify after each switch with:
+    #   zcat /proc/config.gz | grep CONFIG_X86_64_VERSION   # expect 3
+    kernelPackages = pkgs.cachyosKernels.linuxPackages-cachyos-latest-lto-x86_64-v3;
     kernelParams = [
       "8250.nr_uarts=0" # disable unused legacy serial ports
 
