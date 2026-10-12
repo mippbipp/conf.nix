@@ -1,4 +1,4 @@
-# ADR 0004: t3code remote workspace server, reachable via Tailscale Serve HTTPS
+# ADR 0004: t3code Remote workspace server, reachable via Tailscale Serve HTTPS.
 {
   pkgs,
   username,
@@ -9,9 +9,10 @@
     pkgs.t3code
   ];
 
-  # Operator grant (`tailscale set --operator` via `tailscaled-set`) lives in
-  # ./default.nix, kept there singly so hosts importing multiple *-serve
-  # modules don't concatenate duplicate --operator flags.
+  tailnetExpose.t3code = {
+    httpsPort = 443; # t3code's default, passed in here to avoid port collision
+    backend = null;
+  };
 
   systemd.services.t3code = {
     description = "t3code remote workspace server";

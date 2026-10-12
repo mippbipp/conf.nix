@@ -1,5 +1,4 @@
 {
-  pkgs,
   globals,
   host,
   config,
@@ -7,7 +6,7 @@
 }:
 let
   karakeep_port = "3000";
-  tail_port = "3434";
+  tail_port = 3434;
   url = "https://${host}.${globals.tailnet.suffix}:${toString tail_port}";
 in
 {
@@ -40,31 +39,10 @@ in
     };
   };
 
-  # tailscaled terminates tailnet TLS on :{port} and proxies
-  # to the loopback backend. `--bg` is load-bearing (without it serve stays in
-  # the foreground and the oneshot times out). Mapping persists in tailscaled
-  # state until `tailscale serve --https={port} off`.
-  systemd.services.karakeep-serve = {
-    description = "Karakeep via Tailscale Serve HTTPS :${tail_port}";
-    wantedBy = [ "multi-user.target" ];
-    after = [
-      "tailscaled.service"
-      "tailscaled-set.service"
-      "karakeep-web.service" # nixos service
-    ];
-    partOf = [ "tailscaled.service" ];
-    path = [ pkgs.tailscale ];
-    # tailscaled is systemd-active before its backend reaches Running, so the
-    # first serve call can transiently fail with NoState. Retry indefinitely.
-    unitConfig.StartLimitIntervalSec = 0;
-    script = ''
-      tailscale serve --yes --bg --https=${tail_port} http://127.0.0.1:${karakeep_port}
-    '';
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-      Restart = "on-failure";
-      RestartSec = 2;
-    };
+  # Exposed over tailnet HTTPS (generates the `karakeep-serve` unit).
+  tailnetExpose.karakeep = {
+    httpsPort = tail_port;
+    backend = "http://127.0.0.1:${karakeep_port}";
+    dependsOn = [ "karakeep-web.service" ]; # nixos service above
   };
 }

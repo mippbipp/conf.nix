@@ -16,8 +16,8 @@
     inputs.disko.nixosModules.disko
     ./disko.nix
     ./users.nix
-    ../../modules/system/config/tailscale/t3code-serve.nix
-    ../../modules/system/config/tailscale/opencode2-serve.nix
+    ../../modules/llm/t3code.nix
+    ../../modules/llm/opencode2.nix
     ../../modules/system/config/syncthing.nix
     ./attic.nix
     ./karakeep.nix

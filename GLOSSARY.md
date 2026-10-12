@@ -123,6 +123,12 @@ _Avoid_: quad100
 The tailnet flag required for iOS MagicDNS, disabled on `warpe`.
 _Avoid_: override dns
 
+## Tailnet serving
+
+**Tailnet expose**:
+A loopback-only listener made reachable over the tailnet; tailscaled terminates tailnet TLS and proxies to it (Tailscale Serve).
+_Avoid_: serve, mapping
+
 ## Things sync
 
 **things folder**:

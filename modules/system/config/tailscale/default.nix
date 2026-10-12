@@ -10,21 +10,27 @@
 let
   self = config.fleet.hosts.${host};
   inherit (self) isExitNode acceptsTailnetSsh;
+  hasExposes = config.tailnetExpose != { };
 in
 {
+  imports = [ ./serve.nix ];
+
   services.tailscale = lib.mkMerge [
     # Base config for every host
     {
       enable = true;
       disableUpstreamLogging = true; # disables debug logging
       useRoutingFeatures = "client";
-      # Single source for the operator grant: lets $username manage
-      # `tailscale serve` without sudo via the module's `tailscaled-set`
-      # oneshot. Keep it here only: extraSetFlags lists concatenate across
-      # modules, so defining it in each *-serve.nix duplicates --operator
-      # and breaks tailscaled-set ("flag provided multiple times").
-      extraSetFlags = [ "--operator=${username}" ];
     }
+
+    # Operator grant, scoped to hosts that actually expose something: lets
+    # $username manage `tailscale serve` without sudo via the module's
+    # `tailscaled-set` oneshot. Kept here singly: extraSetFlags lists
+    # concatenate across modules, so defining it in each feature duplicates
+    # --operator and breaks tailscaled-set ("flag provided multiple times").
+    (lib.mkIf hasExposes {
+      extraSetFlags = [ "--operator=${username}" ];
+    })
 
     # Exit-node role
     (lib.mkIf isExitNode {
