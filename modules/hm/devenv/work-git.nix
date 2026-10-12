@@ -1,8 +1,7 @@
 # Work GitLab identity for dual-use hosts; see ADR-0019.
 #
 # Under ~/work/, git switches to the work snippet and ssh picks up the work
-# Host block; both snippets come from the work-only sops file. `glab` needs
-# GITLAB_TOKEN/GITLAB_HOST.
+# Host block; both snippets come from the work-only sops file.
 #
 # Before secrets/work.yaml is provisioned the module is inert by design (the
 # sops side guards on the file's existence) and warns instead of failing.

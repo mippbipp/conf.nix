@@ -10,7 +10,7 @@
     ../hm/devenv
     ../ssh/hm.nix
 
-    # Selected by Role flag; each module gates itself.
+    # Selected by Role flag.
     ../hm/devenv/work-git.nix
   ];
 }

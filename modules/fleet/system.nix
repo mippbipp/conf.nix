@@ -7,15 +7,14 @@
   imports = [
     ./registry.nix
 
-    # Fleet-wide baseline. A host that wants less must mkForce it away, so
-    # keep this to infrastructure and tooling that genuinely suits every host.
+    # Fleet-wide baseline.
     ../system/config/common.nix
     ../system/config/dns.nix
     ../system/config/nix.nix
     ../system/config/programs.nix
     ../system/config/tailscale
 
-    # Selected by Role flag; each module gates itself.
+    # Selected by Role flag.
     ../system/config/sops.nix
     ../system/config/sops-work.nix
     ../ssh/system.nix
