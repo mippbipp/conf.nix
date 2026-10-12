@@ -31,8 +31,9 @@ in
       DISABLE_SIGNUPS = "true"; # disabled after first user signup
       DISABLE_NEW_RELEASE_CHECK = "true";
       OPENAI_BASE_URL = "https://openrouter.ai/api/v1";
-      INFERENCE_TEXT_MODEL = "qwen/qwen3.8-27b:free";
-      INFERENCE_IMAGE_MODEL = "qwen/qwen3.8-27b:free";
+      # Models must support images AND response_format:json_schema.
+      INFERENCE_TEXT_MODEL = "dots-studio/dots-3-note-preview:free";
+      INFERENCE_IMAGE_MODEL = "dots-studio/dots-3-note-preview:free";
       INFERENCE_OUTPUT_SCHEMA = "structured";
       INFERENCE_ENABLE_AUTO_SUMMARIZATION = "false";
       EMBEDDING_ENABLE_AUTO_INDEXING = "false";
