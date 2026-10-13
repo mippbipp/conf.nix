@@ -2,6 +2,8 @@
 
 Declarative NixOS/home-manager configuration for the host machines in hosts/.
 
+Always use @unslop skill.
+
 ## Issue tracker
 
 Issues and PRDs live in GitHub Issues. External PRs are treated as a triage surface. See `docs/agents/issue-tracker.md`.
