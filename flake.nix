@@ -73,10 +73,7 @@
     };
     herdr = {
       url = "github:herdrdev/herdr";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        rust-overlay.follows = "rust-overlay";
-      };
+      inputs.rust-overlay.follows = "rust-overlay";
     };
     onlyoffice = {
       url = "github:emmanuelrosa/onlyoffice4nixos";

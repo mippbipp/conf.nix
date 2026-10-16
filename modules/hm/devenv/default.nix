@@ -40,7 +40,6 @@
     );
 
   imports = [
-    ../../llm/hm.nix
     ./git.nix
     ./skills-sync
     ./neovim.nix

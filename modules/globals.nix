@@ -39,10 +39,6 @@
         key = "vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc=";
       }
       {
-        url = "https://attic.xuyh0120.win/lantian";
-        key = "lantian:EeAUQ+W+6r7EtwnmYjeVwx5kOGEBpjlBfPlzGlTNvHc=";
-      }
-      {
         url = "https://cache.numtide.com";
         key = "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=";
       }

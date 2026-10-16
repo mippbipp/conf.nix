@@ -3,5 +3,6 @@ args: {
 
   imports = [
     ../../modules/theme/hm.nix
+    ../../modules/llm/hm.nix
   ];
 }

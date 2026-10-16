@@ -15,7 +15,6 @@
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         packages = with pkgs; [
-          t3code.desktop
           awscli2
           ssm-session-manager-plugin
         ];

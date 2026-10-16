@@ -5,6 +5,7 @@ _: {
 
   imports = [
     ../../modules/theme/hm.nix
+    ../../modules/llm/hm.nix
     ../../modules/de/hm.nix
     ../../modules/de/hyprland/hm.nix
     ../../modules/de/apps/thunar/hm.nix

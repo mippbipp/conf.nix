@@ -121,8 +121,6 @@ in
       acceptsTailnetSsh = true;
       acceptsSsh = true;
       usesWorkGit = true;
-      # No repo checkout by design (receives deployments from other hosts).
-      # Example usage: repo-gated home files ship from the store instead.
       hasRepoCheckout = false;
     };
     brick = {
