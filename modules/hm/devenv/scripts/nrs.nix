@@ -56,9 +56,9 @@ pkgs.writeShellApplication {
         trap 'rm -rf "$workdir"' EXIT
         # nixos-rebuild build always links ./result in CWD (no out-link flag),
         # so build in the temp dir to keep the repo clean.
-        ( cd "$workdir" && rebuild build )
+        ( cd "$workdir" && rebuild build "$@" )
     fi
-    rebuild switch
+    rebuild switch "$@"
 
     if [ "$push_cache" = true ]; then
         ${
