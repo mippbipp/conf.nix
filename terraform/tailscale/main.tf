@@ -15,12 +15,6 @@ provider "tailscale" {}
 # Import existing policy first: tofu import tailscale_acl.main acl
 resource "tailscale_acl" "main" {
   acl = jsonencode({
-    # Tag owners - Work host hector is tag:work, owned by members for auto-approval via auth key
-    tagOwners = {
-      "tag:work" = ["autogroup:member"]
-    }
-
-    # tag:work is not member-meshed - isolated via grants below
     acls = [
       { action = "accept", src = ["autogroup:member"], dst = ["autogroup:member:*"] },
     ]
@@ -28,11 +22,6 @@ resource "tailscale_acl" "main" {
     grants = [
       # Allow personal members exit-node / internet egress
       { src = ["autogroup:member"], dst = ["autogroup:internet"], ip = ["*"] },
-      # Personal -> Work host (hector tag:work) for nrs --target-host and ssh (22)
-      { src = ["autogroup:member"], dst = ["tag:work"], ip = ["tcp:22"] },
-      # Work host -> personal cache pull (Attic pewter 443, public pull-only) and internet egress
-      { src = ["tag:work"], dst = ["autogroup:member"], ip = ["tcp:443"] },
-      { src = ["tag:work"], dst = ["autogroup:internet"], ip = ["*"] },
     ]
 
     ssh = [
@@ -40,12 +29,6 @@ resource "tailscale_acl" "main" {
         action = "check"
         src    = ["autogroup:member"]
         dst    = ["autogroup:self"]
-        users  = ["autogroup:nonroot", "root"]
-      },
-      {
-        action = "check"
-        src    = ["autogroup:member"]
-        dst    = ["tag:work"]
         users  = ["autogroup:nonroot", "root"]
       },
     ]

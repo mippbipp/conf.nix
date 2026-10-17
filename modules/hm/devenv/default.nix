@@ -24,10 +24,8 @@
       opentofu
       attic-client
     ]
-    # nrs builds from the ~/conf.nix checkout, so a host without one gets no
-    # command rather than one pointed at a directory that does not exist.
-    ++ lib.optional globals.hosts.${host}.hasRepoCheckout (
-      import ./scripts/nrs.nix {
+    ++ [
+      (import ./scripts/nrs.nix {
         inherit
           pkgs
           username
@@ -36,8 +34,8 @@
           globals
           sopsSecrets
           ;
-      }
-    );
+      })
+    ];
 
   imports = [
     ./git.nix
@@ -100,7 +98,7 @@
               source $HOME/.zshrc-personal
             fi
 
-            # gh CLI auth from sops-managed token (see modules/sops) - absent on Work host hector
+            # gh CLI auth from sops-managed token (see modules/sops); requires personal sops secrets
             ${lib.optionalString (sopsSecrets ? github_token) ''
               if [ -f ${sopsSecrets.github_token.path} ]; then
                 export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"

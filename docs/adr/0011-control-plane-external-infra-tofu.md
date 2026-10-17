@@ -10,7 +10,6 @@ This currently applies to:
 
 - Tailnet policy and DNS in `terraform/tailscale/`.
 - The `mippbipp.com` zone and its DNS records in `terraform/cloudflare/`.
-- The `hector` work AWS resources in `terraform/aws-hector/` (isolated local state, see ADR-0015).
 
 The OCI stack in `terraform/oci/` owns the root-tenancy resources dedicated to
 pewter: VCN, subnet, gateways, route table, security list, DHCP options,

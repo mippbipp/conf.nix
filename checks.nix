@@ -168,14 +168,6 @@ nixpkgs.lib.genAttrs systems (
       # git_config is the oldest personal secret.
       present = h: (cfgOf h).sops.secrets ? git_config;
     };
-    checkout-wiring = assertRole {
-      name = "checkout-wiring";
-      flag = "hasRepoCheckout";
-      subject = "nrs installed";
-      # nrs builds from ~/conf.nix, so a host without one must not carry a command
-      # pointing at a directory that does not exist.
-      present = h: builtins.any (p: (p.name or "") == "nrs") (hmOf h).home.packages;
-    };
     # The Build gate YAML is control-plane-adjacent text outside this flake's
     # references, so pin it by parsing instead: every extra-substituters /
     # extra-trusted-public-keys row must equal the globals.cache derivation in

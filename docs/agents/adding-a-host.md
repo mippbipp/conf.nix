@@ -47,17 +47,13 @@ hostname and finish every applicable item before considering the host added.
 
 1. Update `terraform/oci/` when the host needs an OCI instance, volume,
     network rule, or budget. Update `terraform/cloudflare/` when it needs a
-    DNS record. Update `terraform/aws-hector/` (isolated local state) and
-    `terraform/tailscale/` when the host needs AWS resources or tailnet
-    ACL/DNS. Keep provider state and credentials out of the Nix host
-    declaration. For example, `hector` added `terraform/aws-hector/` and
-    `tag:work` grants in `terraform/tailscale/` (see
-    `hosts/hector/README.md` and `docs/adr/0015-hector-work-ec2-dev-machine.md`).
+    DNS record. When the host needs AWS resources or tailnet ACL/DNS, give it
+    an isolated `terraform/<provider>-<host>/` root or add the grants to
+    `terraform/tailscale/`. Keep provider state and credentials out of the
+    Nix host declaration.
 2. Update shared docs or an ADR when adding the host changes a fleet-wide
     invariant, a role definition, the Build gate architecture, or the
-    control-plane inventory. `hector` introduced the `Work host` /
-    `Tag isolation` glossary in `GLOSSARY.md` and the `build aarch64-linux`
-    gate coverage for its arch.
+    control-plane inventory. `docs/adr/` has the past instances.
     A normal host addition does not require editing every document that
     mentions existing host names.
 
@@ -80,8 +76,8 @@ main ruleset, and the host's bootstrap or deployment procedure is documented.
 Do not add a host to these just because it exists:
 
 - `modules/hm/devenv/scripts/nrs.nix` derives remote build hosts from the
-  `remoteBuilds` Role flag in the fleet registry, and is installed only where
-  `hasRepoCheckout` is set.
+  `remoteBuilds` Role flag in the fleet registry, and is installed on every
+  NixOS host.
 - `modules/ssh/hm.nix` derives the SSH mesh from the fleet registry: hosts
   with the `acceptsSsh` Role flag appear in every other host's mesh, and hosts
   with `unlocksPewter` receive the `pewter-luks` entry (which also lands them

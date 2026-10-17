@@ -40,11 +40,6 @@ let
         default = false;
         description = "Role flag: carries the work GitLab identity (directory-gated ~/work/); reads the work-only sops file.";
       };
-      hasRepoCheckout = lib.mkOption {
-        type = lib.types.bool;
-        default = true;
-        description = "Role flag: carries a ~/conf.nix checkout; repo-gated home files resolve out-of-store.";
-      };
       unlocksPewter = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -116,12 +111,6 @@ in
       acceptsSsh = true;
       usesWorkGit = true;
       isPersonalHost = true;
-    };
-    hector = {
-      acceptsTailnetSsh = true;
-      acceptsSsh = true;
-      usesWorkGit = true;
-      hasRepoCheckout = false;
     };
     brick = {
       external = true;

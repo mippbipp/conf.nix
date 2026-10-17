@@ -8,22 +8,13 @@ Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 - **harpe**: WSL guest on the personal laptop.
 - **warpe**: WSL guest on the work laptop; carries the company CA trust.
 - **pewter**: always-on Oracle ARM server; tailnet exit node and remote workspace host.
-- **hector**: Work host — EC2 dev machine in the work account, reachable over tailnet.
 - **midd**: Windows host; only `hosts/midd/setup.ps1`, not a NixOS config.
 
 ## Host isolation
 
-**Work host**:
-The fleet member that lives in the work AWS account. Its disk and RAM can be snapshotted by work admins, so it holds no personal secrets or shared age identity.
-_Avoid_: work machine, work box
-
 **Personal host**:
-A fleet member that may hold the shared age identity and personal secrets. The `isPersonalHost` Role flag keeps a Work host from declaring personal secrets; installing the shared age key is a deploy-time step, not part of the flag.
+A fleet member that may hold the shared age identity and personal secrets. The `isPersonalHost` Role flag gates the personal secret list; installing the shared age key is a deploy-time step, not part of the flag.
 _Avoid_: personal machine (ambiguous)
-
-**Tag isolation**:
-The tailnet grants that restrict `hector` to `tag:work`. Only `warpe` and `gram` can reach it, and it can only reach `pewter` and the internet.
-_Avoid_: ACL isolation (generic)
 
 ## Work identity
 
@@ -32,7 +23,7 @@ The work git name, email, and SSH key applied on dual-use hosts for checkouts un
 _Avoid_: work account
 
 **Work secret file**:
-The work-only sops file decryptable on hosts with the work age identity. The shared personal file never lands on a Work host.
+The work-only sops file decryptable on hosts with the work age identity.
 _Avoid_: work secrets
 
 **Conditional identity**:
@@ -58,7 +49,7 @@ _Avoid_: ephemeral vm
 ## Build
 
 **nrs**:
-The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes. Installed only on hosts with a `hasRepoCheckout` Role flag, since it builds from `~/conf.nix`; a host without a checkout is deployed from `pewter`. See ADR 0020.
+The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes. It builds from the `~/conf.nix` checkout; repo-relative Home Manager files (e.g. nvim, hyprland) symlink out-of-store into it. See ADR 0020.
 _Avoid_: rebuild, deploy
 
 ## Globals

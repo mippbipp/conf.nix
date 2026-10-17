@@ -9,7 +9,7 @@ How the engineering skills should consume this repo's domain documentation when 
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
 
-This repo's domain model is thin: host roles (gram the laptop, pewter the always-on Oracle ARM server, harpe and warpe the WSL guests on the personal and work laptops, hector the Work EC2 dev machine, midd the Windows host with only a `setup.ps1`), and a few repo-specific conventions around isolation, identity, and the Build gate.
+This repo's domain model is thin: host roles (gram the laptop, pewter the always-on Oracle ARM server, harpe and warpe the WSL guests on the personal and work laptops, midd the Windows host with only a `setup.ps1`), and a few repo-specific conventions around isolation, identity, and the Build gate.
 
 ## File structure
 

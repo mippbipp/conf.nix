@@ -21,18 +21,9 @@ jobs:
           - system: aarch64-linux
             runs-on: ubuntu-24.04-arm
     steps:
-      - name: Rewrite submodule SSH URLs
-        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
-
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
-          submodules: true
-          # Full history: the build below evaluates
-          # git+file://$PWD?submodules=1, which fetches each submodule as
-          # a git input and needs revCount — unavailable in the default
-          # shallow (--depth=1) clone.
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Nix
@@ -53,13 +44,11 @@ jobs:
         # for the rest. Hosts are enumerated from the flake, so adding a 
         # host of an already-covered arch needs no workflow edit. The 
         # loop keeps going after a failure via the `fail-fast: false` signal across hosts.
-        # The flake source must include submodules: checkout-free hosts
-        # (hector) ship ./nvim from the store, and a plain `.` ref drops
-        # submodule files from the evaluated source, tripping the
-        # neovim.nix assertion. Same form as the documented local verify
-        # (hosts/hector/README.md).
+        # Repo-relative Home Manager paths (e.g. nvim, hyprland) resolve
+        # out-of-store from `~/conf.nix`, so the plain checkout needs no
+        # submodule content at build time.
         run: |
-          flake="git+file://$PWD?submodules=1"
+          flake="."
           hosts_json="$(nix eval --json "$flake#nixosConfigurations" --apply 'cfgs: builtins.mapAttrs (h: c: c.config.nixpkgs.hostPlatform.system) cfgs')"
           hosts="$(echo "$hosts_json" | jq -r --arg sys "${{ matrix.system }}" 'to_entries[] | select(.value == $sys) | .key')"
           if [ -z "$hosts" ]; then

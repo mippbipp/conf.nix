@@ -37,7 +37,7 @@ pkgs.writeShellApplication {
         action="$1"
         shift
         if [ -z "$target_host" ]; then
-            sudo nixos-rebuild "$action" --flake "/home/${username}/conf.nix?submodules=1#${host}" "$@"
+            sudo nixos-rebuild "$action" --flake "/home/${username}/conf.nix#${host}" "$@"
             return
         fi
 
@@ -47,7 +47,7 @@ pkgs.writeShellApplication {
         fi
 
         # shellcheck disable=SC2086
-        nixos-rebuild "$action" --flake "/home/${username}/conf.nix?submodules=1#$target_host" $build_flags "$@"
+        nixos-rebuild "$action" --flake "/home/${username}/conf.nix#$target_host" $build_flags "$@"
     }
 
     workdir=""
@@ -69,7 +69,7 @@ pkgs.writeShellApplication {
             ''
           else
             ''
-              echo "attic push skipped: no attic_cache_token on ${host} (Work host pull-only)" >&2
+              echo "attic push skipped: no attic_cache_token on ${host} (pull-only cache)" >&2
               exit 1
             ''
         }

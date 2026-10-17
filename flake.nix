@@ -229,9 +229,6 @@
         pewter = mkHostConfig {
           host = "pewter";
         };
-        hector = mkHostConfig {
-          host = "hector";
-        };
       };
     in
     {

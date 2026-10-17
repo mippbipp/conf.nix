@@ -1,17 +1,12 @@
 {
   lib,
   config,
-  globals,
-  host,
   terminal,
   ...
 }:
 let
-  outOfStore = globals.hosts.${host}.hasRepoCheckout;
   hyprConfig = "${config.home.homeDirectory}/conf.nix/modules/de/hyprland";
   luaConfig = "${hyprConfig}/lua";
-  storeHyprland = ./hyprland.lua;
-  storeLua = ./lua;
 in
 {
   imports = [
@@ -36,12 +31,9 @@ in
   xdg.configFile = {
     "hypr/hyprland.conf".enable = lib.mkForce false;
     "hypr/hyprland.lua".source = lib.mkForce (
-      if outOfStore then
-        config.lib.file.mkOutOfStoreSymlink "${hyprConfig}/hyprland.lua"
-      else
-        storeHyprland
+      config.lib.file.mkOutOfStoreSymlink "${hyprConfig}/hyprland.lua"
     );
-    "hypr/lua".source = if outOfStore then config.lib.file.mkOutOfStoreSymlink luaConfig else storeLua;
+    "hypr/lua".source = config.lib.file.mkOutOfStoreSymlink luaConfig;
     "hypr/env.lua".text = ''
       return {
         terminal = "${terminal}",

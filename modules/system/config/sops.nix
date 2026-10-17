@@ -8,8 +8,9 @@
   ...
 }:
 let
-  # Personal secrets need the shared age identity. Work hosts read the
-  # work-only file instead (ADR-0015), but still need the key path below.
+  # Personal secrets need the shared age identity. Hosts carrying the work
+  # GitLab identity decrypt the work-only file (sops-work.nix) but
+  # share the key path below.
   isPersonalHost = config.fleet.hosts.${host}.isPersonalHost;
 in
 {
