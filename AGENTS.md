@@ -19,7 +19,7 @@ required declaration, Build gate, GitHub ruleset, documentation, and
 conditional infrastructure surfaces.
 
 When changing, diagnosing, or operating the flake update pipeline, read
-`docs/agents/flake-update-pipeline.md`. It defines the updater, Build gate,
+`docs/adr/0009-flake-update-pipeline.md`. It defines the updater, Build gate,
 watchdog, state directories, and recovery evidence to collect.
 
 ## Encrypted secrets
