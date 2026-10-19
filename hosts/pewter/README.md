@@ -1,8 +1,9 @@
 # pewter - cloud VM
 
-The verified flake update pipeline is documented in
-[`docs/agents/flake-update-pipeline.md`](../../docs/agents/flake-update-pipeline.md).
-Use that runbook for service status, manual updater runs, Build gate
+The flake update pipeline (decision record and operational runbook) is
+documented in
+[`docs/adr/0009-flake-update-pipeline.md`](../../docs/adr/0009-flake-update-pipeline.md).
+Use its runbook for service status, manual updater runs, Build gate
 verification, watchdog checks, and rollback evidence.
 
 - set LUKS password in `/tmp/pewter-luks.key`
