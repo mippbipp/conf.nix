@@ -36,6 +36,7 @@
         nil
         qt6.qtdeclarative # qmlls
         clang-tools # clangd (mason has no aarch64 build; see lsp.lua)
+        copilot-language-server # GitHub Copilot language server
 
         # snacks.image
         imagemagick
