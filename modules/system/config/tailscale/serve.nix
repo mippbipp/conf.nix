@@ -71,9 +71,9 @@ in
             "tailscaled-set.service" # operator grant lands before a user-managed mapping needs it
           ]
           ++ e.dependsOn;
-          # Re-run whenever tailscaled restarts; the mapping otherwise persists
-          # in tailscaled state until `tailscale serve --https=<port> off`.
-          partOf = [ "tailscaled.service" ];
+          # Re-run whenever these services restart to reset state; e.g. the tailscale serve mapping
+          # otherwise persists in tailscaled state until `tailscale serve --https=<port> off`.
+          partOf = [ "tailscaled.service" ] ++ e.dependsOn;
           path = [ pkgs.tailscale ];
           # tailscaled is systemd-active before its backend reaches Running, so
           # the first serve call can transiently fail with NoState. Retry
