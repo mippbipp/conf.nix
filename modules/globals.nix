@@ -42,6 +42,10 @@
         url = "https://cache.numtide.com";
         key = "niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=";
       }
+      {
+        url = "https://cache.lantian.pub/lantian";
+        key = "lantian:WVGO7vsRMSEN+h7Lp7kv6SAmrkEXgUGbbXm7jMDjBuQ=";
+      }
     ];
     substituters = map (c: c.url) caches;
     trustedKeys = map (c: c.key) caches;
