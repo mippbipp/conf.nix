@@ -98,7 +98,8 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
-          submodules: true
+          # GITHUB_TOKEN cannot read the private repos, so submodules stay uninitialized here.
+          submodules: false
           persist-credentials: false
 
       - name: Install Nix

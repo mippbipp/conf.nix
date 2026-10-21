@@ -49,8 +49,5 @@ exists to prevent. `acceptsSsh` had the same shape.
   `work-identity-wiring` probes the Home Manager side because NixOS
   `sops.secrets` stays empty until `secrets/work.yaml` is provisioned and so
   cannot tell "flag off" from "file missing".
-- Repo-relative Home Manager paths (e.g. nvim, hyprland) resolve out-of-store from
-  the host's `~/conf.nix` checkout; every host carries one, and a host without
-  a checkout would dangle these symlinks. `skills-sync` unchanged: its runtime
-  `ConditionPathExists` still skips hosts where `~/.agents/skills` was never
-  cloned.
+- Repo-relative Home Manager paths (e.g. nvim, hyprland, skills) resolve out-of-store from
+  the host's `~/conf.nix` checkout.
