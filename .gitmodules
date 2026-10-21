@@ -1,3 +1,6 @@
 [submodule "modules/hm/devenv/nvim"]
 	path = modules/hm/devenv/nvim
 	url = git@github.com:mippbipp/init.lua.git
+[submodule "modules/llm/skills"]
+	path = modules/llm/skills
+	url = git@github.com:mippbipp/skills.git

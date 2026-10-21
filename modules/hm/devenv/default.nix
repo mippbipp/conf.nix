@@ -39,7 +39,6 @@
 
   imports = [
     ./git.nix
-    ./skills-sync
     ./neovim.nix
     ./starship.nix
     ./superfile
