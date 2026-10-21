@@ -2,7 +2,6 @@
   inputs,
   config,
   terminal,
-  pkgs,
   ...
 }:
 {
@@ -11,16 +10,6 @@
   ];
   programs.caelestia = {
     enable = true;
-    # Upstream bug caelestia-dots/shell#1835: IdleMonitors.qml never sees the
-    # Keep Awake toggle (IdleInhibitor name collision with Quickshell.Wayland
-    # type + 0x0 inhibitor surface sometimes never mapping), so lock/DPMS/suspend
-    # still fire while the button shows ON. Applies the layer-1 fix from PR #1889
-    # until it merges upstream (then drop the override + patch file).
-    package =
-      inputs.caelestia-shell.packages.${pkgs.stdenv.hostPlatform.system}.with-cli.overrideAttrs
-        (oldAttrs: {
-          patches = (oldAttrs.patches or [ ]) ++ [ ./caelestia-idle-inhibitor-fix.patch ];
-        });
     systemd = {
       enable = true;
       target = "graphical-session.target";

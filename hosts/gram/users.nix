@@ -30,6 +30,7 @@
           discord
           code-cursor
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
+          onlyoffice-desktopeditors
         ];
         openssh.authorizedKeys.keys = [ ];
       };
