@@ -1,7 +1,3 @@
-# Both opencode2 (V2 preview CLI) and the t3code override (currently on
-# opencode V1 via providerPackages; swap to opencode2 when t3code supports
-# it) resolve here.
-#
 { inputs, lib, ... }:
 {
   nixpkgs.overlays = [
@@ -23,7 +19,7 @@
           '';
         });
         t3code = llm.t3code.override {
-          providerPackages = with llm; [ opencode ];
+          providerPackages = [ final.opencode2 ];
         };
       }
     )
