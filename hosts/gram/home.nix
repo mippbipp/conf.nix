@@ -14,5 +14,6 @@ _: {
     ../../modules/de/apps/hm/zen
     ../../modules/de/apps/hm/mpv.nix
     ../../modules/de/apps/hm/discord.nix
+    ../../modules/de/apps/dgpu/hm.nix
   ];
 }

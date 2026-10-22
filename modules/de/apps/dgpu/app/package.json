@@ -1,0 +1,52 @@
+{
+  "$schema": "https://raw.githubusercontent.com/vicinaehq/vicinae/refs/heads/main/extra/schemas/extension.json",
+  "name": "dgpu",
+  "title": "dGPU Apps",
+  "description": "Toggle per-app discrete GPU launch wrappers for the Caelestia dGPU setup.",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "categories": [
+    "Applications",
+    "System"
+  ],
+  "license": "MIT",
+  "author": "mippbipp",
+  "icon": "nvidia-settings.png",
+  "platforms": [
+    "Linux"
+  ],
+  "keywords": [
+    "dgpu",
+    "nvidia",
+    "prime",
+    "gpu"
+  ],
+  "commands": [
+    {
+      "name": "apps",
+      "title": "dGPU Apps",
+      "description": "Turn PRIME render offload on or off for installed applications.",
+      "mode": "view"
+    }
+  ],
+  "scripts": {
+    "build": "vici build",
+    "build:cli": "esbuild src/cli.ts --bundle --platform=node --format=esm --outfile=dist/cli.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.5",
+    "@vicinae/api": "0.29.2",
+    "effect": "4.0.5"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.5",
+    "@types/node": "24.9.2",
+    "@types/react": "19.2.17",
+    "esbuild": "0.28.2",
+    "typescript": "5.9.2",
+    "vitest": "5.0.5"
+  }
+}
