@@ -60,6 +60,11 @@
       url = "github:vicinaehq/vicinae";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    vicinae-dgpu = {
+      url = "github:mippbipp/vicinae-dgpu";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.vicinae.follows = "vicinae";
+    };
     xmcl = {
       url = "github:x45iq/xmcl-nix";
       inputs.nixpkgs.follows = "nixpkgs";
