@@ -1,7 +1,7 @@
 {
-  config,
   inputs,
   lib,
+  pkgs,
   ...
 }:
 {
@@ -11,7 +11,9 @@
   ];
   programs.vicinae = {
     enable = true;
-    extensions = [ config.services.dgpu.extension ];
+    extensions = [
+      inputs.vicinae-dgpu.packages.${pkgs.stdenv.hostPlatform.system}.extension
+    ];
     systemd = {
       enable = true;
       autoStart = true;
