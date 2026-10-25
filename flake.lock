@@ -1141,11 +1141,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792890399,
-        "narHash": "sha256-UpeH/2XG5Tzf1x96Rs4tKunp/WT4Q6AHF34uETzVWPI=",
+        "lastModified": 1792891845,
+        "narHash": "sha256-idZtuR1YSSYXRN2HiY/PcxuQuIWWIO0ZewmxYikGuaU=",
         "owner": "mippbipp",
         "repo": "vicinae-dgpu",
-        "rev": "e0ab9a9bf21d5c78ebe918eb2ffe8ab08164cdfc",
+        "rev": "5f152ce038b3eb01e8823601add8bdac23a35ae1",
         "type": "github"
       },
       "original": {

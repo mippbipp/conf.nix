@@ -1,4 +1,4 @@
-{ inputs, ... }: {
+{ ... }: {
   _module.args.terminal = "ghostty";
   home.stateVersion = "23.11";
   xdg.mimeApps.enable = true;
@@ -15,6 +15,5 @@
     ../../modules/de/apps/hm/zen
     ../../modules/de/apps/hm/mpv.nix
     ../../modules/de/apps/hm/discord.nix
-    inputs.vicinae-dgpu.homeManagerModules.default
   ];
 }

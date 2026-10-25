@@ -7,12 +7,11 @@
 {
   imports = [
     inputs.vicinae.homeManagerModules.default
+    inputs.vicinae-dgpu.homeManagerModules.default
   ];
   programs.vicinae = {
     enable = true;
-    extensions = lib.optional (
-      config.services ? dgpu && config.services.dgpu.enable
-    ) config.services.dgpu.extension;
+    extensions = [ config.services.dgpu.extension ];
     systemd = {
       enable = true;
       autoStart = true;
