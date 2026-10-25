@@ -1,4 +1,4 @@
-{ ... }: {
+_: {
   _module.args.terminal = "ghostty";
   home.stateVersion = "23.11";
   xdg.mimeApps.enable = true;
