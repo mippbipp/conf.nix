@@ -1,4 +1,5 @@
 {
+  config,
   inputs,
   lib,
   ...
@@ -9,6 +10,9 @@
   ];
   programs.vicinae = {
     enable = true;
+    extensions = lib.optional (
+      config.services ? dgpu && config.services.dgpu.enable
+    ) config.services.dgpu.extension;
     systemd = {
       enable = true;
       autoStart = true;
