@@ -1,14 +1,19 @@
 {
   inputs,
   lib,
+  pkgs,
   ...
 }:
 {
   imports = [
     inputs.vicinae.homeManagerModules.default
+    inputs.vicinae-dgpu.homeManagerModules.default
   ];
   programs.vicinae = {
     enable = true;
+    extensions = [
+      inputs.vicinae-dgpu.packages.${pkgs.stdenv.hostPlatform.system}.extension
+    ];
     systemd = {
       enable = true;
       autoStart = true;

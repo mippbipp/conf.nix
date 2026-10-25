@@ -37,8 +37,8 @@ jobs:
           NIX_CONFIG: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-            extra-substituters = https://cache.mippbipp.com/fleet https://hyprland.cachix.org https://winapps.cachix.org/ https://vicinae.cachix.org https://cache.numtide.com
-            extra-trusted-public-keys = fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g= vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc= niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+            extra-substituters = https://cache.mippbipp.com/fleet https://hyprland.cachix.org https://winapps.cachix.org/ https://vicinae.cachix.org https://cache.numtide.com https://cache.lantian.pub/lantian
+            extra-trusted-public-keys = fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g= vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc= niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g= lantian:WVGO7vsRMSEN+h7Lp7kv6SAmrkEXgUGbbXm7jMDjBuQ=
         # One job per arch builds every host of that arch in a single
         # /nix/store, so shared derivations compile once and hit locally 
         # for the rest. Hosts are enumerated from the flake, so adding a 
@@ -110,8 +110,8 @@ jobs:
           NIX_CONFIG: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-            extra-substituters = https://cache.mippbipp.com/fleet https://hyprland.cachix.org https://winapps.cachix.org/ https://vicinae.cachix.org  https://cache.numtide.com
-            extra-trusted-public-keys = fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g= vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc=  niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g=
+            extra-substituters = https://cache.mippbipp.com/fleet https://hyprland.cachix.org https://winapps.cachix.org/ https://vicinae.cachix.org  https://cache.numtide.com https://cache.lantian.pub/lantian
+            extra-trusted-public-keys = fleet:6knXbqLkC7Mgd7CImcsLqeTQ27Y+7E7nBLx/hQgCHGY= hyprland.cachix.org-1:a7pgxzMz7+chwVL3/pzj6jIBMioiJM7ypFP8PwtkuGc= winapps.cachix.org-1:HI82jWrXZsQRar/PChgIx1unmuEsiQMQq+zt05CD36g= vicinae.cachix.org-1:1kDrfienkGHPYbkpNj1mWTr7Fm1+zcenzgTizIcI3oc=  niks3.numtide.com-1:DTx8wZduET09hRmMtKdQDxNNthLQETkc/yaX7M4qK0g= lantian:WVGO7vsRMSEN+h7Lp7kv6SAmrkEXgUGbbXm7jMDjBuQ=
         run: |
           for attr in $(nix eval --json ".#checks.${{ matrix.system }}" --apply builtins.attrNames | jq -r '.[]'); do
             nix build -L ".#checks.${{ matrix.system }}.$attr"

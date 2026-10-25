@@ -822,6 +822,7 @@
         "stylix": "stylix",
         "superfile": "superfile",
         "vicinae": "vicinae",
+        "vicinae-dgpu": "vicinae-dgpu",
         "winapps": "winapps",
         "xmcl": "xmcl",
         "zen-browser": "zen-browser"
@@ -1127,6 +1128,26 @@
       "original": {
         "owner": "vicinaehq",
         "repo": "vicinae",
+        "type": "github"
+      }
+    },
+    "vicinae-dgpu": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1792972118,
+        "narHash": "sha256-k4UHDf1nme8nl1AO+jqqvN7KWjRLdi1qMqiieYX3IC8=",
+        "owner": "mippbipp",
+        "repo": "vicinae-dgpu",
+        "rev": "dcc1bf72cbb05da0c56b69df94378a6612b5ffbd",
+        "type": "github"
+      },
+      "original": {
+        "owner": "mippbipp",
+        "repo": "vicinae-dgpu",
         "type": "github"
       }
     },
