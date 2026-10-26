@@ -24,18 +24,9 @@
       url = "github:nix-community/stylix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Pinned to the upstream fix that moved SETUPTOOLS_SCM_PRETEND_VERSION
-    # into `env` for structured-attrs builds. caelestia-shell's lock should
-    # pick this up on its weekly flake-input update; drop the pin once it does.
-    caelestia-cli = {
-      url = "github:caelestia-dots/cli/724d9e34c6b41399cb01296bbc1739daeb8d90ab";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.caelestia-shell.follows = "";
-    };
     caelestia-shell = {
       url = "github:caelestia-dots/shell";
       inputs.nixpkgs.follows = "nixpkgs";
-      inputs.caelestia-cli.follows = "caelestia-cli";
     };
     zen-browser = {
       url = "github:0xc000022070/zen-browser-flake/beta";

@@ -104,31 +104,31 @@
     },
     "caelestia-cli": {
       "inputs": {
-        "caelestia-shell": [],
+        "caelestia-shell": [
+          "caelestia-shell"
+        ],
         "nixpkgs": [
+          "caelestia-shell",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1792545565,
-        "narHash": "sha256-BjwwbrrcmgkpSXV8oD5am2pTDlhy3QLrSCh7VtQc5bY=",
+        "lastModified": 1792988199,
+        "narHash": "sha256-PO3MBtadQMXlaGZCswnIEfBVNFb99c7IuYwB/vFrZLk=",
         "owner": "caelestia-dots",
         "repo": "cli",
-        "rev": "724d9e34c6b41399cb01296bbc1739daeb8d90ab",
+        "rev": "5e804b10c146c9f3278b2da37c8e4b5d8e9708d9",
         "type": "github"
       },
       "original": {
         "owner": "caelestia-dots",
         "repo": "cli",
-        "rev": "724d9e34c6b41399cb01296bbc1739daeb8d90ab",
         "type": "github"
       }
     },
     "caelestia-shell": {
       "inputs": {
-        "caelestia-cli": [
-          "caelestia-cli"
-        ],
+        "caelestia-cli": "caelestia-cli",
         "m3shapes": "m3shapes",
         "nixpkgs": [
           "nixpkgs"
@@ -806,7 +806,6 @@
     },
     "root": {
       "inputs": {
-        "caelestia-cli": "caelestia-cli",
         "caelestia-shell": "caelestia-shell",
         "disko": "disko",
         "herdr": "herdr",
