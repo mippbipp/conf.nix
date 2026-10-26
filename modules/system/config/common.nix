@@ -6,13 +6,7 @@
 {
   boot = {
     loader.timeout = 1;
-    initrd = {
-      verbose = false;
-      systemd = {
-        enable = true;
-        network.wait-online.enable = false;
-      };
-    };
+    initrd.systemd.network.wait-online.enable = false;
     kernelParams = [
       "quiet" # Reduce console output
       "udev.loglevel=3" # Only show errors
