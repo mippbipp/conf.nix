@@ -27,9 +27,9 @@ hl.window_rule({
 	workspace = 4,
 })
 hl.window_rule({
-	name = "virt-manager-workspace6",
+	name = "virt-manager-workspace4",
 	match = { class = "^(.virt-manager.*)$" },
-	workspace = 6,
+	workspace = 4,
 })
 
 hl.window_rule({

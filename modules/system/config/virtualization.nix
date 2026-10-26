@@ -4,6 +4,91 @@
   username,
   ...
 }:
+let
+  # Declarative libvirt networks. Each entry becomes an /etc XML definition plus
+  # a oneshot unit (below) that defines, autostarts, and starts it, so a fresh
+  # machine has the network before any guest needs it.
+  libvirtNetworks = {
+    # Isolated network: no <forward>, so guests reach each other but not the
+    # host LAN or the internet. For throwaway VMs.
+    sandbox = ''
+      <network>
+        <name>sandbox</name>
+        <uuid>5c69bd94-c97d-48fb-b14b-1c3ebed8511c</uuid>
+        <bridge name="virbr1" stp="on" delay="0"/>
+        <ip address="192.168.210.1" netmask="255.255.255.0">
+          <dhcp>
+            <range start="192.168.210.2" end="192.168.210.254"/>
+          </dhcp>
+        </ip>
+      </network>
+    '';
+    # NAT network: guests reach the internet through the host. This replaces the
+    # stock libvirt "default" network, now declared here so it is reproducible
+    # instead of living as imperative state under /var/lib. UUID and MAC are
+    # pinned so the definition is deterministic across machines.
+    default = ''
+      <network>
+        <name>default</name>
+        <uuid>10b5c7e1-cc5e-489a-a11b-88220f33e707</uuid>
+        <forward mode="nat"/>
+        <bridge name="virbr0" stp="on" delay="0"/>
+        <mac address="52:54:00:c2:b3:23"/>
+        <ip address="192.168.122.1" netmask="255.255.255.0">
+          <dhcp>
+            <range start="192.168.122.2" end="192.168.122.254"/>
+          </dhcp>
+        </ip>
+      </network>
+    '';
+  };
+
+  libvirtNetworkEtc = lib.mapAttrs' (
+    name: xml: lib.nameValuePair "libvirt/qemu/networks/${name}.xml" { text = xml; }
+  ) libvirtNetworks;
+
+  # One oneshot unit per network. Ride along with libvirtd instead of pulling it
+  # in: keying off libvirtd.service (not multi-user.target) keeps a network only
+  # throwaway VMs need off the critical path to graphical.target, while still
+  # guaranteeing it is defined before any guest can need it, because anything
+  # that talks to libvirt starts the daemon first.
+  mkNetUnit = name: {
+    description = "Apply libvirt network '${name}'";
+    after = [
+      "libvirtd.service"
+      "libvirtd.socket"
+    ];
+    wantedBy = [ "libvirtd.service" ];
+    environment.LIBVIRT_DEFAULT_URI = "qemu:///system";
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    path = [
+      pkgs.libvirt
+      pkgs.gnugrep
+      pkgs.coreutils
+    ];
+    script = ''
+      # Wait for libvirtd to be ready (socket activation can lag)
+      for i in {1..30}; do
+        if virsh --connect qemu:///system uri >/dev/null 2>&1; then
+          break
+        fi
+        sleep 1
+      done
+      if ! virsh --connect qemu:///system net-info ${name} >/dev/null 2>&1; then
+        virsh --connect qemu:///system net-define /etc/libvirt/qemu/networks/${name}.xml
+      fi
+      # Reassert autostart and active state every boot; both are idempotent and
+      # cover networks that were defined outside this unit.
+      virsh --connect qemu:///system net-autostart ${name} || true
+      if ! virsh --connect qemu:///system net-info ${name} | grep -q "Active:.*yes"; then
+        virsh --connect qemu:///system net-start ${name} || true
+      fi
+    '';
+  };
+in
 {
   environment = {
     sessionVariables = {
@@ -21,23 +106,13 @@
     ];
 
     # expose nix binaries to distrobox containers
-    etc."distrobox/distrobox.conf".text = ''
-      container_additional_volumes="/nix/store:/nix/store:ro /etc/profiles/per-user:/etc/profiles/per-user:ro /etc/static/profiles/per-user:/etc/static/profiles/per-user:ro"
-    '';
-
-    # define isolated network for libvirt VMs
-    etc."libvirt/qemu/networks/sandbox.xml".text = ''
-      <network>
-        <name>sandbox</name>
-        <uuid>5c69bd94-c97d-48fb-b14b-1c3ebed8511c</uuid>
-        <bridge name="virbr1" stp="on" delay="0"/>
-        <ip address="192.168.210.1" netmask="255.255.255.0">
-          <dhcp>
-            <range start="192.168.210.2" end="192.168.210.254"/>
-          </dhcp>
-        </ip>
-      </network>
-    '';
+    etc = {
+      "distrobox/distrobox.conf".text = ''
+        container_additional_volumes="/nix/store:/nix/store:ro /etc/profiles/per-user:/etc/profiles/per-user:ro /etc/static/profiles/per-user:/etc/static/profiles/per-user:ro"
+      '';
+    }
+    # define libvirt VM networks
+    // libvirtNetworkEtc;
   };
   programs.virt-manager.enable = true;
 
@@ -47,47 +122,17 @@
     # redundant. Dropping it hands the daemon start to whoever first
     # connects (virt-manager, virsh, or quickemu).
     libvirtd.wantedBy = lib.mkForce [ ];
-    libvirt-sandbox-net = {
-      description = "Apply isolated libvirt network 'sandbox'";
-      after = [
-        "libvirtd.service"
-        "libvirtd.socket"
-      ];
-      # Ride along with libvirtd instead of pulling it in. This unit used to
-      # Wants= libvirtd.service while itself being WantedBy= multi-user.target,
-      # which put an daemon start on the critical path to
-      # graphical.target for a network only Throwaway VMs need. Keying it off
-      # libvirtd.service keeps the network defined before any guest can need it,
-      # because anything that talks to libvirt starts the daemon first.
-      wantedBy = [ "libvirtd.service" ];
-      environment.LIBVIRT_DEFAULT_URI = "qemu:///system";
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-      };
-      path = [
-        pkgs.libvirt
-        pkgs.gnugrep
-        pkgs.coreutils
-      ];
-      script = ''
-        # Wait for libvirtd to be ready (socket activation can lag)
-        for i in {1..30}; do
-          if virsh --connect qemu:///system uri >/dev/null 2>&1; then
-            break
-          fi
-          sleep 1
-        done
-        if ! virsh --connect qemu:///system net-info sandbox >/dev/null 2>&1; then
-          virsh --connect qemu:///system net-define /etc/libvirt/qemu/networks/sandbox.xml
-          virsh --connect qemu:///system net-autostart sandbox || true
-        fi
-        if ! virsh --connect qemu:///system net-info sandbox | grep -q "Active:.*yes"; then
-          virsh --connect qemu:///system net-start sandbox || true
-        fi
-      '';
-    };
-  };
+
+    # Generating the CDI spec costs boot time and blocks on
+    # `udevadm settle` waiting for GPU device nodes that are usually not needed
+    # yet. The unit is already `requiredBy podman.service`, so dropping it from
+    # multi-user.target leaves it running on first container start instead.
+    nvidia-container-toolkit-cdi-generator.wantedBy = lib.mkForce [ ];
+  }
+  # One libvirt-<name>-net oneshot per declared network.
+  // lib.mapAttrs' (
+    name: _: lib.nameValuePair "libvirt-${name}-net" (mkNetUnit name)
+  ) libvirtNetworks;
 
   virtualisation = {
     containers.enable = true;
@@ -117,10 +162,4 @@
   ];
 
   hardware.nvidia-container-toolkit.enable = true; # for podman
-
-  # Generating the CDI spec costs boot time and blocks on
-  # `udevadm settle` waiting for GPU device nodes that are usually not needed
-  # yet. The unit is already `requiredBy podman.service`, so dropping it from
-  # multi-user.target leaves it running on first container start instead.
-  systemd.services.nvidia-container-toolkit-cdi-generator.wantedBy = lib.mkForce [ ];
 }
