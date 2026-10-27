@@ -15,6 +15,11 @@ let
         default = false;
         description = "Role flag: advertises as tailnet exit node.";
       };
+      isServer = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: always-on server";
+      };
       isWorkPc = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -106,6 +111,7 @@ in
       luksHostname = "129.146.202.171";
       syncId = "POHLBBF-3AOYWFT-OK46SCB-Z4O4VHV-5NFB5MH-SX2OP5M-GNYZSTT-5VKEPQT";
       isExitNode = true;
+      isServer = true;
       remoteBuilds = true;
       acceptsTailnetSsh = true;
       acceptsSsh = true;

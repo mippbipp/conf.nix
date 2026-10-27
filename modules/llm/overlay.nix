@@ -16,6 +16,9 @@
           postInstall = (old.postInstall or "") + ''
             wrapProgram $out/bin/opencode2 \
               --prefix PATH : ${kiroPath}
+
+            # llm-agents installs the v2 binary as `opencode2`
+            ln -s opencode2 $out/bin/opencode
           '';
         });
         t3code = llm.t3code.override {

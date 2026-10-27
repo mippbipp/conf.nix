@@ -25,7 +25,12 @@
   home.file.".agents/skills".source =
     config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/skills";
 
-  home.packages = with pkgs; [
-    kiro-cli
-  ];
+  home.packages =
+    with pkgs;
+    [
+      kiro-cli
+    ]
+    ++ lib.optionals (!globals.hosts.${host}.isServer) [
+      t3code.desktop
+    ];
 }
