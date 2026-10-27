@@ -6,3 +6,6 @@ terraform/**/*.tfstate.backup
 terraform/**/.terraform/
 terraform/**/*.tfvars
 terraform/**/*.tfvars.json
+
+# Engineering-skill scratch: atlases, local specs, research
+.scratch/
