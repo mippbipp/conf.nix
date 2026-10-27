@@ -1,0 +1,33 @@
+name: flake-update-scope
+
+# pull_request_target runs main's copy of this file, so a commit on the PR
+# cannot weaken the check that guards it. It never checks out PR code; it only
+# lists the PR's changed files through the API. Keep the path list in sync with
+# hosts/pewter/flake-updater/src/scope.ts.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scope:
+    name: flake-update-scope
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject blocked paths on the flake-update PR
+        if: github.event.pull_request.head.ref == 'flake-update' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
+          blocked="$(printf '%s\n' "$files" | grep -E '^(\.github/|secrets/|hosts/pewter/flake-updater/)|^(\.sops\.yaml|checks\.nix)$' || true)"
+          if [ -n "$blocked" ]; then
+            echo "the flake-update PR may not change:" >&2
+            printf '%s\n' "$blocked" >&2
+            exit 1
+          fi
+          echo "no blocked paths changed"

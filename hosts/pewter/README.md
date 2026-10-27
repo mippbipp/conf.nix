@@ -4,7 +4,8 @@ The flake update pipeline (decision record and operational runbook) is
 documented in
 [`docs/adr/0009-flake-update-pipeline.md`](../../docs/adr/0009-flake-update-pipeline.md).
 Use its runbook for service status, manual updater runs, Build gate
-verification, watchdog checks, and rollback evidence.
+verification, watchdog checks, and rollback evidence. The Updater's source,
+package and NixOS module live in [`flake-updater/`](./flake-updater/).
 
 - set LUKS password in `/tmp/pewter-luks.key`
 - initrd host keys made with `ssh-keygen -t ed25519 -N "" -f /tmp/pewter-extra-files/etc/secrets/initrd/ssh_host_ed25519_key`
@@ -91,3 +92,19 @@ nrs --push pewter
 The first command switches the current host and pushes its `result` closure;
 the second targets pewter. The token has pull and push access to `fleet` and is
 not part of the Nix configuration or shell history.
+
+## Flake fixer
+
+Off by default. To turn it on:
+
+1. Set `services.flake-updater.agent.enable = true;` in `config.nix` (and
+   `services.flake-updater.agent.model` if the default free model is out of
+   quota), then `nrs pewter`.
+2. Check `systemctl status flake-fixer.service flake-fixer-password.service`.
+3. Open `https://pewter.<tailnet>:8444` from a tailnet device, user `opencode`,
+   password from `sudo cat /var/lib/flake-updater/fixer-password`.
+4. After the first update PR shows a `flake-update-scope` check, add it to the
+   GitHub ruleset's required checks.
+
+To try it without pushing:
+`flake-updater --dry-run --agent --repo-dir /tmp/flake-updater-dry`.

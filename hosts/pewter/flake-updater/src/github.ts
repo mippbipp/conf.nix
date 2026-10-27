@@ -1,0 +1,56 @@
+import type { Effect, Option } from "effect";
+import { Context, Schema } from "effect";
+
+export class GitHubError extends Schema.TaggedError<
+  GitHubError,
+  { readonly brand: unique symbol }
+>()("GitHubError", { message: Schema.String, cause: Schema.Defect() }) {}
+
+export interface PullRequest {
+  readonly number: number;
+  readonly url: string;
+}
+
+export interface Issue {
+  readonly number: number;
+  readonly title: string;
+  readonly body: string;
+  readonly url: string;
+}
+
+export interface PullRequestUpdate {
+  readonly body: string;
+  /** Off whenever the branch carries a commit that needs human review. */
+  readonly autoMerge: boolean;
+  /** Adds or removes the `ready-for-human` label. */
+  readonly needsReview: boolean;
+}
+
+export class GitHub extends Context.Service<
+  GitHub,
+  {
+    readonly openPr: Effect.Effect<Option.Option<PullRequest>, GitHubError>;
+    readonly createPr: (
+      title: string,
+      body: string
+    ) => Effect.Effect<PullRequest, GitHubError>;
+    readonly updatePr: (
+      pr: PullRequest,
+      update: PullRequestUpdate
+    ) => Effect.Effect<void, GitHubError>;
+    /** Open issues labelled `automated`. */
+    readonly openIssues: Effect.Effect<readonly Issue[], GitHubError>;
+    readonly createIssue: (
+      title: string,
+      body: string
+    ) => Effect.Effect<Issue, GitHubError>;
+    readonly commentIssue: (
+      issue: Issue,
+      body: string
+    ) => Effect.Effect<void, GitHubError>;
+    readonly closeIssue: (
+      issue: Issue,
+      comment: string
+    ) => Effect.Effect<void, GitHubError>;
+  }
+>()("flake-updater/github") {}
