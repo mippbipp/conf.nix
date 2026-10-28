@@ -1,0 +1,14 @@
+{
+  "name": "opencode-kiro",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.1.1",
+    "@types/bun": "1.4.2",
+    "effect": "4.0.1",
+    "typescript": "7.0.2"
+  }
+}

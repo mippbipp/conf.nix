@@ -10,7 +10,7 @@
       in
       {
         t3code = llm.t3code.override {
-          providerPackages = [ final.opencode2 ];
+          providerPackages = [ final.opencode ];
           # T3 otherwise downloads an unpatched chrome-headless-shell into
           # ~/.t3/tools, which can't find its libraries on NixOS
           t3code-unwrapped = llm.t3code.unwrapped.overrideAttrs (

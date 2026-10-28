@@ -1,12 +1,12 @@
-# opencode2 API + web server, reachable via Tailscale Serve HTTPS.
+# opencode API + web server, reachable via Tailscale Serve HTTPS.
 #
 # Note: `serve --service` makes this unit THE registered background service
 # (same `~/.local/state/opencode/service.json` local CLIs discover), with the
-# persistent password from `~/.config/opencode/service.json`, so `opencode2
-# pair`, plain `opencode2`, and `--server` clients all work with stable creds.
+# persistent password from `~/.config/opencode/service.json`, so `opencode
+# pair`, plain `opencode`, and `--server` clients all work with stable creds.
 # Plain `serve` instead mints an ephemeral password per start (printed once on
 # stdout), which would break remote clients on every unit restart. Do not run
-# a second server as this user (e.g. `opencode2 service start`); local TUIs
+# a second server as this user (e.g. `opencode service start`); local TUIs
 # attach to this unit automatically via service discovery.
 {
   pkgs,
@@ -14,28 +14,28 @@
   ...
 }:
 let
-  inherit (pkgs) opencode2;
-  opencode2_port = "4096";
+  inherit (pkgs) opencode;
+  opencode_port = "4096";
 in
 {
   environment.systemPackages = [
-    opencode2
+    opencode
   ];
 
-  tailnetExpose.opencode2 = {
+  tailnetExpose.opencode = {
     httpsPort = 8443;
-    backend = "http://127.0.0.1:${opencode2_port}";
-    dependsOn = [ "opencode2.service" ];
+    backend = "http://127.0.0.1:${opencode_port}";
+    dependsOn = [ "opencode.service" ];
   };
 
-  systemd.services.opencode2 = {
-    description = "opencode2 API + web server (loopback, via Tailscale Serve)";
+  systemd.services.opencode = {
+    description = "opencode API + web server (loopback, via Tailscale Serve)";
     wantedBy = [ "multi-user.target" ];
     after = [ "network.target" ];
     serviceConfig = {
       User = username;
       WorkingDirectory = "/home/${username}";
-      ExecStart = "${opencode2}/bin/opencode2 serve --service --hostname 127.0.0.1 --port ${opencode2_port}";
+      ExecStart = "${opencode}/bin/opencode serve --service --hostname 127.0.0.1 --port ${opencode_port}";
       Restart = "always";
       RestartSec = 5;
     };
