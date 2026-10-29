@@ -1,6 +1,8 @@
 // The Kiro section of the session sidebar: the account's plan and credits
 // this month, and what the session has spent. The server part (index.ts)
 // answers over the RPC in rpc.ts, and says when to ask again.
+
+import { Plugin } from "@opencode/plugin/tui";
 import { Option, Schema } from "effect";
 import {
   type Accessor,
@@ -12,7 +14,7 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
-import { Plugin } from "@opencode/plugin/tui";
+
 import { type AccountUsage, type Allowance, KiroRpc, UsageAnswer } from "./rpc.ts";
 
 const decodeAnswer = Schema.decodeUnknownOption(UsageAnswer);
@@ -51,7 +53,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
       return [...new Set([props.sessionID, ...data.family(data.root(props.sessionID))])];
     },
     undefined,
-    { equals: (a, b) => a.join() === b.join() },
+    { equals: (a, b) => a.join(",") === b.join(",") }
   );
   const location = createMemo(() => session()?.location, undefined, {
     equals: (a, b) => a?.directory === b?.directory,
@@ -73,8 +75,8 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
     }
   };
   const [usage, { refetch }] = createResource(
-    () => [sessionIDs().join(), location()?.directory ?? ""].join("\n"),
-    ask,
+    () => [sessionIDs().join(","), location()?.directory ?? ""].join("\n"),
+    ask
   );
 
   // asked again when the server says so, and when a reply ends
@@ -85,8 +87,8 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
       () => data.status(props.sessionID),
       (now, before) => {
         if (before === "running" && now === "idle") void refetch();
-      },
-    ),
+      }
+    )
   );
 
   const credits = () => {

@@ -1,8 +1,9 @@
 // The Kiro plugin's RPC, between its server part (index.ts) and its sidebar
 // (tui.tsx). OpenCode checks calls against its JSON Schema; UsageAnswer is
 // the same answer in Effect's words, which index.ts builds and tui.tsx reads.
-import { Schema } from "effect";
+
 import { Rpc } from "@opencode/plugin/rpc";
+import { Schema } from "effect";
 
 const Allowance = Schema.Struct({
   name: Schema.String,
@@ -16,14 +17,14 @@ const Allowance = Schema.Struct({
       rate: Schema.Number,
       cap: Schema.Number,
       enabled: Schema.Boolean,
-    }),
+    })
   ),
   trial: Schema.optional(
     Schema.Struct({
       used: Schema.Number,
       limit: Schema.Number,
       expiresAt: Schema.optional(Schema.Number),
-    }),
+    })
   ),
 });
 export const AccountUsage = Schema.Struct({

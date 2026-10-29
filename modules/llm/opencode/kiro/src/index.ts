@@ -13,17 +13,21 @@
 //
 // OpenCode loads this file as it is: Bun strips the types, and OpenCode
 // supplies `effect` and `@opencode/plugin` itself, so the plugin may import
-// only those, Bun's and Node's own modules, and its rpc.ts beside it.
+// only those, Bun's and Node's own modules, and its rpc.ts beside it. The
+// no-restricted-imports rule in ../oxlint.config.ts fails lint on any other.
 //
 // The sidebar (tui.tsx) shows the account's usage and what each session has
 // spent, which it asks for over the RPC in rpc.ts.
+
 import { Database } from "bun:sqlite";
-import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { existsSync, statSync } from "node:fs";
 import { readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
+
+import type { Model, Plugin, Provider } from "@opencode/plugin/effect";
 import {
   Cause,
   Clock,
@@ -50,7 +54,7 @@ import {
   HttpClientRequest,
   HttpClientResponse,
 } from "effect/http";
-import type { Model, Plugin, Provider } from "@opencode/plugin/effect";
+
 import { type AccountUsage, type Allowance, KiroRpc, type UsageAnswer } from "./rpc.ts";
 
 const ID = "kiro";
@@ -70,7 +74,8 @@ const DESKTOP_UA = "Kiro-Desktop/0.2.13 (darwin; arm64)";
 // for this operation"). kiro-cli and the IDE use this service profile.
 const BUILDER_ID_START = "https://view.awsapps.com/start";
 const BUILDER_ID_PROFILE = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX";
-const isBuilderID = (provider: unknown) => String(provider ?? "").toLowerCase() === "builderid";
+const isBuilderID = (provider: string | null | undefined) =>
+  (provider ?? "").toLowerCase() === "builderid";
 
 const env = (k: string) => process.env[k] ?? "";
 const home = () => env("HOME") || homedir();
@@ -107,7 +112,7 @@ const decodeErrorBody = Schema.decodeUnknownOption(Schema.fromJsonString(ErrorBo
 
 const kiroApiError = (status: number, body: string) => {
   const msg = Option.getOrUndefined(decodeErrorBody(body))?.message;
-  return new KiroApiError({
+  return KiroApiError.make({
     status,
     body,
     message: msg ? `Kiro: ${msg} (HTTP ${status})` : `Kiro answered HTTP ${status}`,
@@ -145,9 +150,9 @@ const stalled = (seconds: number): Failure => ({
 // failureOf is the status and message OpenCode is given for a failure.
 function failureOf(cause: Cause.Cause<unknown>): Failure {
   const e = Cause.squash(cause);
-  if (e instanceof SignInError) return { status: 401, message: e.message };
-  if (e instanceof KiroApiError) return { status: e.status, message: e.message };
-  if (e instanceof RefreshError) return { status: 502, message: e.message };
+  if (Schema.is(SignInError)(e)) return { status: 401, message: e.message };
+  if (Schema.is(KiroApiError)(e)) return { status: e.status, message: e.message };
+  if (Schema.is(RefreshError)(e)) return { status: 502, message: e.message };
   if (Cause.isTimeoutError(e)) return { status: 504, message: messageOf(e) };
   if (HttpClientError.isHttpClientError(e))
     return { status: 502, message: "Couldn't reach Kiro: " + e.message };
@@ -218,7 +223,7 @@ const IdeRegistration = Schema.Struct({
 });
 
 // a JSON object as it is, for writing a token back with every field it had
-const JsonObject = Schema.Record(Schema.String, Schema.Unknown);
+const JsonObject = Schema.Record(Schema.String, Schema.Json);
 
 const decodeCliToken = Schema.decodeUnknownOption(Schema.fromJsonString(CliToken));
 const decodeCliRegistration = Schema.decodeUnknownOption(Schema.fromJsonString(CliRegistration));
@@ -269,12 +274,12 @@ const time = (s: string | null | undefined) =>
 const withDB = <A>(
   path: string,
   options: { readonly: true } | { readwrite: true },
-  use: (db: Database) => A,
+  use: (db: Database) => A
 ) =>
   Effect.acquireUseRelease(
     Effect.try(() => new Database(path, options)),
     (db) => Effect.try(() => use(db)),
-    (db) => Effect.sync(() => db.close()),
+    (db) => Effect.sync(() => db.close())
   );
 
 type Row = { value: string | Uint8Array | null };
@@ -342,12 +347,12 @@ const readCLI = Effect.fnUntraced(
     }));
     return cliCred(rows);
   },
-  Effect.orElseSucceed(() => null),
+  Effect.orElseSucceed(() => null)
 );
 
 const readJson = <A>(path: string, decode: (u: unknown) => Option.Option<A>) =>
   Effect.tryPromise(() => readFile(path, "utf8")).pipe(
-    Effect.flatMap((text) => Effect.fromOption(decode(text))),
+    Effect.flatMap((text) => Effect.fromOption(decode(text)))
   );
 
 // readIDE reads the Kiro IDE's sign-in; null when there is none it can read.
@@ -369,7 +374,7 @@ const readIDE = Effect.fnUntraced(
     if (t.clientIdHash) {
       const reg = yield* readJson(
         join(ideDir(), t.clientIdHash + ".json"),
-        decodeIdeRegistration,
+        decodeIdeRegistration
       ).pipe(Effect.option);
       if (Option.isSome(reg))
         [c.clientId, c.clientSecret] = [reg.value.clientId ?? "", reg.value.clientSecret ?? ""];
@@ -377,7 +382,7 @@ const readIDE = Effect.fnUntraced(
     if (String(t.authMethod).toLowerCase() === "social" || !c.clientId) c.method = "social";
     return c;
   },
-  Effect.orElseSucceed(() => null),
+  Effect.orElseSucceed(() => null)
 );
 
 // saveBack writes a refreshed token back where it was read from, so kiro-cli
@@ -389,10 +394,10 @@ const saveBack = Effect.fnUntraced(
     if (c.dbKey) {
       const key = c.dbKey;
       yield* withDB(cliDB(), { readwrite: true }, (db) => {
-        db.exec("PRAGMA busy_timeout = 3000");
+        db.run("PRAGMA busy_timeout = 3000");
         const m = parsed(decodeJsonObject, readText(db, "auth_kv", key));
         if (!m) return;
-        const next: Record<string, unknown> = {
+        const next: Record<string, Schema.Json> = {
           ...m,
           access_token: c.access,
           refresh_token: c.refresh,
@@ -405,13 +410,13 @@ const saveBack = Effect.fnUntraced(
       const path = c.idePath;
       const m = yield* readJson(path, decodeJsonObject);
       const next = { ...m, accessToken: c.access, refreshToken: c.refresh, expiresAt: expires };
-      yield* Effect.tryPromise(async () => {
-        await writeFile(path + ".opencode-tmp", JSON.stringify(next, null, 2), { mode: 0o600 });
-        await rename(path + ".opencode-tmp", path);
-      });
+      yield* Effect.tryPromise(() =>
+        writeFile(path + ".opencode-tmp", JSON.stringify(next, null, 2), { mode: 0o600 })
+      );
+      yield* Effect.tryPromise(() => rename(path + ".opencode-tmp", path));
     }
   },
-  (effect) => Effect.ignore(effect),
+  (effect) => Effect.ignore(effect)
 );
 
 // ---- tokens --------------------------------------------------------------------
@@ -433,11 +438,11 @@ const send = (request: HttpClientRequest.HttpClientRequest, seconds?: number) =>
           orElse: () =>
             Effect.fail(
               new Cause.TimeoutError(
-                `${new URL(request.url).host} didn't answer within ${seconds} seconds`,
-              ),
+                `${new URL(request.url).host} didn't answer within ${seconds} seconds`
+              )
             ),
         }),
-    Effect.provideService(Tracer.DisablePropagation, true),
+    Effect.provideService(Tracer.DisablePropagation, true)
   );
 
 // the fields the three token endpoints answer with, in their two spellings
@@ -452,28 +457,30 @@ const TokenAnswer = Schema.Struct({
 });
 
 const refreshFailed = (e: { message: string }) =>
-  new RefreshError({ message: "Couldn't refresh Kiro's sign-in: " + e.message });
+  RefreshError.make({ message: "Couldn't refresh Kiro's sign-in: " + e.message });
 
 // tokenPost asks a token endpoint for a new token.
 const tokenPost = Effect.fnUntraced(function* (request: HttpClientRequest.HttpClientRequest) {
   const res = yield* send(HttpClientRequest.acceptJson(request), 30).pipe(
-    Effect.mapError(refreshFailed),
+    Effect.mapError(refreshFailed)
   );
-  if ([400, 401, 403].includes(res.status)) return yield* new SignInError({ message: EXPIRED });
+  if ([400, 401, 403].includes(res.status)) return yield* SignInError.make({ message: EXPIRED });
   if (res.status < 200 || res.status > 299)
     return yield* refreshFailed({
       message: `${new URL(request.url).host} answered HTTP ${res.status}`,
     });
   return yield* HttpClientResponse.schemaBodyJson(TokenAnswer)(res).pipe(
-    Effect.mapError(refreshFailed),
+    Effect.mapError(refreshFailed)
   );
 });
 
 // kiroCli runs kiro-cli and waits for it to end, however it ends. It runs
 // in the home directory, so nothing it might write lands in a project.
 const kiroCli = (bin: string, args: string[]) =>
-  Effect.callback<void>((resume) => {
-    const child = execFile(bin, args, { timeout: 20_000, cwd: home() }, () => resume(Effect.void));
+  Effect.callback<undefined>((resume) => {
+    const child = execFile(bin, args, { timeout: 20_000, cwd: home() }, () =>
+      resume(Effect.undefined)
+    );
     return Effect.sync(() => {
       child.kill();
     });
@@ -482,7 +489,7 @@ const kiroCli = (bin: string, args: string[]) =>
 // refresh refreshes a sign-in's token the way its owner would, kiro-cli's
 // by kiro-cli first.
 const refresh = Effect.fnUntraced(function* (
-  c: Cred,
+  c: Cred
 ): Effect.fn.Return<Cred, SignInError | RefreshError, HttpClient.HttpClient> {
   if (c.dbKey) {
     const bin = yield* Effect.sync(kiroExecutable);
@@ -493,15 +500,15 @@ const refresh = Effect.fnUntraced(function* (
       if (n && n.dbKey === c.dbKey && n.access !== c.access && fresh(n, now)) return n;
     }
   }
-  if (!c.refresh) return yield* new SignInError({ message: EXPIRED });
+  if (!c.refresh) return yield* SignInError.make({ message: EXPIRED });
   let profile = c.profile;
   let out: { access?: string | null; refresh?: string | null; expiresIn?: number | null };
   if (c.method === "social") {
     const r = yield* tokenPost(
       HttpClientRequest.post(refreshURL(c.region)).pipe(
         HttpClientRequest.setHeader("User-Agent", DESKTOP_UA),
-        HttpClientRequest.bodyText(JSON.stringify({ refreshToken: c.refresh }), "application/json"),
-      ),
+        HttpClientRequest.bodyText(JSON.stringify({ refreshToken: c.refresh }), "application/json")
+      )
     );
     out = { access: r.accessToken, refresh: r.refreshToken, expiresIn: r.expiresIn };
     if (r.profileArn) profile = r.profileArn;
@@ -515,25 +522,25 @@ const refresh = Effect.fnUntraced(function* (
             refreshToken: c.refresh,
             grantType: "refresh_token",
           }),
-          "application/json",
-        ),
-      ),
+          "application/json"
+        )
+      )
     );
     out = { access: r.accessToken, refresh: r.refreshToken, expiresIn: r.expiresIn };
   } else {
-    if (!c.tokenURL) return yield* new SignInError({ message: EXPIRED });
+    if (!c.tokenURL) return yield* SignInError.make({ message: EXPIRED });
     const r = yield* tokenPost(
       HttpClientRequest.post(c.tokenURL).pipe(
         HttpClientRequest.bodyUrlParams({
           grant_type: "refresh_token",
           client_id: c.clientId ?? "",
           refresh_token: c.refresh,
-        }),
-      ),
+        })
+      )
     );
     out = { access: r.access_token, refresh: r.refresh_token, expiresIn: r.expires_in };
   }
-  if (!out.access) return yield* new SignInError({ message: EXPIRED });
+  if (!out.access) return yield* SignInError.make({ message: EXPIRED });
   const expiresIn = out.expiresIn && out.expiresIn > 0 ? out.expiresIn : 3600;
   const now = yield* Clock.currentTimeMillis;
   const n: Cred = { ...c, profile, access: out.access, expires: now + expiresIn * 1000 };
@@ -573,7 +580,7 @@ function managementCall<A>(
   a: Pick<Auth, "token" | "tokenType">,
   method: string,
   query: Record<string, string> | null,
-  body?: object,
+  body?: object
 ): Effect.Effect<A, KiroApiError, HttpClient.HttpClient> {
   return Effect.gen(function* () {
     const url = `${management(region)}/${method}`;
@@ -583,39 +590,37 @@ function managementCall<A>(
         : HttpClientRequest.setUrlParams(HttpClientRequest.get(url), query ?? {})
     ).pipe(HttpClientRequest.setHeaders(authHeaders(a)), HttpClientRequest.acceptJson);
     const res = yield* send(request, 20).pipe(
-      Effect.mapError(
-        (e) =>
-          new KiroApiError({
-            status: 502,
-            body: "",
-            message: `Couldn't reach Kiro for ${method}: ${e.message}`,
-          }),
-      ),
+      Effect.mapError((e) =>
+        KiroApiError.make({
+          status: 502,
+          body: "",
+          message: `Couldn't reach Kiro for ${method}: ${e.message}`,
+        })
+      )
     );
     if (res.status < 200 || res.status > 299)
       return yield* kiroApiError(res.status, yield* res.text.pipe(Effect.orElseSucceed(() => "")));
     return yield* res.json.pipe(
       Effect.flatMap(decode),
-      Effect.mapError(
-        (e) =>
-          new KiroApiError({
-            status: 502,
-            body: "",
-            message: `Kiro's ${method} answer didn't read as expected: ${e.message}`,
-          }),
-      ),
+      Effect.mapError((e) =>
+        KiroApiError.make({
+          status: 502,
+          body: "",
+          message: `Kiro's ${method} answer didn't read as expected: ${e.message}`,
+        })
+      )
     );
   });
 }
 
 const decodeProfiles = Schema.decodeUnknownEffect(
-  Schema.Struct({ profiles: field(Schema.Array(Schema.Struct({ arn: field(Schema.String) }))) }),
+  Schema.Struct({ profiles: field(Schema.Array(Schema.Struct({ arn: field(Schema.String) }))) })
 );
 
 // profileOf finds the profile for a sign-in that names none: Builder ID's,
 // or the first Kiro lists in either of its regions.
 const profileOf = Effect.fnUntraced(function* (
-  c: Cred,
+  c: Cred
 ): Effect.fn.Return<string, KiroApiError, HttpClient.HttpClient> {
   if (c.builderID) return BUILDER_ID_PROFILE;
   let last: KiroApiError | undefined;
@@ -626,7 +631,7 @@ const profileOf = Effect.fnUntraced(function* (
       { token: c.access, tokenType: tokenType(c) },
       "List-Available-Profiles",
       null,
-      {},
+      {}
     ).pipe(Effect.result);
     if (Result.isSuccess(out)) {
       const arn = (out.success.profiles ?? []).find((p) => p?.arn)?.arn;
@@ -640,7 +645,7 @@ const profileOf = Effect.fnUntraced(function* (
   }
   return yield* (
     last ??
-      new KiroApiError({ status: 502, body: "", message: "Kiro has no profile for this sign-in" })
+      KiroApiError.make({ status: 502, body: "", message: "Kiro has no profile for this sign-in" })
   );
 });
 
@@ -670,7 +675,7 @@ class KiroAccount extends Context.Service<
       const credentials = Effect.fn("KiroAccount.credentials")(
         function* (rejected?: string) {
           let c = (yield* readCLI()) ?? (yield* readIDE());
-          if (!c) return yield* new SignInError({ message: NOT_SIGNED_IN });
+          if (!c) return yield* SignInError.make({ message: NOT_SIGNED_IN });
           for (let i = 0; i < 16; i++) {
             const n = after.get(c.access);
             if (!n) break;
@@ -693,11 +698,11 @@ class KiroAccount extends Context.Service<
           };
         },
         lock.withPermits(1),
-        Effect.provideService(HttpClient.HttpClient, http),
+        Effect.provideService(HttpClient.HttpClient, http)
       );
 
       return KiroAccount.of({ credentials });
-    }),
+    })
   );
 }
 
@@ -731,7 +736,7 @@ const Breakdown = Schema.Struct({
       usageLimit: amount,
       usageLimitWithPrecision: amount,
       freeTrialExpiry: when,
-    }),
+    })
   ),
 });
 const decodeUsageLimits = Schema.decodeUnknownEffect(
@@ -740,23 +745,21 @@ const decodeUsageLimits = Schema.decodeUnknownEffect(
     overageConfiguration: field(Schema.Struct({ overageStatus: field(Schema.String) })),
     subscriptionInfo: field(Schema.Struct({ subscriptionTitle: field(Schema.String) })),
     usageBreakdownList: field(Schema.Array(Breakdown)),
-  }),
+  })
 );
 
 const millis = (t: number | string | null | undefined) => {
   if (typeof t === "number") return t > 1e12 ? t : t * 1000;
-  const ms = typeof t === "string" ? Date.parse(t) : NaN;
+  const ms = typeof t === "string" ? Date.parse(t) : Number.NaN;
   return Number.isFinite(ms) ? ms : 0;
 };
 // "KIRO PRO" is Kiro Pro
 const planName = (title: string | null | undefined) =>
-  (title || "Kiro")
-    .toLowerCase()
-    .replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+  (title || "Kiro").toLowerCase().replace(/\b\p{L}/gu, (c) => c.toUpperCase());
 
 function accountUsage(
   u: Effect.Success<ReturnType<typeof decodeUsageLimits>>,
-  checkedAt: number,
+  checkedAt: number
 ): AccountUsage {
   const enabled = u.overageConfiguration?.overageStatus === "ENABLED";
   const allowances: Allowance[] = [];
@@ -812,7 +815,7 @@ const readUsage = Effect.fnUntraced(function* (a: Auth) {
 const creditsKey = (sessionID: string) => `credits/${sessionID}`;
 const decodeCredits = Schema.decodeUnknownOption(Schema.Number);
 const decodeUsageInput = Schema.decodeUnknownEffect(
-  Schema.Struct({ sessionIDs: Schema.Array(Schema.String) }),
+  Schema.Struct({ sessionIDs: Schema.Array(Schema.String) })
 );
 
 // ---- models ----------------------------------------------------------------------
@@ -873,7 +876,7 @@ const ListedModel = Schema.Struct({
   modelId: Schema.String,
   modelName: field(Schema.String),
   tokenLimits: field(
-    Schema.Struct({ maxInputTokens: field(Schema.Number), maxOutputTokens: field(Schema.Number) }),
+    Schema.Struct({ maxInputTokens: field(Schema.Number), maxOutputTokens: field(Schema.Number) })
   ),
   supportedInputTypes: field(Schema.Array(Schema.Unknown)),
   additionalModelRequestFieldsSchema: field(
@@ -881,18 +884,18 @@ const ListedModel = Schema.Struct({
       properties: field(
         Schema.Struct({
           thinking: field(
-            Schema.Struct({ properties: field(Schema.Struct({ type: Enum, display: Enum })) }),
+            Schema.Struct({ properties: field(Schema.Struct({ type: Enum, display: Enum })) })
           ),
           output_config: field(
-            Schema.Struct({ properties: field(Schema.Struct({ effort: Enum })) }),
+            Schema.Struct({ properties: field(Schema.Struct({ effort: Enum })) })
           ),
           reasoning: field(Schema.Struct({ properties: field(Schema.Struct({ effort: Enum })) })),
           max_tokens: field(
-            Schema.Struct({ minimum: field(Schema.Number), maximum: field(Schema.Number) }),
+            Schema.Struct({ minimum: field(Schema.Number), maximum: field(Schema.Number) })
           ),
-        }),
+        })
       ),
-    }),
+    })
   ),
 });
 type ListedModel = typeof ListedModel.Type;
@@ -905,7 +908,7 @@ const decodeModelsPage = Schema.decodeUnknownEffect(
     models: field(Schema.Array(Schema.Unknown)),
     defaultModel: field(Schema.Struct({ modelId: field(Schema.String) })),
     nextToken: field(Schema.String),
-  }),
+  })
 );
 
 function modelOf(m: ListedModel): KiroModel {
@@ -955,7 +958,7 @@ const listModels = Effect.fnUntraced(function* (a: Auth) {
     if (!next) break;
   }
   if (!list.length)
-    return yield* new KiroApiError({ status: 502, body: "", message: "Kiro listed no models" });
+    return yield* KiroApiError.make({ status: 502, body: "", message: "Kiro listed no models" });
   const i = list.findIndex((m) => m.id === defaultModel);
   if (i > 0) list.unshift(...list.splice(i, 1));
   return list;
@@ -1243,7 +1246,7 @@ function kiroRequest(
   req: MessagesRequest,
   model: string,
   profile: string,
-  { budget, fields }: Thinking = {},
+  { budget, fields }: Thinking = {}
 ): KiroRequest {
   const entries: Entry[] = [];
   // the messages the caller marked for its prompt cache (cache_control),
@@ -1281,7 +1284,8 @@ function kiroRequest(
       continue;
     }
     const u = user();
-    const images: KiroImage[] = (u.images = []);
+    const images: KiroImage[] = [];
+    u.images = images;
     const results: ToolResult[] = [];
     for (const p of parts) {
       if (p?.type === "text") {
@@ -1316,7 +1320,7 @@ function kiroRequest(
   // the conversation opens with something the user said: tool results with
   // no call before them go, and so does a reply the caller began with
   while (entries.length) {
-    const u = entries[0].userInputMessage;
+    const u = entries[0]?.userInputMessage;
     if (u) {
       if (u.userInputMessageContext && !u.content && !u.images?.length) {
         entries.shift();
@@ -1358,7 +1362,7 @@ function kiroRequest(
   // only the latest images are sent again, as Kiro's own agent does
   let latest = -1;
   for (let i = entries.length - 1; i >= 0; i--)
-    if (entries[i].userInputMessage?.images?.length) {
+    if (entries[i]?.userInputMessage?.images?.length) {
       latest = i;
       break;
     }
@@ -1371,7 +1375,7 @@ function kiroRequest(
       delete e.assistantResponseMessage.toolUses;
   // the instructions go at the head of the first message, which the loops
   // above made the user's
-  const first = entries[0].userInputMessage ?? current;
+  const first = entries[0]?.userInputMessage ?? current;
   let system = typeof req.system === "string" ? req.system : textOf(req.system);
   // Kiro has no field for the answer's format, so it is told in words
   const format = formatText(req);
@@ -1414,12 +1418,18 @@ function kiroRequest(
   // a request may hold 4 at most; past that the last ones are kept, as they
   // cover the most of the prompt
   const points: (() => void)[] = [];
-  for (const t of tools) if (t.cachePoint) points.push(() => tools.splice(tools.indexOf(t), 1));
+  for (const t of tools)
+    if (t.cachePoint)
+      points.push(() => {
+        tools.splice(tools.indexOf(t), 1);
+      });
   for (const e of entries) {
     const msg = e.userInputMessage ?? e.assistantResponseMessage;
     if (msg && marked.has(msg)) {
       msg.cachePoint = { type: "default" };
-      points.push(() => delete msg.cachePoint);
+      points.push(() => {
+        delete msg.cachePoint;
+      });
     }
   }
   for (const drop of points.slice(0, Math.max(0, points.length - 4))) drop();
@@ -1453,7 +1463,7 @@ function kiroCall(a: Auth, body: string) {
       "x-amz-user-agent": ua,
       "User-Agent": ua,
     }),
-    HttpClientRequest.bodyText(body, "application/json"),
+    HttpClientRequest.bodyText(body, "application/json")
   );
 }
 
@@ -1489,12 +1499,12 @@ const shrink = Effect.fnUntraced(
     const raw = Buffer.from(b64, "base64");
     const meta = yield* Effect.tryPromise({
       try: () => new Bun.Image(raw, { maxPixels: IMAGE_MAX_PIXELS }).metadata(),
-      catch: (e) => e,
+      catch: (e) => ({ code: codeOf(e) }),
     }).pipe(Effect.result);
     if (Result.isFailure(meta))
       return {
         note:
-          codeOf(meta.failure) === "ERR_IMAGE_TOO_MANY_PIXELS"
+          meta.failure.code === "ERR_IMAGE_TOO_MANY_PIXELS"
             ? "it has too many pixels to resize"
             : "it couldn't be read as an image",
       };
@@ -1524,10 +1534,10 @@ const shrink = Effect.fnUntraced(
             img = img.resize(t.edge, t.edge, { fit: "inside", withoutEnlargement: true });
           return t.encode(img).toBase64();
         },
-        catch: (e) => e,
+        catch: (e) => ({ code: codeOf(e) }),
       }).pipe(Effect.result);
       if (Result.isFailure(out)) {
-        if (codeOf(out.failure) === "ERR_IMAGE_FORMAT_UNSUPPORTED") continue;
+        if (out.failure.code === "ERR_IMAGE_FORMAT_UNSUPPORTED") continue;
         return { note: "it couldn't be resized" };
       }
       if (out.success.length <= IMAGE_LIMIT) return { format: t.format, bytes: out.success };
@@ -1538,7 +1548,7 @@ const shrink = Effect.fnUntraced(
     duration: IMAGE_DEADLINE,
     orElse: () => Effect.succeed({ note: "resizing it took too long" }),
   }),
-  Effect.catchDefect(() => Effect.succeed({ note: "it couldn't be resized" })),
+  Effect.catchDefect(() => Effect.succeed({ note: "it couldn't be resized" }))
 );
 
 // Images brings every image left in a built request under Kiro's limit.
@@ -1585,7 +1595,7 @@ class Images extends Context.Service<
             kept.push({ ...img, format: r.format, source: { ...img.source, bytes: r.bytes } });
           else
             notes.push(
-              `[An image (${img.format}, ${mib(b64.length)} as Base64) was left out of this message: Kiro takes at most ${mib(IMAGE_LIMIT)} per image, and ${r.note}.]`,
+              `[An image (${img.format}, ${mib(b64.length)} as Base64) was left out of this message: Kiro takes at most ${mib(IMAGE_LIMIT)} per image, and ${r.note}.]`
             );
         }
         if (kept.length) u.images = kept;
@@ -1656,7 +1666,7 @@ function errorText(body: string) {
 function failure(
   status: number,
   body: string,
-  headers: Readonly<Record<string, string | undefined>> = {},
+  headers: Readonly<Record<string, string | undefined>> = {}
 ): Failure {
   const kind = (headers["x-amzn-errortype"] ?? "").split(":")[0];
   const f = classify(status, errorText(String(body ?? "")), kind);
@@ -1680,9 +1690,9 @@ const errorResponse = (f: Failure) => {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (f.retryAfter) headers["retry-after"] = f.retryAfter;
   if (f.retry === false) headers["x-should-retry"] = "false";
-  return new Response(
-    JSON.stringify({ type: "error", error: { type: errorType(f.status), message: f.message } }),
-    { status: f.status, headers },
+  return Response.json(
+    { type: "error", error: { type: errorType(f.status), message: f.message } },
+    { status: f.status, headers }
   );
 };
 
@@ -1697,10 +1707,10 @@ function frameHeaders(h: Uint8Array) {
   const v = new DataView(h.buffer, h.byteOffset, h.byteLength);
   let i = 0;
   while (i < h.length) {
-    const n = h[i];
+    const n = v.getUint8(i);
     if (h.length < i + 2 + n) break;
     const name = dec.decode(h.subarray(i + 1, i + 1 + n));
-    const type = h[i + 1 + n];
+    const type = v.getUint8(i + 1 + n);
     i += 2 + n;
     if (type === 6 || type === 7) {
       if (h.length < i + 2) break;
@@ -1764,7 +1774,7 @@ class ThinkParser {
           if (!this.buf) return out;
         }
         const i = this.buf.indexOf(CLOSE);
-        if (i >= 0) {
+        if (i !== -1) {
           if (i > 0) {
             out.push({ kind: "think", text: this.buf.slice(0, i) });
             this.said = true;
@@ -1831,7 +1841,7 @@ const Payload = Schema.Struct({
       cacheReadInputTokens: count,
       cacheWriteInputTokens: count,
       contextUsagePercentage: count,
-    }),
+    })
   ),
 });
 const decodePayload = Schema.decodeUnknownOption(Schema.fromJsonString(Payload));
@@ -1872,7 +1882,7 @@ class ReplyDecoder {
 
   constructor(
     private readonly window: number, // the model's context, to reckon the input from
-    private readonly budget: number | undefined, // the thinking budget the prompt set
+    private readonly budget: number | undefined // the thinking budget the prompt set
   ) {}
 
   // done is whether the reply has failed, so no more of it need be read
@@ -1897,7 +1907,7 @@ class ReplyDecoder {
       }
       if (this.buf.length < total) break;
       const rest = this.buf.subarray(12, total);
-      this.message(frameHeaders(rest.subarray(0, hlen)), rest.subarray(hlen, rest.length - 4), out);
+      this.message(frameHeaders(rest.subarray(0, hlen)), rest.subarray(hlen, -4), out);
       this.buf = this.buf.slice(total);
     }
     return out;
@@ -1993,8 +2003,8 @@ class ReplyDecoder {
     } else if (kind === "contextUsageEvent") {
       if (m.contextUsagePercentage && m.contextUsagePercentage > 0)
         this.pct = m.contextUsagePercentage;
-    } else if (kind === "meteringEvent") {
-      if (m.usage && m.usage > 0) this.usage.credits += m.usage;
+    } else if (kind === "meteringEvent" && m.usage && m.usage > 0) {
+      this.usage.credits += m.usage;
     }
   }
 }
@@ -2006,7 +2016,7 @@ const events = (
   body: Stream.Stream<Uint8Array, unknown>,
   window: number,
   budget: number | undefined,
-  idleSeconds = IDLE_SECONDS,
+  idleSeconds = IDLE_SECONDS
 ): Stream.Stream<KiroEvent> =>
   Stream.suspend(() => {
     const reader = new ReplyDecoder(window, budget);
@@ -2024,7 +2034,7 @@ const events = (
         else reader.broke(messageOf(e));
         return Stream.empty;
       }),
-      Stream.concat(Stream.suspend(() => Stream.fromIterable(reader.end()))),
+      Stream.concat(Stream.suspend(() => Stream.fromIterable(reader.end())))
     );
   });
 
@@ -2053,7 +2063,7 @@ class MessagesEncoder {
 
   constructor(
     private readonly model: string,
-    private readonly names: Map<string, string>,
+    private readonly names: Map<string, string>
   ) {}
 
   encode(e: KiroEvent): Uint8Array[] {
@@ -2146,7 +2156,7 @@ const reply = Effect.fnUntraced(function* (
   kiro: Stream.Stream<KiroEvent>,
   model: string,
   names: Map<string, string>,
-  finished: (usage: Usage) => Effect.Effect<void>,
+  finished: (usage: Usage) => Effect.Effect<void>
 ) {
   // the first event is read before answering: an error before any of the
   // answer is a status, so OpenCode can retry it or say why. The rest of
@@ -2156,13 +2166,13 @@ const reply = Effect.fnUntraced(function* (
   const scope = yield* Scope.make();
   const [head, rest] = yield* Stream.peel(Stream.rechunk(kiro, 1), Sink.head<KiroEvent>()).pipe(
     Scope.provide(scope),
-    Effect.onError(() => Scope.close(scope, Exit.void)),
+    Effect.onError(() => Scope.close(scope, Exit.void))
   );
   const first = Option.getOrUndefined(head);
   if (!first || first.kind === "error") {
     yield* Scope.close(scope, Exit.void);
     return errorResponse(
-      first ?? { status: 502, message: "Kiro ended its reply without sending anything" },
+      first ?? { status: 502, message: "Kiro ended its reply without sending anything" }
     );
   }
   const body = Stream.concat(Stream.make(first), rest).pipe(
@@ -2170,9 +2180,9 @@ const reply = Effect.fnUntraced(function* (
     Stream.tap((e) => (e.kind === "stop" ? finished(e.usage) : Effect.void)),
     Stream.mapAccum(
       () => new MessagesEncoder(model, names),
-      (encoder, e) => [encoder, encoder.encode(e)] as const,
+      (encoder, e) => [encoder, encoder.encode(e)] as const
     ),
-    Stream.ensuring(Scope.close(scope, Exit.void)),
+    Stream.ensuring(Scope.close(scope, Exit.void))
   );
   return new Response(Stream.toReadableStream(body), {
     status: 200,
@@ -2207,7 +2217,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   const sent = new WeakMap<Request, Sent>();
   // the account's models: last run's until Kiro lists them
   const models = yield* Ref.make(
-    Option.getOrElse(decodeSaved(yield* ctx.storage.get(MODELS_KEY)), () => FALLBACK),
+    Option.getOrElse(decodeSaved(yield* ctx.storage.get(MODELS_KEY)), () => FALLBACK)
   );
   const modelNamed = (id: string) =>
     Ref.get(models).pipe(Effect.map((list) => list.find((m) => m.id === id)));
@@ -2218,17 +2228,16 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   // the account's usage, read at most once a minute (a failure, every 10
   // seconds), and a short reason when it can't be
   const [usageCached, usageStale] = yield* Effect.cachedInvalidateWithTTL(
-    account.credentials().pipe(
-      Effect.flatMap(readUsage),
-      Effect.provideService(HttpClient.HttpClient, http),
-    ),
-    (exit) => (Exit.isSuccess(exit) ? "60 seconds" : "10 seconds"),
+    account
+      .credentials()
+      .pipe(Effect.flatMap(readUsage), Effect.provideService(HttpClient.HttpClient, http)),
+    (exit) => (Exit.isSuccess(exit) ? "60 seconds" : "10 seconds")
   );
   const accountNow = usageCached.pipe(
-    Effect.map((account): { account: AccountUsage | null; error?: string } => ({ account })),
+    Effect.map((usage): { account: AccountUsage | null; error?: string } => ({ account: usage })),
     Effect.catchCause((cause) =>
-      Effect.succeed({ account: null, error: failureOf(cause).message.slice(0, 200) }),
-    ),
+      Effect.succeed({ account: null, error: failureOf(cause).message.slice(0, 200) })
+    )
   );
 
   // the credits each session has spent: storage's, and what was added since
@@ -2239,7 +2248,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
     if (known !== undefined) return known;
     const saved = Option.getOrElse(
       decodeCredits(yield* ctx.storage.get(creditsKey(sessionID))),
-      () => 0,
+      () => 0
     );
     credits.set(sessionID, saved);
     return saved;
@@ -2250,47 +2259,56 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         const total = (yield* creditsOf(sessionID)) + n;
         credits.set(sessionID, total);
         yield* ctx.storage.set(creditsKey(sessionID), total);
-      }),
+      })
     );
 
   // without the RPC the sidebar shows nothing, and Kiro still answers
-  const registration = yield* ctx.rpc.register(KiroRpc, {
-    usage: (input) =>
-      Effect.gen(function* () {
-        const { sessionIDs } = yield* decodeUsageInput(input).pipe(
-          Effect.orElseSucceed(() => ({ sessionIDs: [] as readonly string[] })),
-        );
-        const spent: Record<string, number> = {};
-        for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
-        const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };
-        return answer;
-      }),
-  }).pipe(
-    Effect.catchCause((cause) =>
-      Effect.logWarning("Kiro: registering the usage RPC failed", cause).pipe(Effect.as(undefined)),
-    ),
-  );
-  const emitUpdated = registration ? registration.events.emit("updated", {}) : Effect.void;
+  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC API fails with unknown
+  const registration = yield* ctx.rpc
+    .register(KiroRpc, {
+      usage: (input) =>
+        Effect.gen(function* () {
+          const { sessionIDs } = yield* decodeUsageInput(input).pipe(
+            Effect.orElseSucceed(() => ({ sessionIDs: [] as readonly string[] }))
+          );
+          const spent: Record<string, number> = {};
+          for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
+          const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };
+          return answer;
+        }),
+    })
+    .pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Kiro: registering the usage RPC failed", cause).pipe(
+          Effect.as(undefined)
+        )
+      )
+    );
+  // telling the sidebar is best effort
+  const emitUpdated = registration
+    ? // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC fails with unknown
+      registration.events.emit("updated", {}).pipe(Effect.ignore)
+    : Effect.void;
 
   // after a reply, the account read again and the sidebar told. One read
   // runs at a time; a reply ending during one is in what it tells.
   const refreshing = yield* Semaphore.make(1);
-  const refresh = usageStale.pipe(
+  const refreshUsage = usageStale.pipe(
     Effect.andThen(accountNow),
     Effect.andThen(emitUpdated),
     Effect.ignore,
-    refreshing.withPermitsIfAvailable(1),
+    refreshing.withPermitsIfAvailable(1)
   );
   const finished = (sessionID: string | undefined) => (usage: Usage) =>
     Effect.gen(function* () {
       if (sessionID && usage.credits > 0) yield* addCredits(sessionID, usage.credits);
-      yield* refresh;
+      yield* refreshUsage;
     }).pipe(
       Effect.catchCause((cause) =>
-        Effect.logWarning("Kiro: counting a reply's credits failed", cause),
+        Effect.logWarning("Kiro: counting a reply's credits failed", cause)
       ),
       Effect.forkIn(scope),
-      Effect.asVoid,
+      Effect.asVoid
     );
 
   const kiroBody = (req: MessagesRequest, model: string, profile: string, thinking: Thinking) =>
@@ -2310,13 +2328,13 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         if (!new URL(event.request.url).pathname.endsWith("/messages")) return;
         // OpenCode's own Anthropic route wrote this body (see MessagesRequest)
         const req = (yield* Effect.tryPromise(() =>
-          event.request.clone().json(),
+          event.request.clone().json()
         )) as MessagesRequest;
         const model = String(req.model ?? "auto");
         const thinking = thinkingOf(req, model, yield* modelNamed(model));
         const a = yield* account.credentials();
         const call = yield* HttpClientRequest.toWeb(
-          kiroCall(a, yield* kiroBody(req, model, a.profile, thinking)),
+          kiroCall(a, yield* kiroBody(req, model, a.profile, thinking))
         );
         sent.set(call, { req, model, thinking, a });
         event.request = call;
@@ -2329,10 +2347,10 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
             const call = standIn();
             sent.set(call, { error: failureOf(cause) });
             event.request = call;
-          }),
-        ),
+          })
+        )
     ),
-    { providerID: ID },
+    { providerID: ID }
   );
 
   yield* ctx.session.hook(
@@ -2348,19 +2366,19 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         }
         let res = HttpClientResponse.fromWeb(
           HttpClientRequest.fromWeb(event.request),
-          event.response,
+          event.response
         );
         // a token Kiro turned down: once more, refreshed, unless kiro-cli
         // already has
         if (res.status === 401 || res.status === 403) {
           const turnedDown = event.response;
           yield* Effect.tryPromise(() => turnedDown.body?.cancel() ?? Promise.resolve()).pipe(
-            Effect.ignore,
+            Effect.ignore
           );
           const a = yield* account.credentials(p.a.token);
           res = yield* send(
             kiroCall(a, yield* kiroBody(p.req, p.model, a.profile, p.thinking)),
-            HEADERS_SECONDS,
+            HEADERS_SECONDS
           );
         }
         if (res.status < 200 || res.status > 299) {
@@ -2373,7 +2391,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           events(res.stream, window, p.thinking.budget),
           p.model,
           toolNames(p.req),
-          finished(event.sessionID),
+          finished(event.sessionID)
         );
       },
       (effect, event) =>
@@ -2381,12 +2399,12 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           Effect.provideService(HttpClient.HttpClient, http),
           Effect.catchCause((cause) =>
             Effect.sync(() => {
-              event.response = errorResponse(failureOf(cause));
-            }),
-          ),
-        ),
+              event.response = cause.pipe(failureOf, errorResponse);
+            })
+          )
+        )
     ),
-    { providerID: ID },
+    { providerID: ID }
   );
 
   // the account's own models once Kiro lists them. A listing that fails on
@@ -2402,23 +2420,24 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
       schedule: Schedule.exponential("5 seconds", 4),
       times: 3,
       while: (e) =>
-        e instanceof RefreshError ||
-        (e instanceof KiroApiError && (e.status === 429 || e.status >= 500)),
+        Schema.is(RefreshError)(e) ||
+        (Schema.is(KiroApiError)(e) && (e.status === 429 || e.status >= 500)),
     }),
     Effect.catchCause((cause) =>
-      Effect.logWarning("Kiro: listing the account's models failed", cause),
+      Effect.logWarning("Kiro: listing the account's models failed", cause)
     ),
-    Effect.forkScoped,
+    Effect.forkScoped
   );
 });
 
 // the services make runs on: the account and image fitting, over fetch
 const layer = Layer.mergeAll(KiroAccount.layer, Images.layer).pipe(
-  Layer.provideMerge(FetchHttpClient.layer),
+  Layer.provideMerge(FetchHttpClient.layer)
 );
 
 export default {
   id: ID,
+  // oxlint-disable-next-line effecttsgo/strict-effect-provide -- the plugin's entry point
   effect: (ctx) => make(ctx).pipe(Effect.provide(layer)),
 } satisfies Plugin.Plugin;
 

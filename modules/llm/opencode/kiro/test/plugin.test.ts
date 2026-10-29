@@ -1,27 +1,30 @@
-// Run in this directory, with BUN_BE_BUN=1 so opencode acts as the Bun it
-// ships, the runtime the plugin loads in:
+// Run in the plugin directory (modules/llm/opencode/kiro), with BUN_BE_BUN=1
+// so opencode acts as the Bun it ships, the runtime the plugin loads in:
 //   BUN_BE_BUN=1 opencode test
-//   BUN_BE_BUN=1 opencode install && BUN_BE_BUN=1 opencode run check   # tsc
+//   BUN_BE_BUN=1 opencode install && BUN_BE_BUN=1 opencode run ox   # format, lint, tsc
 // HOME is a throwaway dir so no real sign-in is read or written, and PATH is
 // empty so kiro-cli is never run. The plugin reads both on each call. Its
 // HTTP goes to the fake client below, never the network.
-import { afterAll, expect, test } from "bun:test";
+
 import { Database } from "bun:sqlite";
+import { afterAll, expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { deflateSync } from "node:zlib";
-import { Effect, Layer, Option, Scope, Stream } from "effect";
+
+import { Effect, Layer, Option, type Scope, Stream } from "effect";
 import {
   HttpClient,
   HttpClientError,
-  HttpClientRequest,
+  type HttpClientRequest,
   HttpClientResponse,
   UrlParams,
 } from "effect/http";
 import { TestClock } from "effect/testing";
-import { _internal as k } from "./index.ts";
+
+import { _internal as k } from "../src/index.ts";
 
 const was = { HOME: process.env.HOME, PATH: process.env.PATH };
 const HOME = mkdtempSync(join(tmpdir(), "kiro-test-"));
@@ -49,14 +52,16 @@ const http = HttpClient.make((request) =>
       new HttpClientError.HttpClientError({
         reason: new HttpClientError.TransportError({ request, cause }),
       }),
-  }),
+  })
 );
 const layer = Layer.mergeAll(k.KiroAccount.layer, k.Images.layer).pipe(
-  Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http)),
+  Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http))
 );
 const run = <A, E>(effect: Effect.Effect<A, E, Layer.Success<typeof layer> | Scope.Scope>) => {
   const result = Effect.runPromise(effect.pipe(Effect.scoped, Effect.provide(layer)));
-  return result.finally(() => (answer = offline));
+  return result.finally(() => {
+    answer = offline;
+  });
 };
 const textOf = (request: HttpClientRequest.HttpClientRequest) =>
   request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "";
@@ -73,8 +78,8 @@ function signIn({
   rmSync(dbPath, { force: true });
   mkdirSync(dbDir, { recursive: true });
   const db = new Database(dbPath, { create: true });
-  db.exec("CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT)");
-  db.exec("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value BLOB)");
+  db.run("CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT)");
+  db.run("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value BLOB)");
   const put = (table: "auth_kv" | "state", key: string, value: object) =>
     db
       .query(`INSERT OR REPLACE INTO ${table} (key, value) VALUES (?, ?)`)
@@ -134,8 +139,8 @@ async function sse(res: Response) {
         block
           .split("\n")
           .find((l) => l.startsWith("data: "))!
-          .slice(6),
-      ),
+          .slice(6)
+      )
     );
 }
 // errorOf reads an Anthropic error body
@@ -180,7 +185,11 @@ function fakeHost() {
     provider: {
       transform: (fn: (editor: { add: (d: (typeof added)[number]) => void }) => void) =>
         Effect.sync(() => {
-          fn({ add: (d) => added.push(d) });
+          fn({
+            add: (d) => {
+              added.push(d);
+            },
+          });
           return registered;
         }),
       reload: () => Effect.void,
@@ -234,7 +243,7 @@ async function ask(
   hook: Awaited<ReturnType<typeof load>>["hook"],
   response: Response,
   body: object = { model: "claude-x", messages: [{ role: "user", content: "hi" }] },
-  sessionID?: string,
+  sessionID?: string
 ) {
   const event: HookEvent = { request: messages(body), sessionID };
   await hook("http.request").fn(event);
@@ -266,7 +275,7 @@ test("a token near its end is refreshed at AWS and written back for kiro-cli", a
     Effect.gen(function* () {
       const account = yield* k.KiroAccount;
       return yield* account.credentials();
-    }),
+    })
   );
   expect(a).toMatchObject({ token: "new", profile: PROFILE, region: "us-east-1" });
   expect(seen[0]![0]).toBe("https://oidc.us-east-1.amazonaws.com/token");
@@ -346,7 +355,7 @@ test("a mid-conversation system update is said as the user's; an effort-only one
     },
     "claude-x",
     PROFILE,
-    { fields: { output_config: { effort: "low" } } },
+    { fields: { output_config: { effort: "low" } } }
   );
   expect(out.conversationState.history?.[0]?.userInputMessage?.content).toBe("be brief\n\nhi");
   expect(out.conversationState.currentMessage.userInputMessage.content).toBe("<reminder>\n\nagain");
@@ -360,7 +369,7 @@ const conversation = (req: Req, thinking?: Parameters<typeof k.kiroRequest>[3]) 
   k.kiroRequest(req, "claude-sonnet-4.5", "", thinking).conversationState;
 const resultsOf = (s: Conversation) =>
   (s.currentMessage.userInputMessage.userInputMessageContext?.toolResults ?? []).map(
-    (r) => `${r.toolUseId}=${r.content[0]?.text}`,
+    (r) => `${r.toolUseId}=${r.content[0]?.text}`
   );
 const NO_RESULT = "Tool use was interrupted and did not produce a result.";
 
@@ -442,7 +451,7 @@ test("with no system prompt the schema is the whole of it, after a thinking budg
   expect(opening(req, thinking)).toBe(
     "<thinking_mode>enabled</thinking_mode><max_thinking_length>30000</max_thinking_length>\n" +
       told +
-      "\n\nhi",
+      "\n\nhi"
   );
 });
 
@@ -525,7 +534,7 @@ test("a tool's text and images both go, every image in order", () => {
       { type: "text", text: "Screenshot of Finder" },
       image(PNG),
       image(JPG, "image/jpeg"),
-    ]),
+    ])
   ).currentMessage.userInputMessage;
   expect(u.userInputMessageContext?.toolResults?.[0]?.content).toEqual([
     { text: "Screenshot of Finder" },
@@ -552,7 +561,7 @@ test("only the latest tool image is sent again, as Kiro's own agent sends only t
       content: [
         { type: "tool_result", tool_use_id: "call_view2", content: [image(JPG, "image/jpeg")] },
       ],
-    },
+    }
   );
   const s = conversation(r);
   expect(s.currentMessage.userInputMessage.images).toEqual([
@@ -639,7 +648,7 @@ test("a marked tool is followed by a cachePoint, and marked messages get one eac
     ],
   });
   expect(
-    s.currentMessage.userInputMessage.userInputMessageContext?.tools?.map((t) => Object.keys(t)[0]),
+    s.currentMessage.userInputMessage.userInputMessageContext?.tools?.map((t) => Object.keys(t)[0])
   ).toEqual(["toolSpecification", "toolSpecification", "cachePoint"]);
   expect(s.history?.[0]?.userInputMessage?.cachePoint).toEqual(POINT);
   expect(s.history?.[1]?.assistantResponseMessage?.cachePoint).toEqual(POINT);
@@ -660,8 +669,10 @@ test("nothing marked, no cachePoint sent", () => {
 test("at most 4 cachePoints, the last ones kept", () => {
   const msgs: NonNullable<Req["messages"]> = [];
   for (let i = 0; i < 6; i++) {
-    msgs.push({ role: "user", content: [{ type: "text", text: "q" + i, cache_control: EPH }] });
-    msgs.push({ role: "assistant", content: "a" + i });
+    msgs.push(
+      { role: "user", content: [{ type: "text", text: "q" + i, cache_control: EPH }] },
+      { role: "assistant", content: "a" + i }
+    );
   }
   msgs.push({ role: "user", content: [{ type: "text", text: "last", cache_control: EPH }] });
   const s = conversation({
@@ -671,12 +682,10 @@ test("at most 4 cachePoints, the last ones kept", () => {
   expect(JSON.stringify(s).match(/cachePoint/g)?.length).toBe(4);
   expect(s.currentMessage.userInputMessage.cachePoint).toEqual(POINT);
   expect(
-    s.currentMessage.userInputMessage.userInputMessageContext?.tools?.some((t) => t.cachePoint),
+    s.currentMessage.userInputMessage.userInputMessageContext?.tools?.some((t) => t.cachePoint)
   ).toBe(false);
   expect(
-    s.history
-      ?.filter((e) => e.userInputMessage?.cachePoint)
-      .map((e) => e.userInputMessage?.content),
+    s.history?.filter((e) => e.userInputMessage?.cachePoint).map((e) => e.userInputMessage?.content)
   ).toEqual(["q3", "q4", "q5"]);
 });
 
@@ -708,14 +717,14 @@ test("every tool name Kiro is sent is one it takes, and a short one is kept", ()
     ],
   });
   const names = (s.currentMessage.userInputMessage.userInputMessageContext?.tools ?? []).map(
-    (t) => t.toolSpecification?.name ?? "",
+    (t) => t.toolSpecification?.name ?? ""
   );
   for (const n of names) expect(n).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
   expect(names[2]).toBe("Read");
   expect(new Set(names).size).toBe(3);
   expect(names[0]).toStartWith("mcp__plugin_cloudflare_cloudflare-docs__");
   // the call in the history names the tool as its declaration does
-  expect(s.history?.[1]?.assistantResponseMessage?.toolUses?.[0]?.name).toBe(names[0]!);
+  expect(s.history?.[1]?.assistantResponseMessage?.toolUses?.[0]?.name).toBe(names[0]);
   expect(resultsOf(s)).toEqual(["toolu_1=found"]);
 });
 
@@ -725,7 +734,7 @@ test("a tool name is shortened the same way each turn", () => {
   expect(k.toolName(LONG).length).toBeLessThanOrEqual(64);
   expect(k.toolName("a.b")).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
   expect(k.toolNames({ tools: [{ name: LONG }, { name: "Read" }] })).toEqual(
-    new Map([[k.toolName(LONG), LONG]]),
+    new Map([[k.toolName(LONG), LONG]])
   );
 });
 
@@ -733,7 +742,7 @@ test("a tool name is shortened the same way each turn", () => {
 // routed as max (magpie #120)
 test("efforts: xhigh keeps its own meaning, and a model that doesn't think offers no levels", () => {
   expect(
-    k.thinkingOf({ output_config: { effort: "xhigh" } }, "claude-opus-4.5", undefined),
+    k.thinkingOf({ output_config: { effort: "xhigh" } }, "claude-opus-4.5", undefined)
   ).toEqual({ budget: 50000 });
   const listsXhigh = k.modelOf({
     modelId: "claude-y",
@@ -748,7 +757,7 @@ test("efforts: xhigh keeps its own meaning, and a model that doesn't think offer
   ]);
   expect(
     k.thinkingOf({ output_config: { effort: "xhigh" } }, "claude-y", listsXhigh).fields
-      ?.output_config,
+      ?.output_config
   ).toEqual({ effort: "xhigh" });
   const deepseek = k.modelOf({ modelId: "deepseek-3.2" });
   expect(k.modelInfo(deepseek).variants).toEqual([]);
@@ -786,12 +795,12 @@ test("an image over Kiro's limit is made small enough to send", async () => {
     Effect.gen(function* () {
       const images = yield* k.Images;
       return yield* images.fit(k.kiroRequest(req, "claude-x", ""));
-    }),
+    })
   );
-  const [image] = out.conversationState.currentMessage.userInputMessage.images ?? [];
+  const [fitted] = out.conversationState.currentMessage.userInputMessage.images ?? [];
   expect(b64.length).toBeGreaterThan(5 * 1024 * 1024);
-  expect(image?.format).toBe("webp");
-  expect(image?.source.bytes.length).toBeLessThanOrEqual(5 * 1024 * 1024);
+  expect(fitted?.format).toBe("webp");
+  expect(fitted?.source.bytes.length).toBeLessThanOrEqual(5 * 1024 * 1024);
 });
 
 // Kiro turns away an image whose Base64 is over 5 MiB (magpie-community/
@@ -836,7 +845,7 @@ const ihdr = (w: number, h: number) => {
 function png(
   w: number,
   h: number,
-  { noise = true, size }: { noise?: boolean; size?: number } = {},
+  { noise = true, size }: { noise?: boolean; size?: number } = {}
 ) {
   const row = 1 + w * 3;
   const rows = Buffer.alloc(h * row, 0x80);
@@ -884,7 +893,7 @@ function codex(data: string, follow = false) {
   if (follow)
     r.messages.push(
       { role: "assistant", content: [{ type: "text", text: "It is a contact sheet." }] },
-      { role: "user", content: [{ type: "text", text: "now make it smaller" }] },
+      { role: "user", content: [{ type: "text", text: "now make it smaller" }] }
     );
   return r;
 }
@@ -898,17 +907,17 @@ const fitted = (...reqs: Req[]) =>
       for (const r of reqs)
         out.push((yield* images.fit(k.kiroRequest(r, "claude-opus-4.5", ""))).conversationState);
       return out;
-    }),
+    })
   );
 const fit = async (req: Req) => (await fitted(req))[0]!;
 const usersOf = (s: Conversation) =>
   [...(s.history ?? []).map((e) => e.userInputMessage), s.currentMessage.userInputMessage].filter(
-    (u) => u !== undefined,
+    (u) => u !== undefined
   );
 const imagesOf = (s: Conversation) => usersOf(s).flatMap((u) => u.images ?? []);
 // the conversation with its images' bytes and format left out, which
 // fitting may change
-const shape = (s: Conversation) => {
+const withoutImageBytes = (s: Conversation) => {
   const c = structuredClone(s) as Partial<Conversation>;
   delete c.conversationId;
   for (const u of usersOf(c as Conversation))
@@ -935,7 +944,9 @@ test("the reported tool image goes under the limit as an image Kiro can read, th
   const m = await meta(i!.source.bytes);
   expect<string>(m.format).toBe(i!.format);
   expect(m.width / m.height).toBeCloseTo(1389 / 1000, 2);
-  expect(shape(s)).toEqual(shape(k.kiroRequest(req, "claude-opus-4.5", "").conversationState));
+  expect(withoutImageBytes(s)).toEqual(
+    withoutImageBytes(k.kiroRequest(req, "claude-opus-4.5", "").conversationState)
+  );
   // the caller's request is untouched
   expect(req).toEqual(before);
 }, 60_000);
@@ -951,7 +962,7 @@ test("a text-only turn after the image goes too: the image in history is fitted,
   expect(where(s)).toEqual(where(plain));
   expect(imagesOf(s)).toHaveLength(1);
   expect(imagesOf(s)[0]!.source.bytes.length).toBeLessThanOrEqual(LIMIT);
-  expect(shape(s)).toEqual(shape(plain));
+  expect(withoutImageBytes(s)).toEqual(withoutImageBytes(plain));
 }, 60_000);
 
 test("at the limit an image is sent byte for byte; one Base64 quad over, it is fitted", async () => {
@@ -974,7 +985,7 @@ test("at the limit an image is sent byte for byte; one Base64 quad over, it is f
 test("small images beside a large one are left as they are, in their order", async () => {
   const small = png(8, 8, { noise: false }).toString("base64");
   const s = await fit(
-    viewImage([image(small), image(REPORTED), { type: "text", text: "two images" }, image(small)]),
+    viewImage([image(small), image(REPORTED), { type: "text", text: "two images" }, image(small)])
   );
   const got = s.currentMessage.userInputMessage.images ?? [];
   expect(got).toHaveLength(3);
@@ -982,7 +993,7 @@ test("small images beside a large one are left as they are, in their order", asy
   expect(got[2]).toEqual({ format: "png", source: { bytes: small } });
   expect(got[1]!.source.bytes.length).toBeLessThanOrEqual(LIMIT);
   expect(
-    s.currentMessage.userInputMessage.userInputMessageContext?.toolResults?.[0]?.content,
+    s.currentMessage.userInputMessage.userInputMessageContext?.toolResults?.[0]?.content
   ).toEqual([{ text: "two images" }]);
 }, 60_000);
 
@@ -1024,11 +1035,11 @@ test("an image is fitted once, and the next turn sends the same fitted bytes", a
     const [a, b] = await run(
       Effect.gen(function* () {
         const images = yield* k.Images;
-        const a = yield* images.fit(k.kiroRequest(codex(flat), "claude-opus-4.5", ""));
+        const first = yield* images.fit(k.kiroRequest(codex(flat), "claude-opus-4.5", ""));
         once = made;
-        const b = yield* images.fit(k.kiroRequest(codex(flat, true), "claude-opus-4.5", ""));
-        return [a, b].map((r) => r.conversationState);
-      }),
+        const second = yield* images.fit(k.kiroRequest(codex(flat, true), "claude-opus-4.5", ""));
+        return [first, second].map((r) => r.conversationState);
+      })
     );
     expect(once).toBeGreaterThan(0);
     expect(made).toBe(once);
@@ -1046,7 +1057,7 @@ test("a host without Bun.Image sends a note in the image's place", async () => {
     const s = await fit(codex(flat));
     expect(imagesOf(s)).toEqual([]);
     expect(s.currentMessage.userInputMessage.content).toContain(
-      "this plugin host can't resize images",
+      "this plugin host can't resize images"
     );
   } finally {
     Bun.Image = real;
@@ -1106,7 +1117,7 @@ test("hooks: a Messages request goes to Kiro, and its event stream comes back as
       frame("toolUseEvent", { toolUseId: "t1", name: kiroTool, input: '{"city":' }),
       frame("toolUseEvent", { toolUseId: "t1", name: kiroTool, input: '"Paris"}' }),
       frame("contextUsageEvent", { contextUsagePercentage: 10 }),
-      frame("metadataEvent", { stopReason: "TOOL_USE" }),
+      frame("metadataEvent", { stopReason: "TOOL_USE" })
     ),
   };
   await hook("http.response").fn(res);
@@ -1146,7 +1157,7 @@ test.each([401, 403])(
       sent.push(request.headers.authorization);
       return stream(
         frame("assistantResponseEvent", { content: "ok" }),
-        frame("metadataEvent", { stopReason: "END_TURN" }),
+        frame("metadataEvent", { stopReason: "END_TURN" })
       );
     };
     const res = await ask(hook, new Response("{}", { status }));
@@ -1154,7 +1165,7 @@ test.each([401, 403])(
     expect(sent).toEqual(["Bearer fresh"]);
     const delta = (await sse(res)).find((e) => e.type === "content_block_delta");
     expect(delta.delta.text).toBe("ok");
-  },
+  }
 );
 
 test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
@@ -1168,16 +1179,16 @@ test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
   const overflow = await answered(
     Response.json(
       { message: "Input is too long.", reason: "CONTENT_LENGTH_EXCEEDS_THRESHOLD" },
-      { status: 400 },
-    ),
+      { status: 400 }
+    )
   );
   expect(overflow.status).toBe(400);
   expect(overflow.error.message).toBe(
-    "prompt is too long for this model's context window. Kiro said: Input is too long. (CONTENT_LENGTH_EXCEEDS_THRESHOLD)",
+    "prompt is too long for this model's context window. Kiro said: Input is too long. (CONTENT_LENGTH_EXCEEDS_THRESHOLD)"
   );
   // and doesn't retry a spent allowance
   const limit = await answered(
-    Response.json({ message: "no", reason: "MONTHLY_REQUEST_COUNT" }, { status: 429 }),
+    Response.json({ message: "no", reason: "MONTHLY_REQUEST_COUNT" }, { status: 429 })
   );
   expect(limit.status).toBe(402);
   expect(limit.error.type).toBe("billing_error");
@@ -1191,8 +1202,8 @@ test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
           "retry-after": "7",
           "x-amzn-errortype": "ThrottlingException:http://internal.amazon.com/coral/",
         },
-      },
-    ),
+      }
+    )
   );
   expect(throttled.status).toBe(429);
   expect(throttled.headers.get("retry-after")).toBe("7");
@@ -1201,13 +1212,13 @@ test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
     message: "Kiro is rate limiting requests. Kiro said: Too many requests",
   });
   const busy = await answered(
-    Response.json({ message: "busy", reason: "INSUFFICIENT_MODEL_CAPACITY" }, { status: 429 }),
+    Response.json({ message: "busy", reason: "INSUFFICIENT_MODEL_CAPACITY" }, { status: 429 })
   );
   expect(busy.status).toBe(503);
   expect(busy.error.message).toStartWith("Kiro has no capacity for this model right now");
   // an exception before any of the answer is a status too
   const streamed = await answered(
-    stream(frame("ThrottlingException", { message: "slow down" }, "exception")),
+    stream(frame("ThrottlingException", { message: "slow down" }, "exception"))
   );
   expect(streamed.status).toBe(429);
   expect(streamed.error.message).toBe("Kiro is rate limiting requests. Kiro said: slow down");
@@ -1228,7 +1239,7 @@ test("hooks: a request the plugin can't handle says so, and isn't retried", asyn
   expect(res.response!.status).toBe(500);
   expect(res.response!.headers.get("x-should-retry")).toBe("false");
   expect((await errorOf(res.response!)).message).toStartWith(
-    "The Kiro plugin failed on this request",
+    "The Kiro plugin failed on this request"
   );
 });
 
@@ -1300,7 +1311,7 @@ test("models: a listing Kiro fails is tried again, 5 and then 20 seconds later",
       yield* TestClock.adjust("20 seconds");
       yield* settle;
       expect(calls).toBe(3);
-    }).pipe(Effect.provide(TestClock.layer())),
+    }).pipe(Effect.provide(TestClock.layer()))
   );
   expect(saved).toEqual([[expect.objectContaining({ id: "claude-y", name: "Claude Y" })]]);
 });
@@ -1335,8 +1346,8 @@ test("hooks: a reply with no token counts leaves the cache out, and reckons the 
       frame("assistantResponseEvent", { content: "OK" }),
       frame("metadataEvent", { stopReason: "END_TURN" }),
       frame("contextUsageEvent", { contextUsagePercentage: 11.032500267028809 }),
-      frame("meteringEvent", { unit: "credit", unitPlural: "credits", usage: 0.091 }),
-    ),
+      frame("meteringEvent", { unit: "credit", unitPlural: "credits", usage: 0.091 })
+    )
   );
   // claude-x's window is 1000 tokens; "OK" is about 1 token
   expect(await usageOf(res)).toEqual({ input_tokens: 110, output_tokens: 1 });
@@ -1356,8 +1367,8 @@ test("hooks: a reply whose metadataEvent counts tokens tells them, cache include
     hook,
     stream(
       frame("assistantResponseEvent", { content: "OK" }),
-      frame("metadataEvent", { stopReason: "END_TURN", tokenUsage }),
-    ),
+      frame("metadataEvent", { stopReason: "END_TURN", tokenUsage })
+    )
   );
   expect(await usageOf(res)).toEqual({
     input_tokens: 120,
@@ -1374,8 +1385,8 @@ test("hooks: an exception after the answer began ends the stream with an error e
     hook,
     stream(
       frame("assistantResponseEvent", { content: "Hello" }),
-      frame("ThrottlingException", { message: "slow down" }, "exception"),
-    ),
+      frame("ThrottlingException", { message: "slow down" }, "exception")
+    )
   );
   expect(res.status).toBe(200);
   const out = await sse(res);
@@ -1398,7 +1409,7 @@ test("hooks: a validation exception before the answer is a 400, compacting one t
   const long = await ask(hook, exception("Input is too long."));
   expect(long.status).toBe(400);
   expect((await errorOf(long)).message).toStartWith(
-    "prompt is too long for this model's context window",
+    "prompt is too long for this model's context window"
   );
   const bad = await ask(hook, exception("bad field"));
   expect(bad.status).toBe(400);
@@ -1434,7 +1445,7 @@ test("one refresh at a time: two requests at once spend the refresh token once",
       return yield* Effect.all([account.credentials(), account.credentials()], {
         concurrency: 2,
       });
-    }),
+    })
   );
   expect(both.map((a) => a.token)).toEqual(["new", "new"]);
   expect(refreshes).toHaveLength(1);
@@ -1456,7 +1467,7 @@ test("a refresh whose write-back failed isn't repeated with the refresh token it
         const a = yield* account.credentials();
         const b = yield* account.credentials();
         return [a.token, b.token];
-      }),
+      })
     );
     expect(tokens).toEqual(["new", "new"]);
     expect(refreshes).toHaveLength(1);
@@ -1556,7 +1567,7 @@ test("models: a Builder ID account's own models are listed under Builder ID's pr
     Effect.gen(function* () {
       yield* k.make(ctx);
       for (let i = 0; i < 100 && !saved.length; i++) yield* Effect.sleep("10 millis");
-    }),
+    })
   );
   expect(seen.listedWith).toEqual([BUILDER_ID]);
   expect((saved[0] as { id: string }[]).map((m) => m.id)).toEqual(["auto", "claude-opus-5.5"]);
@@ -1591,7 +1602,7 @@ test("the Kiro IDE's Builder ID sign-in is asked with Builder ID's profile", asy
         provider: "BuilderId",
         region: "us-east-1",
         clientIdHash: "h",
-      }),
+      })
     );
     writeFileSync(join(ide, "h.json"), JSON.stringify({ clientId: "c", clientSecret: "s" }));
     const seen = management();
@@ -1649,9 +1660,9 @@ const PRO_USAGE = {
 const withPlugin = <A>(
   usage: object | number,
   use: (
-    p: ReturnType<typeof fakeHost> & { asked: Record<string, string>[] },
+    p: ReturnType<typeof fakeHost> & { asked: Record<string, string>[] }
   ) => Effect.Effect<A, unknown, any>,
-  host = fakeHost(),
+  host = fakeHost()
 ) => {
   const asked: Record<string, string>[] = [];
   answer = async (request) => {
@@ -1666,7 +1677,7 @@ const withPlugin = <A>(
     Effect.gen(function* () {
       yield* k.make(host.ctx);
       return yield* use({ ...host, asked });
-    }),
+    })
   );
 };
 const usageOfRpc = (p: ReturnType<typeof fakeHost>, sessionIDs: string[] = []) =>
@@ -1696,7 +1707,7 @@ test("usage: a reply's meteringEvents add up, and a session's replies add up in 
         p,
         "ses_a",
         frame("assistantResponseEvent", { content: "OK" }),
-        metering(0.091),
+        metering(0.091)
       );
       expect(p.store.get("credits/ses_a")).toBeCloseTo(0.091);
       yield* replyIn(
@@ -1704,11 +1715,11 @@ test("usage: a reply's meteringEvents add up, and a session's replies add up in 
         "ses_a",
         frame("assistantResponseEvent", { content: "OK" }),
         metering(0.2),
-        metering(0.05),
+        metering(0.05)
       );
       const out = yield* usageOfRpc(p, ["ses_a", "ses_b"]);
       return { ...p, credits: out.credits };
-    }),
+    })
   );
   expect(store.get("credits/ses_a")).toBeCloseTo(0.341);
   expect(store.has("credits/ses_b")).toBe(false);
@@ -1730,11 +1741,11 @@ test("usage: a session's credits from an earlier run are read from storage", asy
           p,
           "ses_old",
           frame("assistantResponseEvent", { content: "OK" }),
-          metering(1),
+          metering(1)
         );
         return yield* usageOfRpc(p, ["ses_old"]);
       }),
-    host,
+    host
   );
   expect(out.credits.ses_old).toBeCloseTo(13.4);
   expect(host.store.get("credits/ses_old")).toBeCloseTo(13.4);
@@ -1743,7 +1754,7 @@ test("usage: a session's credits from an earlier run are read from storage", asy
 test("usage: Get-Usage-Limits reads as the plan, its credits and the overage, and nothing of the user", async () => {
   signIn({ access: "tok" });
   const { out, asked } = await withPlugin(PRO_USAGE, (p) =>
-    Effect.map(usageOfRpc(p), (out) => ({ out, asked: p.asked })),
+    Effect.map(usageOfRpc(p), (usage) => ({ out: usage, asked: p.asked }))
   );
   expect(asked).toHaveLength(1);
   expect(asked[0]).toEqual({
