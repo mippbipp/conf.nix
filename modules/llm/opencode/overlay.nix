@@ -1,27 +1,19 @@
-{ inputs, lib, ... }:
+{ lib, ... }:
 {
   nixpkgs.overlays = [
-    (
-      final: prev:
-      let
-        llm = inputs.llm-agents.packages.${final.stdenv.hostPlatform.system};
-        kiroPath = lib.makeBinPath [
-          final.kiro-cli
-          final.nodejs
-        ];
-      in
-      {
-        opencode2 = llm.opencode2.overrideAttrs (old: {
-          # put opencode-kiro plugin's runtime dependencies on PATH
-          postInstall = (old.postInstall or "") + ''
-            wrapProgram $out/bin/opencode2 \
-              --prefix PATH : ${kiroPath}
-
-            # llm-agents installs the v2 binary as `opencode2`
-            ln -s opencode2 $out/bin/opencode
-          '';
-        });
-      }
-    )
+    (final: prev: {
+      # kiro-cli on opencode's PATH, so the Kiro plugin can have it refresh its
+      # sign-in.
+      opencode = final.symlinkJoin {
+        name = "opencode-${prev.opencode.version}";
+        paths = [ prev.opencode ];
+        nativeBuildInputs = [ final.makeWrapper ];
+        postBuild = ''
+          wrapProgram $out/bin/opencode \
+            --prefix PATH : ${lib.makeBinPath [ final.kiro-cli ]}
+        '';
+        inherit (prev.opencode) meta passthru;
+      };
+    })
   ];
 }
