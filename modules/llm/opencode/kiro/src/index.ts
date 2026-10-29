@@ -18,12 +18,12 @@
 // no-restricted-imports rule in ../oxlint.config.ts fails lint on any other.
 //
 // The sidebar (tui.tsx) shows the account's usage and what each session has
-// spent, which it asks for over the RPC in rpc.ts.
+// spent, which it asks for over the RPC in rpc.ts. usage.ts answers it.
 
 import { randomUUID } from "node:crypto";
 
 import type { Plugin, Provider } from "@opencode/plugin/effect";
-import { Effect, Exit, Layer, Option, Ref, Schedule, Schema, Semaphore } from "effect";
+import { Effect, Layer, Option, Ref, Schedule, Schema } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
 import { type Auth, authHeaders, KiroAccount } from "./account.ts";
@@ -32,7 +32,7 @@ import * as Failure from "./failure.ts";
 import { Images } from "./images.ts";
 import { HEADERS_SECONDS, ID, IDLE_SECONDS, send } from "./kiro.ts";
 import { decodeSaved, FALLBACK, modelInfo } from "./models.ts";
-import { type AccountUsage, KiroRpc, type UsageAnswer } from "./rpc.ts";
+import * as Usage from "./usage.ts";
 
 const PACKAGE = "@opencode/ai/providers/anthropic";
 // where the Anthropic route posts; http.request sends it on to the account's region
@@ -40,12 +40,6 @@ const BASE = "https://runtime.us-east-1.kiro.dev";
 const MODELS_KEY = "models";
 
 const runtime = (region: string) => `https://runtime.${region}.kiro.dev`;
-
-// ---- usage -----------------------------------------------------------------------
-
-// what each session has spent, kept in the plugin's storage
-const creditsKey = (sessionID: string) => `credits/${sessionID}`;
-const decodeCredits = Schema.decodeUnknownOption(Schema.Number);
 
 // ---- models ----------------------------------------------------------------------
 
@@ -96,11 +90,9 @@ const standIn = () => new Request("data:application/json,%7B%7D", { method: "POS
 type Sent = { turn: Conversation.Turn; a: Auth; error?: never } | { error: Failure.Failure };
 
 // Host is the part of OpenCode's plugin context this plugin uses.
-type Host = {
-  readonly storage: Pick<Plugin.Context["storage"], "get" | "set">;
+type Host = Usage.Host & {
   readonly provider: Pick<Plugin.Context["provider"], "transform" | "reload">;
   readonly session: Pick<Plugin.Context["session"], "hook">;
-  readonly rpc: Pick<Plugin.Context["rpc"], "register">;
 };
 
 const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
@@ -113,89 +105,8 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   const models = yield* Ref.make(
     Option.getOrElse(decodeSaved(yield* ctx.storage.get(MODELS_KEY)), () => FALLBACK)
   );
-  // where work outlives the request that started it: the plugin's own scope.
-  // A reply's stream ends its fibers with its body.
-  const scope = yield* Effect.scope;
-
-  // the account's usage, read at most once a minute (a failure, every 10
-  // seconds), and a short reason when it can't be
-  const [usageCached, usageStale] = yield* Effect.cachedInvalidateWithTTL(account.usage, (exit) =>
-    Exit.isSuccess(exit) ? "60 seconds" : "10 seconds"
-  );
-  const accountNow = usageCached.pipe(
-    Effect.map((usage): { account: AccountUsage | null; error?: string } => ({ account: usage })),
-    Effect.catchCause((cause) =>
-      Effect.succeed({ account: null, error: Failure.fromCause(cause).message.slice(0, 200) })
-    )
-  );
-
-  // the credits each session has spent: storage's, and what was added since
-  const credits = new Map<string, number>();
-  const creditLock = yield* Semaphore.make(1);
-  const creditsOf = Effect.fnUntraced(function* (sessionID: string) {
-    const known = credits.get(sessionID);
-    if (known !== undefined) return known;
-    const saved = Option.getOrElse(
-      decodeCredits(yield* ctx.storage.get(creditsKey(sessionID))),
-      () => 0
-    );
-    credits.set(sessionID, saved);
-    return saved;
-  });
-  const addCredits = (sessionID: string, n: number) =>
-    creditLock.withPermits(1)(
-      Effect.gen(function* () {
-        const total = (yield* creditsOf(sessionID)) + n;
-        credits.set(sessionID, total);
-        yield* ctx.storage.set(creditsKey(sessionID), total);
-      })
-    );
-
-  // without the RPC the sidebar shows nothing, and Kiro still answers
-  // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC API fails with unknown
-  const registration = yield* ctx.rpc
-    .register(KiroRpc, {
-      usage: ({ sessionIDs }) =>
-        Effect.gen(function* () {
-          const spent: Record<string, number> = {};
-          for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
-          const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };
-          return answer;
-        }),
-    })
-    .pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("Kiro: registering the usage RPC failed", cause).pipe(
-          Effect.as(undefined)
-        )
-      )
-    );
-  // telling the sidebar is best effort
-  const emitUpdated = registration
-    ? // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC fails with unknown
-      registration.events.emit("updated", {}).pipe(Effect.ignore)
-    : Effect.void;
-
-  // after a reply, the account read again and the sidebar told. One read
-  // runs at a time; a reply ending during one is in what it tells.
-  const refreshing = yield* Semaphore.make(1);
-  const refreshUsage = usageStale.pipe(
-    Effect.andThen(accountNow),
-    Effect.andThen(emitUpdated),
-    Effect.ignore,
-    refreshing.withPermitsIfAvailable(1)
-  );
-  const finished = (sessionID: string | undefined) => (usage: Conversation.Usage) =>
-    Effect.gen(function* () {
-      if (sessionID && usage.credits > 0) yield* addCredits(sessionID, usage.credits);
-      yield* refreshUsage;
-    }).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("Kiro: counting a reply's credits failed", cause)
-      ),
-      Effect.forkIn(scope),
-      Effect.asVoid
-    );
+  // what each reply cost, for the sidebar
+  const usage = yield* Usage.make(ctx);
 
   // the call that sends a turn to Kiro, its images fitted
   const callFor = (turn: Conversation.Turn, a: Auth) =>
@@ -267,7 +178,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           );
           return;
         }
-        event.response = yield* p.turn.answer(res.stream, finished(event.sessionID));
+        event.response = yield* p.turn.answer(res.stream, (u) => usage.record(event.sessionID, u));
       },
       (effect, event) =>
         effect.pipe(

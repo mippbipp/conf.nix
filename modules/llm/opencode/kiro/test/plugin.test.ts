@@ -477,7 +477,7 @@ test("hooks: a refresh failing after Kiro turned the token down is a status, not
   expect((await errorOf(refused)).message).toContain("kiro-cli login");
 });
 
-// ---- usage: the sidebar's credits ------------------------------------------------
+// ---- usage: the sidebar's credits, end to end (the rest is in usage.test.ts) -----
 
 // Get-Usage-Limits as Kiro answered it (2026-10-28) for a Kiro Pro account
 // over its limit, the user's own details made up
@@ -520,19 +520,17 @@ const PRO_USAGE = {
 };
 
 // the plugin loaded in a scope that stays open, as OpenCode keeps it, with
-// Kiro's management API answering usage (or a status)
+// Kiro's management API answering usage
 const withPlugin = <A>(
-  usage: object | number,
-  use: (p: ReturnType<typeof fakeHost>) => Effect.Effect<A, unknown, any>,
-  host = fakeHost()
+  usage: object,
+  use: (p: ReturnType<typeof fakeHost>) => Effect.Effect<A, unknown, any>
 ) => {
   answer = async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.endsWith("/Get-Usage-Limits")) throw new Error("unexpected " + url.pathname);
-    return typeof usage === "number"
-      ? Response.json({ message: "Not allowed", reason: null }, { status: usage })
-      : Response.json(usage);
+    return Response.json(usage);
   };
+  const host = fakeHost();
   return run(
     Effect.gen(function* () {
       yield* k.make(host.ctx);
@@ -588,36 +586,4 @@ test("usage: a reply's meteringEvents add up, and a session's replies add up in 
   expect(credits.ses_b).toBe(0);
   // each finished reply tells the sidebar to look again
   expect(emitted).toEqual(["updated", "updated"]);
-});
-
-test("usage: a session's credits from an earlier run are read from storage", async () => {
-  signIn({ access: "tok" });
-  const host = fakeHost();
-  host.store.set("credits/ses_old", 12.4);
-  const out = await withPlugin(
-    PRO_USAGE,
-    (p) =>
-      Effect.gen(function* () {
-        yield* replyIn(
-          p,
-          "ses_old",
-          frame("assistantResponseEvent", { content: "OK" }),
-          metering(1)
-        );
-        return yield* usageOfRpc(p, ["ses_old"]);
-      }),
-    host
-  );
-  expect(out.credits.ses_old).toBeCloseTo(13.4);
-  expect(host.store.get("credits/ses_old")).toBeCloseTo(13.4);
-});
-
-test("usage: an account Kiro won't show is an error, not a failure", async () => {
-  signIn({ access: "tok" });
-  const out = await withPlugin(403, (p) => usageOfRpc(p, ["ses_x"]));
-  expect(out).toEqual({
-    account: null,
-    error: "Kiro: Not allowed (HTTP 403)",
-    credits: { ses_x: 0 },
-  });
 });

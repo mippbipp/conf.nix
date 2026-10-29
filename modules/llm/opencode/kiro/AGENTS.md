@@ -19,6 +19,8 @@ For APIs it doesn't cover, search `node_modules/effect/src`.
   request into the Kiro request and the reader of Kiro's event stream),
   `images.ts` (images over Kiro's size limit, behind the `Images` service),
   `models.ts` (the model catalogue and how each model thinks),
+  `usage.ts` (the account's usage and each session's credits, which it
+  answers the sidebar's RPC with),
   `failure.ts` (what OpenCode is told when a request fails) and `kiro.ts`
   (what several modules share: the provider id, the timeouts, the `field`
   Schema helper and `send`).
