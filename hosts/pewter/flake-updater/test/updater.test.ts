@@ -3,12 +3,19 @@ import { Array as Arr, Duration, Effect, Fiber, Option } from "effect";
 import { TestClock } from "effect/testing";
 
 import { AgentError } from "../src/agent.ts";
+import { heldBackMarker } from "../src/branch-state.ts";
 import { parseLock, shortRev } from "../src/lock.ts";
 import { run } from "../src/updater.ts";
 import { edits, failed, lockAt, World, worldLayer } from "./fakes.ts";
 import { gate232 } from "./fixtures/gate-232.ts";
 
 const runIn = (world: World) => run().pipe(Effect.provide(worldLayer(world)));
+
+/** The marker a held-back issue gets when main has `input` at `rev`. */
+const heldAt = (input: string, rev: string) =>
+  Effect.map(parseLock(lockAt({ [input]: rev })), (lock) =>
+    heldBackMarker(lock, input)
+  );
 
 /** A world where `nix flake update` moves nixpkgs from aaaaaaa to bbbbbbb. */
 const updated = () => {
@@ -50,7 +57,7 @@ describe("updater", () => {
         ["up"]
       );
       const update = world.lastUpdate();
-      assert.isTrue(update.autoMerge);
+      assert.isFalse(update.needsReview);
       assert.include(update.body, "`home-manager` 1111111 → 2222222");
       assert.include(update.body, "`nixpkgs` aaaaaaa → bbbbbbb");
       assert.deepStrictEqual(world.verdicts, []);
@@ -148,7 +155,6 @@ describe("updater", () => {
             "{ }\n"
           );
           const update = world.lastUpdate();
-          assert.isFalse(update.autoMerge);
           assert.isTrue(update.needsReview);
           assert.include(
             update.body,
@@ -192,7 +198,6 @@ describe("updater", () => {
           assert.strictEqual(shortRev(pushed, "home-manager"), "2222222");
 
           const update = world.lastUpdate();
-          assert.isTrue(update.autoMerge);
           assert.isFalse(update.needsReview);
           assert.include(
             update.body,
@@ -208,7 +213,8 @@ describe("updater", () => {
             issue?.body,
             "Failing hosts: gram, harpe, pewter, warpe"
           );
-          assert.include(issue?.body, "main-narHash=sha256-aaaaaaanixpkgs");
+          const main = yield* parseLock(world.main.get("flake.lock") ?? "");
+          assert.include(issue?.body, heldBackMarker(main, "nixpkgs"));
         })
     );
 
@@ -380,20 +386,21 @@ describe("updater", () => {
     );
   });
 
-  it.effect("closes held-back issues once main has a newer revision", () =>
+  it.effect("closes held-back issues once main's lock entry changes", () =>
     Effect.gen(function* () {
       const world = new World();
+
       world.issues = [
         {
           number: 5,
           title: "flake-update: nixpkgs held back",
-          body: "<!-- flake-update main-narHash=sha256-0000000nixpkgs -->",
+          body: yield* heldAt("nixpkgs", "0000000"),
           url: "https://github.test/issues/5",
         },
         {
           number: 6,
           title: "flake-update: home-manager held back",
-          body: "<!-- flake-update main-narHash=sha256-1111111home-manager -->",
+          body: yield* heldAt("home-manager", "1111111"),
           url: "https://github.test/issues/6",
         },
       ];

@@ -20,9 +20,10 @@ export interface Issue {
 
 export interface PullRequestUpdate {
   readonly body: string;
-  /** Off whenever the branch carries a commit that needs human review. */
-  readonly autoMerge: boolean;
-  /** Adds or removes the `ready-for-human` label. */
+  /**
+   * Turns auto-merge off and adds the `ready-for-human` label; otherwise
+   * auto-merge is on and the label is removed.
+   */
   readonly needsReview: boolean;
 }
 

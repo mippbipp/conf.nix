@@ -11,7 +11,12 @@ import {
 
 import { Agent } from "./agent.ts";
 import type { AgentError, RepairResult } from "./agent.ts";
-import { formatFixerCommit, parseFixerCommit } from "./commit-message.ts";
+import {
+  deriveBranchState,
+  formatFixerCommit,
+  heldBackMarker,
+  heldBackTitle,
+} from "./branch-state.ts";
 import { trimGateLog } from "./gate-log.ts";
 import { Gate } from "./gate.ts";
 import type { FailedCheck } from "./gate.ts";
@@ -19,8 +24,6 @@ import { Git, mainRef } from "./git.ts";
 import { GitHub } from "./github.ts";
 import type { PullRequest } from "./github.ts";
 import {
-  heldBackTitle,
-  parseHeldBack,
   renderFailures,
   renderHeldBackIssue,
   renderRepairFailedIssue,
@@ -31,16 +34,13 @@ import {
   changedInputs,
   classifyLockChange,
   formatLock,
-  narHash,
   parseLock,
   revertInputs,
-  sameRevision,
   shortRev,
 } from "./lock.ts";
 import type { FlakeLock } from "./lock.ts";
 import { Nix } from "./nix.ts";
 import { renderPrBody } from "./pr-body.ts";
-import type { HeldBack } from "./pr-body.ts";
 import type { RepairReport } from "./report.ts";
 import { isBlocked } from "./scope.ts";
 import { Settings } from "./settings.ts";
@@ -71,6 +71,19 @@ const readLock = Effect.fn("Updater.readLock")(function* (rev: string) {
 const sessionLink = (settings: UpdaterSettings, session: string) =>
   `\`${session}\` on ${settings.sessionUrl}`;
 
+/** Everything the branch, both locks and the open issues record. */
+const readBranch = Effect.fn("Updater.readBranch")(function* (main: FlakeLock) {
+  const git = yield* Git;
+  const github = yield* GitHub;
+
+  return deriveBranchState({
+    commits: yield* git.branchCommits,
+    head: yield* readLock("HEAD"),
+    main,
+    issues: yield* github.openIssues,
+  });
+});
+
 /**
  * Regenerates the PR body and merge settings from the branch itself, so a
  * run that died halfway leaves nothing the next run cannot rebuild.
@@ -80,58 +93,17 @@ const syncPr = Effect.fn("Updater.syncPr")(function* (
   main: FlakeLock,
   progress: Progress
 ) {
-  const git = yield* Git;
   const github = yield* GitHub;
   const settings = yield* Settings;
-  const head = yield* readLock("HEAD");
-  const issues = yield* github.openIssues;
+  const state = yield* readBranch(main);
 
-  const fixerCommits = Arr.flatMap(yield* git.branchCommits, (commit) =>
-    Option.toArray(parseFixerCommit(commit.message))
-  );
-
-  const needsReview = Arr.some(
-    fixerCommits,
-    (commit) => commit.trailers.reviewRequired
-  );
-
-  const issueUrl = (input: string) =>
-    Option.map(
-      Arr.findFirst(issues, (issue) => issue.title === heldBackTitle(input)),
-      (issue) => issue.url
-    );
-
-  // An input reverted in an earlier round stays held back only while the
-  // branch still has it at main's revision; `nix flake update` retries it.
-  const heldBack = new Map<string, HeldBack>();
-
-  for (const commit of fixerCommits) {
-    for (const input of commit.trailers.reverted) {
-      if (sameRevision(head, main, input)) {
-        heldBack.set(input, {
-          input,
-          reason: commit.subject,
-          issue: issueUrl(input),
-        });
-      }
-    }
-  }
-
-  const body = renderPrBody({
-    updated: changedInputs(main, head),
-    heldBack: [...heldBack.values()],
-    fixerCommits: Arr.map(fixerCommits, (commit) => ({
-      subject: commit.subject,
-      round: commit.trailers.round,
-      reviewRequired: commit.trailers.reviewRequired,
-    })),
+  const body = renderPrBody(state, {
     rounds: progress.rounds,
     maxRounds: settings.maxRounds,
     session: Option.map(progress.session, (id) => sessionLink(settings, id)),
-    needsReview,
   });
 
-  yield* github.updatePr(pr, { body, autoMerge: !needsReview, needsReview });
+  yield* github.updatePr(pr, { body, needsReview: state.needsReview });
 });
 
 const findIssue = Effect.fn("Updater.findIssue")(function* (title: string) {
@@ -157,25 +129,18 @@ const reportIssue = Effect.fn("Updater.reportIssue")(function* (
   });
 });
 
-/** Closes held-back issues whose input main has since moved past. */
+/** Closes held-back issues whose input main has moved past. */
 const closeLandedIssues = Effect.fn("Updater.closeLandedIssues")(function* (
   main: FlakeLock
 ) {
   const github = yield* GitHub;
+  const state = yield* readBranch(main);
 
-  const heldBack = Arr.flatMap(yield* github.openIssues, (issue) =>
-    Option.toArray(parseHeldBack(issue))
-  );
-
-  for (const { issue, input, mainNarHash } of heldBack) {
-    const current = narHash(main, input);
-
-    if (Option.isSome(current) && current.value !== mainNarHash) {
-      yield* github.closeIssue(
-        issue,
-        `main now has \`${input}\` at ${shortRev(main, input)}, so the update landed.`
-      );
-    }
+  for (const { issue, input } of state.landed) {
+    yield* github.closeIssue(
+      issue,
+      `main now has \`${input}\` at ${shortRev(main, input)}, so the update landed.`
+    );
   }
 });
 
@@ -308,18 +273,13 @@ const reportHeldBack = Effect.fn("Updater.reportHeldBack")(function* (
     onSome: (id) => sessionLink(settings, id),
   });
 
-  const mainNarHash = Option.getOrElse(
-    narHash(target.main, input),
-    () => "unknown"
-  );
-
   yield* reportIssue(
     heldBackTitle(input),
     renderHeldBackIssue({
       input,
       pr: target.pr.number,
       reason: progress.summary,
-      mainNarHash,
+      marker: heldBackMarker(target.main, input),
       failures: progress.failures,
       session,
     })

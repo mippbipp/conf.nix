@@ -117,7 +117,7 @@ export const layer = Layer.effect(
 
       if (host.dryRun) {
         yield* Effect.log(
-          `dry-run: PR body would be:\n${update.body}\n(auto-merge ${update.autoMerge ? "on" : "off"})`
+          `dry-run: PR body would be:\n${update.body}\n(auto-merge ${update.needsReview ? "off" : "on"})`
         );
 
         return;
@@ -140,13 +140,13 @@ export const layer = Layer.effect(
 
       // Auto-merge still waits for every required gate check; squash keeps
       // main to one commit per update.
-      if (update.autoMerge) {
-        yield* gh(["pr", "merge", number, "--auto", "--squash"]);
-      } else {
+      if (update.needsReview) {
         // Fails when auto-merge was never on, which is the state we want.
         yield* gh(["pr", "merge", number, "--disable-auto"]).pipe(
           Effect.catchTag("GitHubError", () => Effect.void)
         );
+      } else {
+        yield* gh(["pr", "merge", number, "--auto", "--squash"]);
       }
     });
 

@@ -77,7 +77,7 @@ The opencode agent pewter's Updater calls when the Build gate is red on the upda
 _Avoid_: bot, auto-fixer
 
 **Held-back input**:
-A flake input whose lock entry the Updater reverted to main's revision for one update PR, at the Flake fixer's request. It has an open issue and is retried by the next week's update.
+A flake input whose lock entry the Updater reverted to main's revision for one update PR, at the Flake fixer's request. It stays held back while the branch has main's whole lock entry for it, including its own inputs. It has an open issue, which closes once main's entry changes, and is retried by the next week's update.
 _Avoid_: pinned input
 
 ## Theming

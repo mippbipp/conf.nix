@@ -1,41 +1,29 @@
 import { Array as Arr, Option, String as Str } from "effect";
 
-import type { InputChange } from "./lock.ts";
+import type { BranchState } from "./branch-state.ts";
 
-export interface HeldBack {
-  readonly input: string;
-  readonly reason: string;
-  readonly issue: Option.Option<string>;
-}
-
-export interface FixerCommit {
-  readonly subject: string;
-  readonly round: string;
-  readonly reviewRequired: boolean;
-}
-
-export interface PrBody {
-  readonly updated: readonly InputChange[];
-  readonly heldBack: readonly HeldBack[];
-  readonly fixerCommits: readonly FixerCommit[];
+/** This run's repair progress, beside what the branch itself records. */
+export interface RunProgress {
   readonly rounds: number;
   readonly maxRounds: number;
   readonly session: Option.Option<string>;
-  readonly needsReview: boolean;
 }
 
 const section = (title: string, lines: readonly string[]) =>
   Arr.isReadonlyArrayNonEmpty(lines) ? [`## ${title}`, "", ...lines, ""] : [];
 
-export const renderPrBody = (body: PrBody): string => {
+export const renderPrBody = (
+  state: BranchState,
+  progress: RunProgress
+): string => {
   // Same revision on both sides means only the input's own inputs moved.
-  const updated = Arr.map(body.updated, (change) =>
+  const updated = Arr.map(state.updated, (change) =>
     change.from === change.to
       ? `- \`${change.name}\` ${change.to} (its inputs changed)`
       : `- \`${change.name}\` ${change.from} → ${change.to}`
   );
 
-  const heldBack = Arr.map(body.heldBack, (input) => {
+  const heldBack = Arr.map(state.heldBack, (input) => {
     const link = Option.match(input.issue, {
       onNone: () => "",
       onSome: (url) => ` (${url})`,
@@ -44,17 +32,17 @@ export const renderPrBody = (body: PrBody): string => {
     return `- \`${input.input}\`: ${input.reason}${link}`;
   });
 
-  const commits = Arr.map(body.fixerCommits, (commit) => {
+  const commits = Arr.map(state.fixerCommits, (commit) => {
     const review = commit.reviewRequired ? ", needs review" : "";
 
     return `- ${commit.subject} (round ${commit.round}${review})`;
   });
 
   const rounds =
-    body.rounds > 0
+    progress.rounds > 0
       ? [
-          `Repair rounds this run: ${body.rounds} of ${body.maxRounds}.`,
-          ...Option.match(body.session, {
+          `Repair rounds this run: ${progress.rounds} of ${progress.maxRounds}.`,
+          ...Option.match(progress.session, {
             onNone: () => [],
             onSome: (session) => [`Session: ${session}`],
           }),
@@ -62,7 +50,7 @@ export const renderPrBody = (body: PrBody): string => {
         ]
       : [];
 
-  const review = body.needsReview
+  const review = state.needsReview
     ? [
         "**Needs review.** The Flake fixer changed more than reverting inputs, so auto-merge is off. Review its commits and merge by hand.",
         "",

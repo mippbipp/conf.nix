@@ -1,6 +1,7 @@
 import {
   Array as Arr,
   Effect,
+  Hash,
   Option,
   Order,
   Predicate,
@@ -125,10 +126,6 @@ export const shortRev = (lock: FlakeLock, name: string): string => {
   );
 };
 
-/** The narHash identifying an input's locked revision. */
-export const narHash = (lock: FlakeLock, name: string): Option.Option<string> =>
-  lockedAttr(lock, name, "narHash");
-
 export interface InputChange {
   readonly name: string;
   readonly from: string;
@@ -141,6 +138,13 @@ export const sameRevision = (
   b: FlakeLock,
   name: string
 ): boolean => identity(a, name) === identity(b, name);
+
+/**
+ * A short digest of a root input's whole lock entry, stable across runs.
+ * Equal entries give equal digests, including for inputs without a narHash.
+ */
+export const entryFingerprint = (lock: FlakeLock, name: string): string =>
+  (Hash.string(identity(lock, name)) >>> 0).toString(16);
 
 /** Root inputs whose locked state differs between two lock files. */
 export const changedInputs = (

@@ -71,7 +71,7 @@ Blocked paths are listed once, in `hosts/pewter/flake-updater/blocked-paths.json
 
 A commit that changes anything besides `flake.lock`, or a lock that is not exactly a reset to main's revisions, needs review: the Updater turns auto-merge off and labels the PR `ready-for-human`. Merge it by hand after reading the commit.
 
-The repair stops and opens or comments on `flake-update: repair failed` when the gate is still red after three rounds, the agent gives up, the server or model is unavailable, a check outside the gate fails, or 11.5 hours pass (the unit's hard limit is 12). A green gate closes that issue. A held-back issue closes itself once main has a newer revision of its input.
+The repair stops and opens or comments on `flake-update: repair failed` when the gate is still red after three rounds, the agent gives up, the server or model is unavailable, a check outside the gate fails, or 11.5 hours pass (the unit's hard limit is 12). A green gate closes that issue. A held-back issue closes itself once main's whole lock entry for its input (the input's node and every node it pulls in) differs from the one recorded when it was held back.
 
 The agent never touches the Updater's checkout or its credentials:
 
