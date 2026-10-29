@@ -27,11 +27,18 @@
     };
   };
 
-  # OpenCode loads a directory in ~/.config/opencode/plugins as one plugin
-  home.file.".config/opencode/plugins/kiro".source = pkgs.runCommand "opencode-kiro" { } ''
-    mkdir $out
-    cp ${./kiro/index.ts} $out/index.ts
-    cp ${./kiro/tui.tsx} $out/tui.tsx
-    cp ${./kiro/rpc.ts} $out/rpc.ts
-  '';
+  # OpenCode loads a directory in ~/.config/opencode/plugins as one plugin.
+  # Only the plugin's own sources go in: the dev config (package.json,
+  # tsconfig.json) could change how OpenCode and Bun load it.
+  home.file.".config/opencode/plugins/kiro".source = lib.fileset.toSource {
+    root = ./kiro;
+    fileset =
+      lib.fileset.difference (lib.fileset.fileFilter (f: f.hasExt "ts" || f.hasExt "tsx") ./kiro)
+        (
+          lib.fileset.unions [
+            (lib.fileset.fileFilter (f: lib.hasSuffix ".test.ts" f.name) ./kiro)
+            (lib.fileset.maybeMissing ./kiro/node_modules)
+          ]
+        );
+  };
 }
