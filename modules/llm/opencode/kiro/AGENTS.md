@@ -23,7 +23,9 @@ For APIs it doesn't cover, search `node_modules/effect/src`.
   answers the sidebar's RPC with),
   `failure.ts` (what OpenCode is told when a request fails) and `kiro.ts`
   (what several modules share: the provider id, the timeouts, the `field`
-  Schema helper and `send`).
+  Schema helper and `send`). `sidebar.ts` is the sidebar's view as plain
+  data (whose credits a session counts, whether the section shows, its
+  lines), so `tui.tsx` only asks, subscribes and draws.
 - `test/plugin.test.ts` tests the server part through `src/index.ts`'s
   `_internal` export; `test/<module>.test.ts` tests a module of `src/`
   through its exports. `test/signin.ts` gives a test file a throwaway HOME
