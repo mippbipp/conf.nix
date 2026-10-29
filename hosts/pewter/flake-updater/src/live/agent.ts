@@ -26,7 +26,7 @@ import { HttpClient, HttpClientRequest } from "effect/http";
 import { Agent, AgentError } from "../agent.ts";
 import type { RepairRequest } from "../agent.ts";
 import { RepairReport } from "../report.ts";
-import { blockedFiles, blockedPrefixes } from "../scope.ts";
+import { blockedEntries, blockedGlobs } from "../scope.ts";
 
 export interface FixerServerConfig {
   readonly url: string;
@@ -46,17 +46,7 @@ export class FixerServer extends Context.Service<
   FixerServerConfig
 >()("flake-updater/live/agent/FixerServer") {}
 
-// The scope list, plus files that would let the agent reconfigure opencode or
-// git.
-const blocked = [
-  ...Arr.map(blockedPrefixes, (prefix) => `${prefix}*`),
-  ...blockedFiles,
-  "*.git/*",
-  "*.opencode/*",
-  "*opencode.json*",
-];
-
-const blockedList = Arr.join([...blockedPrefixes, ...blockedFiles], ", ");
+const blockedList = Arr.join(blockedEntries, ", ");
 
 const shellAllowed = [
   "nix eval *",
@@ -81,8 +71,6 @@ const shellAllowed = [
   "diff *",
   "sort *",
   "uniq *",
-  "sed *",
-  "echo *",
 ];
 
 type Rule = Readonly<{
@@ -116,7 +104,7 @@ const sessionRules = (contextDir: string): readonly Rule[] => [
     effect: "allow",
   })),
   { action: "shell", resource: "*--impure*", effect: "deny" },
-  ...Arr.map(blocked, (resource): Rule => ({
+  ...Arr.map(blockedGlobs, (resource): Rule => ({
     action: "edit",
     resource,
     effect: "deny",

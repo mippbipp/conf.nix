@@ -5,6 +5,7 @@
 { model }:
 let
   provider = builtins.head (builtins.split "/" model);
+  blocked = builtins.fromJSON (builtins.readFile ./blocked-paths.json);
   deny = resource: {
     action = "tool.use";
     inherit resource;
@@ -72,15 +73,10 @@ in
     "shell:nix profile *"
     "shell:nix copy *"
     "shell:nix-shell *"
-    # src/scope.ts holds the same paths.
-    "edit:.github/*"
-    "edit:secrets/*"
-    "edit:.sops.yaml"
-    "edit:checks.nix"
-    "edit:hosts/pewter/flake-updater/*"
-    "edit:*.git/*"
-    "edit:*.opencode/*"
-    "edit:*opencode.json*"
     "read:secrets/*"
-  ];
+  ]
+  # Same globs as blockedGlobs in src/scope.ts.
+  ++ map (prefix: deny "edit:${prefix}*") blocked.prefixes
+  ++ map (file: deny "edit:${file}") blocked.files
+  ++ map (substring: deny "edit:*${substring}*") blocked.substrings;
 }

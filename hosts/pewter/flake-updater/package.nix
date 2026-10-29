@@ -20,6 +20,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     root = ./.;
     fileset = lib.fileset.unions [
       ./package.json
+      ./blocked-paths.json
       ./pnpm-lock.yaml
       ./pnpm-workspace.yaml
       ./tsconfig.json
@@ -70,7 +71,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     rm -rf node_modules
     pnpm install --offline --prod --ignore-scripts --frozen-lockfile
     mkdir -p $out/lib/flake-updater $out/bin
-    cp -r package.json src node_modules $out/lib/flake-updater/
+    cp -r package.json blocked-paths.json src node_modules $out/lib/flake-updater/
     makeWrapper ${lib.getExe nodejs_24} $out/bin/flake-updater \
       --add-flags $out/lib/flake-updater/src/main.ts \
       --prefix PATH : ${

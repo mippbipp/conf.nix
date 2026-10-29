@@ -2,8 +2,8 @@ name: flake-update-scope
 
 # pull_request_target runs main's copy of this file, so a commit on the PR
 # cannot weaken the check that guards it. It never checks out PR code; it only
-# lists the PR's changed files through the API. Keep the path list in sync with
-# hosts/pewter/flake-updater/src/scope.ts.
+# lists the PR's changed files and reads the base branch's
+# hosts/pewter/flake-updater/blocked-paths.json through the API.
 on:
   pull_request_target:
     types: [opened, synchronize, reopened]
@@ -22,9 +22,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
+          list="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/hosts/pewter/flake-updater/blocked-paths.json?ref=$BASE_REF")"
           files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
-          blocked="$(printf '%s\n' "$files" | grep -E '^(\.github/|secrets/|hosts/pewter/flake-updater/)|^(\.sops\.yaml|checks\.nix)$' || true)"
+          blocked="$(printf '%s\n' "$files" | jq -Rr --argjson list "$list" '
+            select(. as $path
+              | any($list.prefixes[]; . as $prefix | $path | startswith($prefix))
+                or any($list.files[]; . == $path)
+                or any($list.substrings[]; . as $substring | $path | contains($substring)))
+          ')"
           if [ -n "$blocked" ]; then
             echo "the flake-update PR may not change:" >&2
             printf '%s\n' "$blocked" >&2

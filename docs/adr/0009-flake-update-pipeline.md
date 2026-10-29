@@ -63,9 +63,11 @@ When the gate is red, each round:
 4. Prompts the agent (round 1 opens a session titled `flake-update #<pr>`; later rounds continue it). The agent fixes configuration that uses renamed or removed upstream options, or lists inputs to hold back. It must evaluate every host's `toplevel.drvPath` and run `nix flake check --no-build` before it finishes; building is left to the gate.
 5. Asks the agent for a JSON report: outcome, held-back inputs, changed files, summary.
 6. Rebuilds `flake.lock` itself from the report: every held-back input is reset to main's node and everything else stays as the update left it. The agent's own lock edits are ignored.
-7. Discards the round, and tells the agent why next round, when it changed nothing, touched a blocked path (`.github/`, `secrets/`, `.sops.yaml`, `checks.nix`, `hosts/pewter/flake-updater/`), or reported files that differ from what it changed.
+7. Discards the round, and tells the agent why next round, when it changed nothing, touched a blocked path, or reported files that differ from what it changed.
 8. Otherwise commits the result on top of the branch as author `flake-fixer`, with `Flake-Fixer-*` trailers recording the round, session, held-back inputs and whether review is needed, then pushes.
 9. Opens or comments on one `flake-update: <input> held back` issue per held-back input, with the failing hosts, the trimmed error, the failing checks and the session.
+
+Blocked paths are listed once, in `hosts/pewter/flake-updater/blocked-paths.json`: `.github/`, `secrets/`, `hosts/pewter/flake-updater/`, `.sops.yaml`, `checks.nix`, and `.git/`, `.opencode/` or `opencode.json` anywhere in a path. The Updater, the opencode policies and the `flake-update-scope` workflow all read that file.
 
 A commit that changes anything besides `flake.lock`, or a lock that is not exactly a reset to main's revisions, needs review: the Updater turns auto-merge off and labels the PR `ready-for-human`. Merge it by hand after reading the commit.
 
