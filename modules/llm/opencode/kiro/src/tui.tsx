@@ -106,11 +106,6 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
         <text fg={theme().text.muted}>
           {amount(a.used)} / {amount(cap)} {unit}
         </text>
-        <Show when={a.overage && a.overage.charges > 0 ? a.overage : undefined}>
-          {(o: Accessor<NonNullable<Allowance["overage"]>>) => (
-            <text fg={theme().text.feedback.warning.base}>{money(o().charges, o().currency)}</text>
-          )}
-        </Show>
         <Show when={a.trial}>
           {(t: Accessor<NonNullable<Allowance["trial"]>>) => (
             <text fg={theme().text.muted}>
