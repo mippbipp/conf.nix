@@ -21,7 +21,7 @@
     ../../modules/system/config/syncthing.nix
     ./attic.nix
     ./karakeep.nix
-    ./flake-updater.nix
+    ./flake-updater
   ];
 
   security.sudo.wheelNeedsPassword = false;

@@ -1,0 +1,6 @@
+{
+  "$comment": "Paths the Flake fixer may never change, relative to the repository root. A path is blocked when it starts with one of prefixes, equals one of files, or contains one of substrings anywhere. Read by src/scope.ts, opencode-config.nix and .github/workflows/flake-update-scope.yml.",
+  "prefixes": [".github/", "secrets/", "hosts/pewter/flake-updater/"],
+  "files": [".sops.yaml", "checks.nix"],
+  "substrings": [".git/", ".opencode/", "opencode.json"]
+}

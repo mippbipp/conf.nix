@@ -1,0 +1,42 @@
+name: flake-update-scope
+
+# pull_request_target runs main's copy of this file, so a commit on the PR
+# cannot weaken the check that guards it. It never checks out PR code; it only
+# lists the PR's changed files and reads the base branch's
+# hosts/pewter/flake-updater/blocked-paths.json through the API.
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  scope:
+    name: flake-update-scope
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject blocked paths on the flake-update PR
+        if: github.event.pull_request.head.ref == 'flake-update' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+        run: |
+          list="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/hosts/pewter/flake-updater/blocked-paths.json?ref=$BASE_REF")"
+          # A rename lists its old path too, so moving a file out of a blocked
+          # path counts as touching it.
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
+          blocked="$(printf '%s\n' "$files" | jq -Rr --argjson list "$list" '
+            select(. as $path
+              | any($list.prefixes[]; . as $prefix | $path | startswith($prefix))
+                or any($list.files[]; . == $path)
+                or any($list.substrings[]; . as $substring | $path | contains($substring)))
+          ')"
+          if [ -n "$blocked" ]; then
+            echo "the flake-update PR may not change:" >&2
+            printf '%s\n' "$blocked" >&2
+            exit 1
+          fi
+          echo "no blocked paths changed"

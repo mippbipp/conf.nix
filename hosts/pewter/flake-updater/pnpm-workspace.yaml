@@ -1,0 +1,9 @@
+# Written out even though it matches pnpm's default: an explicit value makes
+# pnpm fail resolution instead of silently installing a too-new version.
+minimumReleaseAge: 1440
+
+# @opencode/schema and @opencode/protocol 2.1.4 pin effect 4.0.1 as a direct
+# dependency. Keep one effect copy so the client's decoded schema values and
+# this project's runtime come from the same module instances.
+overrides:
+  effect: 4.0.6

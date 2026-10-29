@@ -72,6 +72,14 @@ _Avoid_: build cache (ambiguous)
 The required CI check that builds every host's toplevel before main can merge. It enforces "main is always buildable".
 _Avoid_: CI (generic)
 
+**Flake fixer**:
+The opencode agent pewter's Updater calls when the Build gate is red on the update PR. It fixes our configuration or asks for inputs to be held back at main's revision; the Updater commits, pushes and reverts lock entries itself. See ADR 0009.
+_Avoid_: bot, auto-fixer
+
+**Held-back input**:
+A flake input whose lock entry the Updater reverted to main's revision for one update PR, at the Flake fixer's request. It stays held back while the branch has main's whole lock entry for it, including its own inputs. It has an open issue, which closes once main's entry changes, and is retried by the next week's update.
+_Avoid_: pinned input
+
 ## Theming
 
 **Stylix**:

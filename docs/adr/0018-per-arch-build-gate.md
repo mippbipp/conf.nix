@@ -19,7 +19,7 @@ failure accumulator so one broken host does not mask another (the old
 (Attic dedups shared paths server-side). Per-host failure attribution lives
 in grouped `build <host>` log sections rather than in separate check names.
 
-Operational details live in `docs/agents/flake-update-pipeline.md`; this ADR
+Operational details live in `docs/adr/0009-flake-update-pipeline.md`; this ADR
 records the rationale for the per-arch shape.
 
 Why this shape: the duplicate-work unit is the derivation, and the sharing

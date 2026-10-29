@@ -1,0 +1,33 @@
+{
+  "name": "flake-updater",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "effect-tsgo patch --oxlint",
+    "start": "node src/main.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint",
+    "format": "oxfmt --check",
+    "format:fix": "oxfmt",
+    "ox": "pnpm run typecheck && pnpm run lint && pnpm run format"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.6",
+    "@opencode/client": "2.1.4",
+    "effect": "4.0.6"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "^0.57.0",
+    "@effect/vitest": "4.0.6",
+    "@oxlint/plugins": "^1.89.0",
+    "@types/node": "^26.6.5",
+    "oxfmt": "^0.74.0",
+    "oxlint": "^1.89.0",
+    "oxlint-tsgolint": "^7.0.2005",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.2"
+  },
+  "packageManager": "pnpm@12.3.4"
+}
