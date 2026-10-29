@@ -87,7 +87,7 @@ const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
     password,
     agent: options.agentName,
     model: options.model,
-    workDir: options.workDir,
+    workspace: options.workDir,
     contextDir: options.contextDir,
     roundTimeout: Duration.hours(1),
   });

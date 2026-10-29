@@ -33,9 +33,9 @@ export const renderPrBody = (
   });
 
   const commits = Arr.map(state.fixerCommits, (commit) => {
-    const review = commit.reviewRequired ? ", needs review" : "";
+    const review = commit.trailers.reviewRequired ? ", needs review" : "";
 
-    return `- ${commit.subject} (round ${commit.round}${review})`;
+    return `- ${commit.subject} (round ${commit.trailers.round}${review})`;
   });
 
   const rounds =

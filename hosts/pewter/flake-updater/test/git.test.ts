@@ -557,6 +557,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         );
 
         assert.deepStrictEqual(imported.files, []);
+        assert.deepStrictEqual(imported.gitlinks, []);
         assert.strictEqual(
           imported.tree,
           yield* remote.git("checkout", ["rev-parse", "HEAD^{tree}"])
@@ -603,6 +604,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         // A nested repository becomes a gitlink, never its .git contents.
         assert.deepStrictEqual(imported.files, ["vendor/evil"]);
+        assert.deepStrictEqual(imported.gitlinks, ["vendor/evil"]);
         assert.include(
           yield* remote.git("checkout", [
             "ls-tree",

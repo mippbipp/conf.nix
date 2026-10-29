@@ -295,11 +295,17 @@ export const layer = Layer.effect(
 
       const tree = Str.trim(yield* git(["write-tree"], index));
 
-      const files = lines(
-        yield* git(["diff-tree", "-r", "--name-only", "HEAD", tree])
+      // `:<old mode> <new mode> <old sha> <new sha> <status>\t<path>`
+      const raw = lines(yield* git(["diff-tree", "-r", "--raw", "HEAD", tree]));
+      const files = Arr.map(raw, (line) => Str.split(line, "\t")[1] ?? "");
+
+      const changedGitlinks = Arr.flatMap(raw, (line) =>
+        Str.split(line, " ")[1] === "160000"
+          ? [Str.split(line, "\t")[1] ?? ""]
+          : []
       );
 
-      return { tree, files };
+      return { tree, files, gitlinks: changedGitlinks };
     });
 
     const commitTree = Effect.fn("Git.commitTree")(function* (

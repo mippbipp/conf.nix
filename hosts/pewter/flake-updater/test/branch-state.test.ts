@@ -210,18 +210,16 @@ describe("branch state", () => {
             issue: Option.some(issue.url),
           },
         ]);
-        assert.deepStrictEqual(state.fixerCommits, [
-          {
-            subject: "drop removed boot.initrd options",
-            round: "1",
-            reviewRequired: true,
-          },
-          {
-            subject: "nixpkgs breaks every host",
-            round: "1",
-            reviewRequired: false,
-          },
-        ]);
+        assert.deepStrictEqual(
+          Arr.map(state.fixerCommits, (commit) => [
+            commit.subject,
+            commit.trailers.reviewRequired,
+          ]),
+          [
+            ["drop removed boot.initrd options", true],
+            ["nixpkgs breaks every host", false],
+          ]
+        );
       })
   );
 });

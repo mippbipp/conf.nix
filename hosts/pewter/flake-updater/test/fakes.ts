@@ -130,6 +130,14 @@ const diffPaths = (a: Tree, b: Tree) => {
   return Arr.sort(changed, Str.Order);
 };
 
+/** Workspace content standing for a nested repository at a commit. */
+export const gitlinkPrefix = "gitlink:";
+
+const gitlinkPaths = (a: Tree, b: Tree) =>
+  Arr.filter(diffPaths(a, b), (path) =>
+    Str.startsWith(gitlinkPrefix)(b.get(path) ?? "")
+  );
+
 const gitLayer = (world: World) =>
   Layer.succeed(Git)({
     prepare: Effect.void,
@@ -180,7 +188,11 @@ const gitLayer = (world: World) =>
         const id = world.next("t");
         world.trees.set(id, tree);
 
-        return { tree: id, files: diffPaths(world.head, tree) };
+        return {
+          tree: id,
+          files: diffPaths(world.head, tree),
+          gitlinks: gitlinkPaths(world.head, tree),
+        };
       }),
     commitTree: (tree, message) =>
       Effect.sync(() => {

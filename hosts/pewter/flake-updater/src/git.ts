@@ -1,5 +1,6 @@
-import type { Effect } from "effect";
-import { Context, Schema } from "effect";
+import { Context, Effect, Schema } from "effect";
+
+import { parseLock } from "./lock.ts";
 
 export class GitError extends Schema.TaggedError<
   GitError,
@@ -27,6 +28,8 @@ export interface ImportedTree {
   readonly tree: string;
   /** Paths that differ from HEAD. */
   readonly files: readonly string[];
+  /** Of `files`, those that are gitlinks added or moved by the workspace. */
+  readonly gitlinks: readonly string[];
 }
 
 export const mainRef = "origin/main";
@@ -66,3 +69,12 @@ export class Git extends Context.Service<
     ) => Effect.Effect<string, GitError>;
   }
 >()("flake-updater/git") {}
+
+/** flake.lock at `rev`, parsed. */
+export const readFlakeLock = Effect.fn("Git.readFlakeLock")(function* (
+  rev: string
+) {
+  const git = yield* Git;
+
+  return yield* parseLock(yield* git.readLock(rev));
+});

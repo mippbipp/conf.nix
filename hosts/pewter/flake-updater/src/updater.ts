@@ -8,8 +8,10 @@ import {
   heldBackTitle,
   landedIssues,
 } from "./branch-state.ts";
+import { readFailures } from "./gate-log.ts";
+import type { CheckFailure } from "./gate-log.ts";
 import { Gate } from "./gate.ts";
-import { Git, mainRef } from "./git.ts";
+import { Git, mainRef, readFlakeLock } from "./git.ts";
 import { GitHub } from "./github.ts";
 import type { PullRequest } from "./github.ts";
 import {
@@ -17,16 +19,12 @@ import {
   renderRepairFailedIssue,
   repairFailedTitle,
 } from "./issues.ts";
-import { parseLock, shortRev } from "./lock.ts";
+import { shortRev } from "./lock.ts";
 import type { FlakeLock } from "./lock.ts";
 import { Nix } from "./nix.ts";
 import { renderPrBody } from "./pr-body.ts";
-import { readFailures, repairRound, roundOutcome } from "./repair-round.ts";
-import type {
-  CheckFailure,
-  CommittedRound,
-  RoundOutcome,
-} from "./repair-round.ts";
+import { repairRound, roundOutcome } from "./repair-round.ts";
+import type { CommittedRound, RoundOutcome } from "./repair-round.ts";
 import { Settings } from "./settings.ts";
 import type { UpdaterSettings } from "./settings.ts";
 
@@ -43,12 +41,6 @@ const noProgress: Progress = {
   failures: [],
 };
 
-const readLock = Effect.fn("Updater.readLock")(function* (rev: string) {
-  const git = yield* Git;
-
-  return yield* parseLock(yield* git.readLock(rev));
-});
-
 const sessionLink = (settings: UpdaterSettings, session: string) =>
   `\`${session}\` on ${settings.sessionUrl}`;
 
@@ -59,24 +51,29 @@ const readBranch = Effect.fn("Updater.readBranch")(function* (main: FlakeLock) {
 
   return deriveBranchState({
     commits: yield* git.branchCommits,
-    head: yield* readLock("HEAD"),
+    head: yield* readFlakeLock("HEAD"),
     main,
     issues: yield* github.openIssues,
   });
 });
+
+/** The PR under repair and main's lock, fixed for the whole run. */
+interface Target {
+  readonly pr: PullRequest;
+  readonly main: FlakeLock;
+}
 
 /**
  * Regenerates the PR body and merge settings from the branch itself, so a
  * run that died halfway leaves nothing the next run cannot rebuild.
  */
 const syncPr = Effect.fn("Updater.syncPr")(function* (
-  pr: PullRequest,
-  main: FlakeLock,
+  target: Target,
   progress: Progress
 ) {
   const github = yield* GitHub;
   const settings = yield* Settings;
-  const state = yield* readBranch(main);
+  const state = yield* readBranch(target.main);
 
   const body = renderPrBody(state, {
     rounds: progress.rounds,
@@ -84,7 +81,10 @@ const syncPr = Effect.fn("Updater.syncPr")(function* (
     session: Option.map(progress.session, (id) => sessionLink(settings, id)),
   });
 
-  yield* github.updatePr(pr, { body, needsReview: state.needsReview });
+  yield* github.updatePr(target.pr, {
+    body,
+    needsReview: state.needsReview,
+  });
 });
 
 const findIssue = Effect.fn("Updater.findIssue")(function* (title: string) {
@@ -125,12 +125,6 @@ const closeLandedIssues = Effect.fn("Updater.closeLandedIssues")(function* (
   }
 });
 
-/** The PR under repair and main's lock, fixed for the whole run. */
-interface Target {
-  readonly pr: PullRequest;
-  readonly main: FlakeLock;
-}
-
 const reportRepairFailure = Effect.fn("Updater.reportRepairFailure")(function* (
   target: Target,
   progress: Progress,
@@ -150,7 +144,7 @@ const reportRepairFailure = Effect.fn("Updater.reportRepairFailure")(function* (
       session: Option.map(progress.session, (id) => sessionLink(settings, id)),
     })
   );
-  yield* syncPr(target.pr, target.main, progress);
+  yield* syncPr(target, progress);
 });
 
 const closeRepairIssue = Effect.fn("Updater.closeRepairIssue")(function* (
@@ -239,15 +233,16 @@ const settle = Effect.fn("Updater.settle")(function* (
   }));
 
   return yield* roundOutcome.$match(outcome, {
-    AgentFailed: ({ error }) =>
-      Effect.succeed(error.pipe(agentFailure, stopWith)),
-    GaveUp: ({ summary }) =>
-      Effect.succeed(stopWith(`the Flake fixer gave up: ${summary}`)),
-    Discarded: ({ reason }) => Effect.succeed(carryOn(Option.some(reason))),
+    AgentFailed: (failed) =>
+      Effect.succeed(failed.error.pipe(agentFailure, stopWith)),
+    GaveUp: (gaveUp) =>
+      Effect.succeed(stopWith(`the Flake fixer gave up: ${gaveUp.summary}`)),
+    Discarded: (discarded) =>
+      Effect.succeed(carryOn(Option.some(discarded.reason))),
     Committed: (committed) =>
       Effect.gen(function* () {
         yield* reportHeldBack(target, progress, committed);
-        yield* syncPr(target.pr, target.main, progress);
+        yield* syncPr(target, progress);
 
         return carryOn(Option.none());
       }),
@@ -349,7 +344,7 @@ export const run = Effect.fn("Updater.run")(function* () {
     Match.exhaustive
   );
 
-  const main = yield* readLock(mainRef);
+  const main = yield* readFlakeLock(mainRef);
 
   yield* closeLandedIssues(main);
   yield* nix.update;
@@ -368,7 +363,9 @@ export const run = Effect.fn("Updater.run")(function* () {
     onSome: Effect.succeed,
   });
 
-  yield* syncPr(pr, main, noProgress);
+  const target = { pr, main };
+
+  yield* syncPr(target, noProgress);
 
   // Repair rounds run only when the Flake fixer is configured.
   const agent = yield* Effect.serviceOption(Agent);
@@ -377,7 +374,6 @@ export const run = Effect.fn("Updater.run")(function* () {
     return;
   }
 
-  const target = { pr, main };
   const state = yield* Ref.make(noProgress);
 
   yield* repair(target, state).pipe(

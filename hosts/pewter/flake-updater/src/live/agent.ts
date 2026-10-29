@@ -35,7 +35,7 @@ export interface FixerServerConfig {
   /** `provider/model`, pinned on every session. */
   readonly model: string;
   /** The Flake fixer's workspace, outside the Updater's checkout. */
-  readonly workDir: string;
+  readonly workspace: string;
   /** Read-only material for the agent, outside the workspace. */
   readonly contextDir: string;
   readonly roundTimeout: Duration.Duration;
@@ -69,8 +69,15 @@ const shellAllowed = [
   "rg *",
   "jq *",
   "diff *",
-  "sort *",
-  "uniq *",
+];
+
+// Flags and redirection that write files from otherwise read-only commands.
+const shellWrites = [
+  "*--impure*",
+  "*>*",
+  "*--pre*",
+  "*--write-to*",
+  "*--output-lock-file*",
 ];
 
 type Rule = Readonly<{
@@ -103,7 +110,11 @@ const sessionRules = (contextDir: string): readonly Rule[] => [
     resource,
     effect: "allow",
   })),
-  { action: "shell", resource: "*--impure*", effect: "deny" },
+  ...Arr.map(shellWrites, (resource): Rule => ({
+    action: "shell",
+    resource,
+    effect: "deny",
+  })),
   ...Arr.map(blockedGlobs, (resource): Rule => ({
     action: "edit",
     resource,
@@ -295,7 +306,7 @@ export const layer = Layer.effect(
               title: request.title,
               agent: AgentSchema.ID.make(config.agent),
               model: Model.Ref.parse(config.model),
-              location: { directory: AbsolutePath.make(config.workDir) },
+              location: { directory: AbsolutePath.make(config.workspace) },
               permissions: [...sessionRules(config.contextDir)],
             })
             .pipe(
@@ -374,7 +385,7 @@ export const layer = Layer.effect(
       const sessionID = yield* openSession(request);
 
       const text = Option.isNone(request.session)
-        ? firstRound(request, mainLock, config.workDir)
+        ? firstRound(request, mainLock, config.workspace)
         : laterRound(request);
 
       yield* Effect.log(`Flake fixer round ${request.round} in ${sessionID}`);
@@ -392,6 +403,6 @@ export const layer = Layer.effect(
       return { session: sessionID, report };
     });
 
-    return Agent.of({ workspace: config.workDir, repair });
+    return Agent.of({ workspace: config.workspace, repair });
   })
 );

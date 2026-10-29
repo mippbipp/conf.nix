@@ -1,5 +1,7 @@
 import { Array as Arr, Option, Order, String as Str } from "effect";
 
+import type { FailedCheck } from "./gate.ts";
+
 /**
  * Cuts a GitHub Actions `--log-failed` dump down to the Nix error blocks, so a
  * failing round fits the agent's context. Lines look like
@@ -137,3 +139,42 @@ export const trimGateLog = (log: string): FailureExcerpt => {
     hosts: Arr.sort([...hosts], Order.String),
   };
 };
+
+export interface CheckFailure {
+  readonly check: FailedCheck;
+  readonly excerpt: FailureExcerpt;
+}
+
+/** Failing checks as the agent and issues see them. */
+export const renderFailures = (failures: readonly CheckFailure[]): string =>
+  Arr.join(
+    Arr.map(failures, ({ check, excerpt }) => {
+      const text =
+        excerpt.text === ""
+          ? "(no Nix error block found; read the job log)"
+          : excerpt.text;
+
+      return `## ${check.name}\n${check.url}\n\n${text}`;
+    }),
+    "\n\n"
+  );
+
+/** The Build gate's own jobs; any other failing check is out of reach. */
+const repairableCheck = /^(?:build|checks) /u;
+
+export interface GateFailures {
+  readonly failures: readonly CheckFailure[];
+  /** Names of failing checks outside the Build gate. */
+  readonly outsideGate: readonly string[];
+}
+
+/** A red verdict as a repair round sees it: trimmed to the Nix errors. */
+export const readFailures = (checks: readonly FailedCheck[]): GateFailures => ({
+  failures: Arr.map(checks, (check) => ({
+    check,
+    excerpt: trimGateLog(check.log),
+  })),
+  outsideGate: Arr.flatMap(checks, (check) =>
+    repairableCheck.test(check.name) ? [] : [check.name]
+  ),
+});

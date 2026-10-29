@@ -3,58 +3,18 @@ import { Array as Arr, Data, Effect, Option, Order, Result } from "effect";
 import { Agent } from "./agent.ts";
 import type { AgentError, RepairReport, RepairResult } from "./agent.ts";
 import { formatFixerCommit } from "./branch-state.ts";
-import { trimGateLog } from "./gate-log.ts";
-import type { FailureExcerpt } from "./gate-log.ts";
-import type { FailedCheck } from "./gate.ts";
-import { Git } from "./git.ts";
+import { renderFailures } from "./gate-log.ts";
+import type { CheckFailure } from "./gate-log.ts";
+import { Git, readFlakeLock } from "./git.ts";
+import type { ImportedTree } from "./git.ts";
 import {
   changedInputs,
   classifyLockChange,
   formatLock,
-  parseLock,
   revertInputs,
 } from "./lock.ts";
 import type { FlakeLock } from "./lock.ts";
 import { isBlocked } from "./scope.ts";
-
-export interface CheckFailure {
-  readonly check: FailedCheck;
-  readonly excerpt: FailureExcerpt;
-}
-
-/** Failing checks as the agent and issues see them. */
-export const renderFailures = (failures: readonly CheckFailure[]): string =>
-  Arr.join(
-    Arr.map(failures, ({ check, excerpt }) => {
-      const text =
-        excerpt.text === ""
-          ? "(no Nix error block found; read the job log)"
-          : excerpt.text;
-
-      return `## ${check.name}\n${check.url}\n\n${text}`;
-    }),
-    "\n\n"
-  );
-
-/** The Build gate's own jobs; any other failing check is out of reach. */
-const repairableCheck = /^(?:build|checks) /u;
-
-export interface GateFailures {
-  readonly failures: readonly CheckFailure[];
-  /** Names of failing checks outside the Build gate. */
-  readonly outsideGate: readonly string[];
-}
-
-/** A red verdict as a repair round sees it: trimmed to the Nix errors. */
-export const readFailures = (checks: readonly FailedCheck[]): GateFailures => ({
-  failures: Arr.map(checks, (check) => ({
-    check,
-    excerpt: trimGateLog(check.log),
-  })),
-  outsideGate: Arr.flatMap(checks, (check) =>
-    repairableCheck.test(check.name) ? [] : [check.name]
-  ),
-});
 
 export interface RoundRequest {
   readonly pr: number;
@@ -87,12 +47,6 @@ export const roundOutcome = Data.taggedEnum<RoundOutcome>();
 
 export type CommittedRound = Data.TaggedEnum.Value<RoundOutcome, "Committed">;
 
-const readLock = Effect.fn("RepairRound.readLock")(function* (rev: string) {
-  const git = yield* Git;
-
-  return yield* parseLock(yield* git.readLock(rev));
-});
-
 const sorted = (paths: readonly string[]) =>
   Arr.join(Arr.sort(paths, Order.String), ", ");
 
@@ -104,9 +58,11 @@ const withoutLock = (paths: readonly string[]) =>
  * never committed; the agent hears the reason in the next round.
  */
 const rejection = (
-  files: readonly string[],
+  imported: ImportedTree,
   report: RepairReport
 ): Option.Option<string> => {
+  const { files } = imported;
+
   if (Arr.isReadonlyArrayEmpty(files)) {
     return Option.some(
       "The round changed no files and requested no reverts that changed flake.lock."
@@ -118,6 +74,14 @@ const rejection = (
   if (Arr.isReadonlyArrayNonEmpty(blocked)) {
     return Option.some(
       `The round changed paths the Flake fixer may not touch (${sorted(blocked)}), so it was discarded.`
+    );
+  }
+
+  // A nested repository imports as a gitlink pinning any commit, which no
+  // blocked path or report check can vet.
+  if (Arr.isReadonlyArrayNonEmpty(imported.gitlinks)) {
+    return Option.some(
+      `The round added or moved submodule commits (${sorted(imported.gitlinks)}), so it was discarded. Do not create git repositories in the workspace.`
     );
   }
 
@@ -156,7 +120,7 @@ const commitRound = Effect.fn("RepairRound.commitRound")(function* (
   const { report, session } = repaired;
   const lock = revertInputs(before, request.main, report.revertedInputs);
   const imported = yield* git.importTree(agent.workspace, formatLock(lock));
-  const rejected = rejection(imported.files, report);
+  const rejected = rejection(imported, report);
 
   if (Option.isSome(rejected)) {
     yield* Effect.logWarning(rejected.value);
@@ -200,7 +164,7 @@ export const repairRound = Effect.fn("RepairRound.run")(function* (
 ) {
   const agent = yield* Agent;
   const git = yield* Git;
-  const before = yield* readLock("HEAD");
+  const before = yield* readFlakeLock("HEAD");
 
   yield* git.exportTree(agent.workspace);
 

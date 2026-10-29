@@ -123,12 +123,6 @@ export interface HeldBack {
   readonly issue: Option.Option<string>;
 }
 
-export interface FixerCommit {
-  readonly subject: string;
-  readonly round: string;
-  readonly reviewRequired: boolean;
-}
-
 /** A held-back issue whose input main has moved past since it was filed. */
 export interface LandedIssue {
   readonly issue: Issue;
@@ -138,7 +132,7 @@ export interface LandedIssue {
 export interface BranchState {
   readonly updated: readonly InputChange[];
   readonly heldBack: readonly HeldBack[];
-  readonly fixerCommits: readonly FixerCommit[];
+  readonly fixerCommits: readonly FixerCommitMessage[];
   /** Some Flake fixer commit needs human review, so auto-merge is off. */
   readonly needsReview: boolean;
   readonly landed: readonly LandedIssue[];
@@ -203,11 +197,7 @@ export const deriveBranchState = (branch: Branch): BranchState => {
   return {
     updated: changedInputs(branch.main, branch.head),
     heldBack: heldBackInputs(branch, fixerCommits),
-    fixerCommits: Arr.map(fixerCommits, (commit) => ({
-      subject: commit.subject,
-      round: commit.trailers.round,
-      reviewRequired: commit.trailers.reviewRequired,
-    })),
+    fixerCommits,
     needsReview: Arr.some(
       fixerCommits,
       (commit) => commit.trailers.reviewRequired

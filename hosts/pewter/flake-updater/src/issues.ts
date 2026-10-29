@@ -1,7 +1,7 @@
 import { Array as Arr, Option, String as Str } from "effect";
 
-import { renderFailures } from "./repair-round.ts";
-import type { CheckFailure } from "./repair-round.ts";
+import { renderFailures } from "./gate-log.ts";
+import type { CheckFailure } from "./gate-log.ts";
 
 export const repairFailedTitle = "flake-update: repair failed";
 

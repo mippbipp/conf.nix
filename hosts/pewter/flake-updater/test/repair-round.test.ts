@@ -3,12 +3,9 @@ import { Effect, Option } from "effect";
 
 import { AgentError } from "../src/agent.ts";
 import { parseFixerCommit } from "../src/branch-state.ts";
+import { readFailures } from "../src/gate-log.ts";
 import { FlakeLock, formatLock, parseLock, shortRev } from "../src/lock.ts";
-import {
-  readFailures,
-  repairRound,
-  roundOutcome,
-} from "../src/repair-round.ts";
+import { repairRound, roundOutcome } from "../src/repair-round.ts";
 import type { RoundOutcome } from "../src/repair-round.ts";
 import {
   edits,
@@ -16,6 +13,7 @@ import {
   fixerLayer,
   lockAt,
   fixerWorkspace,
+  gitlinkPrefix,
   World,
 } from "./fakes.ts";
 import { gate232 } from "./fixtures/gate-232.ts";
@@ -158,6 +156,22 @@ describe("repair round", () => {
         assert.lengthOf(world.commits, 1);
         assert.deepStrictEqual(world.pushes, []);
       }
+    })
+  );
+
+  it.effect("discards a round that adds or moves a gitlink", () =>
+    Effect.gen(function* () {
+      const world = updated();
+      // The fake checkout treats this content prefix as a gitlink's commit.
+      world.agent.push(edits({ "vendor/evil": `${gitlinkPrefix}1234567` }));
+
+      const outcome = yield* roundIn(world).pipe(
+        Effect.flatMap(expectOutcome("Discarded"))
+      );
+
+      assert.include(outcome.reason, "vendor/evil");
+      assert.lengthOf(world.commits, 1);
+      assert.deepStrictEqual(world.pushes, []);
     })
   );
 
