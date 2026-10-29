@@ -145,6 +145,17 @@ describe("branch state", () => {
     })
   );
 
+  it.effect("keeps the held-back marker stable across runs", () =>
+    Effect.sync(() => {
+      // Issue bodies outlive this code: a changed digest closes every open
+      // held-back issue on the next run.
+      assert.strictEqual(
+        heldBackMarker(bareLock("aaaaaaa"), "tool"),
+        "<!-- flake-update main-entry=b32bec51 -->"
+      );
+    })
+  );
+
   it.effect("closes the held-back issue of an input without a narHash", () =>
     Effect.sync(() => {
       const issues = [heldBackIssue(bareLock("aaaaaaa"), "tool")];

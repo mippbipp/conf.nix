@@ -6,6 +6,7 @@ import {
   deriveBranchState,
   heldBackMarker,
   heldBackTitle,
+  landedIssues,
 } from "./branch-state.ts";
 import { Gate } from "./gate.ts";
 import { Git, mainRef } from "./git.ts";
@@ -114,9 +115,9 @@ const closeLandedIssues = Effect.fn("Updater.closeLandedIssues")(function* (
   main: FlakeLock
 ) {
   const github = yield* GitHub;
-  const state = yield* readBranch(main);
+  const landed = landedIssues(main, yield* github.openIssues);
 
-  for (const { issue, input } of state.landed) {
+  for (const { issue, input } of landed) {
     yield* github.closeIssue(
       issue,
       `main now has \`${input}\` at ${shortRev(main, input)}, so the update landed.`

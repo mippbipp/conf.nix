@@ -155,6 +155,13 @@ const landedIssue = (main: FlakeLock, issue: Issue) => {
     : [{ issue, input }];
 };
 
+/** Held-back issues whose input main has moved past since they were filed. */
+export const landedIssues = (
+  main: FlakeLock,
+  issues: readonly Issue[]
+): readonly LandedIssue[] =>
+  Arr.flatMap(issues, (issue) => landedIssue(main, issue));
+
 // An input reverted in an earlier round stays held back only while the
 // branch still has main's whole lock entry for it; `nix flake update`
 // retries it every run.
@@ -205,8 +212,6 @@ export const deriveBranchState = (branch: Branch): BranchState => {
       fixerCommits,
       (commit) => commit.trailers.reviewRequired
     ),
-    landed: Arr.flatMap(branch.issues, (issue) =>
-      landedIssue(branch.main, issue)
-    ),
+    landed: landedIssues(branch.main, branch.issues),
   };
 };

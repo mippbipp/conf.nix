@@ -1,7 +1,6 @@
 import {
   Array as Arr,
   Effect,
-  Hash,
   Option,
   Order,
   Predicate,
@@ -139,12 +138,30 @@ export const sameRevision = (
   name: string
 ): boolean => identity(a, name) === identity(b, name);
 
+const fnvOffset = 2_166_136_261;
+
+const fnvPrime = 16_777_619;
+
+// 32-bit FNV-1a, written out so held-back markers already in issue bodies
+// keep matching across dependency upgrades.
+const fnv1a = (text: string): number => {
+  let hash = fnvOffset;
+
+  for (const char of text) {
+    const point = Option.getOrElse(Str.codePointAt(0)(char), () => 0);
+
+    hash = Math.imul(hash ^ point, fnvPrime);
+  }
+
+  return hash >>> 0;
+};
+
 /**
  * A short digest of a root input's whole lock entry, stable across runs.
  * Equal entries give equal digests, including for inputs without a narHash.
  */
 export const entryFingerprint = (lock: FlakeLock, name: string): string =>
-  (Hash.string(identity(lock, name)) >>> 0).toString(16);
+  fnv1a(identity(lock, name)).toString(16);
 
 /** Root inputs whose locked state differs between two lock files. */
 export const changedInputs = (

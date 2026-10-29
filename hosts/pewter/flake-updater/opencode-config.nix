@@ -75,7 +75,7 @@ in
     "shell:nix-shell *"
     "read:secrets/*"
   ]
-  # Same globs as blockedGlobs in src/scope.ts.
+  # blocked-paths.json, matched like isBlocked in src/scope.ts.
   ++ map (prefix: deny "edit:${prefix}*") blocked.prefixes
   ++ map (file: deny "edit:${file}") blocked.files
   ++ map (substring: deny "edit:*${substring}*") blocked.substrings;
