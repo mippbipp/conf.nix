@@ -23,9 +23,8 @@ import {
 } from "effect";
 import { HttpClient, HttpClientRequest } from "effect/http";
 
-import { Agent, AgentError } from "../agent.ts";
+import { Agent, AgentError, RepairReport } from "../agent.ts";
 import type { RepairRequest } from "../agent.ts";
-import { RepairReport } from "../report.ts";
 import { blockedEntries, blockedGlobs } from "../scope.ts";
 
 export interface FixerServerConfig {
@@ -35,6 +34,7 @@ export interface FixerServerConfig {
   readonly agent: string;
   /** `provider/model`, pinned on every session. */
   readonly model: string;
+  /** The Flake fixer's workspace, outside the Updater's checkout. */
   readonly workDir: string;
   /** Read-only material for the agent, outside the workspace. */
   readonly contextDir: string;
@@ -118,13 +118,13 @@ const sessionRules = (contextDir: string): readonly Rule[] => [
 const firstRound = (
   request: RepairRequest,
   mainLock: string,
-  workDir: string
+  workspace: string
 ) =>
   Arr.join(
     [
       `PR #${request.pr}: the weekly flake update fails the Build gate. Make the gate pass.`,
       "",
-      `Your workspace, ${workDir}, is a copy of the PR branch. Edit files there. The Updater copies your changes back, commits them, and pushes. Nothing outside the workspace is kept.`,
+      `Your workspace, ${workspace}, is a copy of the PR branch. Edit files there. The Updater copies your changes back, commits them, and pushes. Nothing outside the workspace is kept.`,
       "",
       "Inputs this update changed (main → branch):",
       request.changes,
@@ -392,6 +392,6 @@ export const layer = Layer.effect(
       return { session: sessionID, report };
     });
 
-    return Agent.of({ repair });
+    return Agent.of({ workspace: config.workDir, repair });
   })
 );

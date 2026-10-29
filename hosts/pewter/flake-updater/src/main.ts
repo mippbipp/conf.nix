@@ -10,7 +10,6 @@ import {
 import { Argument, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
-import { Agent, AgentError } from "./agent.ts";
 import { Shell } from "./command.ts";
 import * as AgentLive from "./live/agent.ts";
 import * as GateLive from "./live/gate.ts";
@@ -76,19 +75,9 @@ const readSecret = Effect.fn("readSecret")(function* (file: string) {
   return Redacted.make(Str.trim(yield* fs.readFileString(file)));
 });
 
-const disabledAgent = Layer.succeed(Agent)({
-  repair: () =>
-    Effect.fail(
-      AgentError.make({
-        reason: "unavailable",
-        message: "the Flake fixer is disabled",
-      })
-    ),
-});
-
 const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
   if (!options.agent) {
-    return disabledAgent;
+    return Layer.empty;
   }
 
   const password = yield* readSecret(options.agentPasswordFile);
@@ -123,10 +112,8 @@ const update = Command.make(
     });
 
     const settings = Layer.succeed(Settings)({
-      agent: options.agent,
       maxRounds: options.maxRounds,
       deadline: defaultDeadline,
-      workDir: options.workDir,
       model: options.model,
       sessionUrl: options.sessionUrl,
     });

@@ -8,7 +8,7 @@ import {
   String as Str,
 } from "effect";
 
-import { Agent, AgentError } from "../src/agent.ts";
+import { Agent, AgentError, RepairReport } from "../src/agent.ts";
 import type { RepairRequest, RepairResult } from "../src/agent.ts";
 import { Gate } from "../src/gate.ts";
 import type { GateVerdict } from "../src/gate.ts";
@@ -17,7 +17,6 @@ import type { SyncOutcome, BranchCommit } from "../src/git.ts";
 import { GitHub } from "../src/github.ts";
 import type { Issue, PullRequest, PullRequestUpdate } from "../src/github.ts";
 import { Nix } from "../src/nix.ts";
-import { RepairReport } from "../src/report.ts";
 import { Settings } from "../src/settings.ts";
 
 /** Files of one tree, path to content. */
@@ -84,6 +83,8 @@ export class World {
   public readonly verdicts: string[] = [];
   public readonly agent: AgentStep[] = [];
   public readonly repairRequests: RepairRequest[] = [];
+  /** Directories exportTree and importTree were given, in order. */
+  public readonly workspaceDirs: string[] = [];
   public agentEnabled = true;
   public gateHangs = false;
   private readonly counters = new Map<string, number>();
@@ -167,12 +168,14 @@ const gitLayer = (world: World) =>
       Effect.sync(() => {
         world.pushes.push({ replace, sha: world.sha() });
       }),
-    exportTree: () =>
+    exportTree: (dir) =>
       Effect.sync(() => {
+        world.workspaceDirs.push(dir);
         world.workspace = new Map(world.head);
       }),
-    importTree: (_dir, lock) =>
+    importTree: (dir, lock) =>
       Effect.sync(() => {
+        world.workspaceDirs.push(dir);
         const tree = new Map([...world.workspace, ["flake.lock", lock]]);
         const id = world.next("t");
         world.trees.set(id, tree);
@@ -257,8 +260,11 @@ const gateLayer = (world: World) =>
           }),
   });
 
+export const fixerWorkspace = "/var/lib/flake-fixer/work";
+
 const agentLayer = (world: World) =>
   Layer.succeed(Agent)({
+    workspace: fixerWorkspace,
     repair: (request) =>
       Effect.suspend(() => {
         world.repairRequests.push(request);
@@ -280,20 +286,26 @@ const agentLayer = (world: World) =>
 export const settings = {
   maxRounds: 3,
   deadline: Duration.hours(11),
-  workDir: "/var/lib/flake-fixer/work",
   model: "opencode/deepseek-v4.1-flash-free",
   sessionUrl: "https://pewter.test:8444",
 };
 
-export const worldLayer = (world: World) =>
+const services = (world: World) =>
   Layer.mergeAll(
     gitLayer(world),
     githubLayer(world),
     nixLayer(world),
     gateLayer(world),
-    agentLayer(world),
-    Layer.succeed(Settings)({ ...settings, agent: world.agentEnabled })
+    Layer.succeed(Settings)(settings)
   );
+
+/** The fake services with the Flake fixer. */
+export const fixerLayer = (world: World) =>
+  Layer.merge(services(world), agentLayer(world));
+
+/** The fake services; the Flake fixer is provided only when enabled. */
+export const worldLayer = (world: World) =>
+  world.agentEnabled ? fixerLayer(world) : services(world);
 
 /** An agent round that writes files into the workspace and reports them. */
 export const edits =

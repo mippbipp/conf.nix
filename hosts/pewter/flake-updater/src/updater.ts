@@ -1,48 +1,31 @@
-import {
-  Array as Arr,
-  Duration,
-  Effect,
-  Match,
-  Option,
-  Order,
-  Ref,
-  Result,
-} from "effect";
+import { Array as Arr, Duration, Effect, Match, Option, Ref } from "effect";
 
 import { Agent } from "./agent.ts";
-import type { AgentError, RepairResult } from "./agent.ts";
+import type { AgentError } from "./agent.ts";
 import {
   deriveBranchState,
-  formatFixerCommit,
   heldBackMarker,
   heldBackTitle,
 } from "./branch-state.ts";
-import { trimGateLog } from "./gate-log.ts";
 import { Gate } from "./gate.ts";
-import type { FailedCheck } from "./gate.ts";
 import { Git, mainRef } from "./git.ts";
 import { GitHub } from "./github.ts";
 import type { PullRequest } from "./github.ts";
 import {
-  renderFailures,
   renderHeldBackIssue,
   renderRepairFailedIssue,
   repairFailedTitle,
 } from "./issues.ts";
-import type { CheckFailure } from "./issues.ts";
-import {
-  changedInputs,
-  classifyLockChange,
-  formatLock,
-  parseLock,
-  revertInputs,
-  shortRev,
-} from "./lock.ts";
+import { parseLock, shortRev } from "./lock.ts";
 import type { FlakeLock } from "./lock.ts";
 import { Nix } from "./nix.ts";
 import { renderPrBody } from "./pr-body.ts";
-import type { RepairReport } from "./report.ts";
-import { isBlocked } from "./scope.ts";
+import { readFailures, repairRound, roundOutcome } from "./repair-round.ts";
+import type {
+  CheckFailure,
+  CommittedRound,
+  RoundOutcome,
+} from "./repair-round.ts";
 import { Settings } from "./settings.ts";
 import type { UpdaterSettings } from "./settings.ts";
 
@@ -51,15 +34,12 @@ interface Progress {
   readonly rounds: number;
   readonly session: Option.Option<string>;
   readonly failures: readonly CheckFailure[];
-  /** The latest round's summary from the Flake fixer. */
-  readonly summary: string;
 }
 
 const noProgress: Progress = {
   rounds: 0,
   session: Option.none(),
   failures: [],
-  summary: "",
 };
 
 const readLock = Effect.fn("Updater.readLock")(function* (rev: string) {
@@ -186,85 +166,11 @@ const closeRepairIssue = Effect.fn("Updater.closeRepairIssue")(function* (
   }
 });
 
-const repairableCheck = /^(?:build|checks) /u;
-
-const sorted = (paths: readonly string[]) =>
-  Arr.join(Arr.sort(paths, Order.String), ", ");
-
-const withoutLock = (paths: readonly string[]) =>
-  Arr.filter(paths, (path) => path !== "flake.lock");
-
-/**
- * Why the Updater must discard a round, if it must. A discarded round is
- * never committed; the agent hears the reason in the next round.
- */
-const rejection = (
-  files: readonly string[],
-  report: RepairReport
-): Option.Option<string> => {
-  if (Arr.isReadonlyArrayEmpty(files)) {
-    return Option.some(
-      "The round changed no files and requested no reverts that changed flake.lock."
-    );
-  }
-
-  const blocked = Arr.filter(files, isBlocked);
-
-  if (Arr.isReadonlyArrayNonEmpty(blocked)) {
-    return Option.some(
-      `The round changed paths the Flake fixer may not touch (${sorted(blocked)}), so it was discarded.`
-    );
-  }
-
-  const code = sorted(withoutLock(files));
-  const reported = sorted(withoutLock(report.filesChanged));
-
-  if (code !== reported) {
-    return Option.some(
-      `The report listed [${reported}] but the workspace changed [${code}], so the round was discarded.`
-    );
-  }
-
-  return Option.none();
-};
-
-const describeChanges = (main: FlakeLock, head: FlakeLock) =>
-  Arr.join(
-    Arr.map(
-      changedInputs(main, head),
-      (change) => `${change.name} ${change.from}→${change.to}`
-    ),
-    "\n"
-  );
-
-const runAgent = Effect.fn("Updater.runAgent")(function* (
-  target: Target,
-  progress: Progress,
-  feedback: Option.Option<string>
-) {
-  const git = yield* Git;
-  const agent = yield* Agent;
-  const settings = yield* Settings;
-  const head = yield* readLock("HEAD");
-
-  yield* git.exportTree(settings.workDir);
-
-  return yield* agent.repair({
-    session: progress.session,
-    title: `flake-update #${target.pr.number}`,
-    round: progress.rounds,
-    pr: target.pr.number,
-    failures: renderFailures(progress.failures),
-    changes: describeChanges(target.main, head),
-    mainLock: formatLock(target.main),
-    feedback,
-  });
-});
-
+/** Files a held-back issue for each input a committed round reverted. */
 const reportHeldBack = Effect.fn("Updater.reportHeldBack")(function* (
   target: Target,
   progress: Progress,
-  input: string
+  committed: CommittedRound
 ) {
   const settings = yield* Settings;
 
@@ -273,74 +179,20 @@ const reportHeldBack = Effect.fn("Updater.reportHeldBack")(function* (
     onSome: (id) => sessionLink(settings, id),
   });
 
-  yield* reportIssue(
-    heldBackTitle(input),
-    renderHeldBackIssue({
-      input,
-      pr: target.pr.number,
-      reason: progress.summary,
-      marker: heldBackMarker(target.main, input),
-      failures: progress.failures,
-      session,
-    })
+  yield* Effect.forEach(committed.reverted, (input) =>
+    reportIssue(
+      heldBackTitle(input),
+      renderHeldBackIssue({
+        input,
+        pr: target.pr.number,
+        reason: committed.summary,
+        marker: heldBackMarker(target.main, input),
+        failures: progress.failures,
+        session,
+      })
+    )
   );
 });
-
-/**
- * Commits an accepted round and files a held-back issue per revert.
- * Returns the reason when the round had to be discarded instead.
- */
-const commitRound = Effect.fn("Updater.commitRound")(function* (
-  target: Target,
-  progress: Progress,
-  repaired: RepairResult
-) {
-  const git = yield* Git;
-  const settings = yield* Settings;
-  const before = yield* readLock("HEAD");
-
-  const reverted = revertInputs(
-    before,
-    target.main,
-    repaired.report.revertedInputs
-  );
-
-  const lock = formatLock(reverted);
-  const imported = yield* git.importTree(settings.workDir, lock);
-  const rejected = rejection(imported.files, repaired.report);
-
-  if (Option.isSome(rejected)) {
-    yield* Effect.logWarning(rejected.value);
-
-    return rejected;
-  }
-
-  const change = classifyLockChange(target.main, before, reverted);
-
-  const reviewRequired =
-    Arr.isReadonlyArrayNonEmpty(withoutLock(imported.files)) ||
-    !change.onlyReverts;
-
-  yield* git.commitTree(
-    imported.tree,
-    formatFixerCommit(repaired.report.summary, {
-      round: `${progress.rounds}`,
-      session: repaired.session,
-      reviewRequired,
-      reverted: change.reverted,
-    })
-  );
-  yield* git.push(false);
-  yield* Effect.forEach(change.reverted, (input) =>
-    reportHeldBack(target, progress, input)
-  );
-  yield* syncPr(target.pr, target.main, progress);
-
-  return Option.none<string>();
-});
-
-const excerpts = (checks: readonly FailedCheck[]): readonly CheckFailure[] =>
-  Arr.map(checks, (check) => ({ check, excerpt: trimGateLog(check.log) }));
 
 const agentFailure = (error: AgentError) =>
   error.reason === "unavailable"
@@ -363,7 +215,45 @@ const stopWith = (reason: string): Step => ({
   feedback: Option.none(),
 });
 
-/** One gate verdict, and one repair round if the verdict allows it. */
+const carryOn = (feedback: Option.Option<string>): Step => ({
+  done: false,
+  stop: Option.none(),
+  feedback,
+});
+
+/** Records a round's outcome and decides what the loop does next. */
+const settle = Effect.fn("Updater.settle")(function* (
+  target: Target,
+  state: Ref.Ref<Progress>,
+  outcome: RoundOutcome
+) {
+  // Keep the session so the failure issue links to what the agent tried.
+  const session = roundOutcome.$is("AgentFailed")(outcome)
+    ? Option.fromUndefinedOr(outcome.error.session)
+    : Option.some(outcome.session);
+
+  const progress = yield* Ref.updateAndGet(state, (latest) => ({
+    ...latest,
+    session: Option.orElse(session, () => latest.session),
+  }));
+
+  return yield* roundOutcome.$match(outcome, {
+    AgentFailed: ({ error }) =>
+      Effect.succeed(error.pipe(agentFailure, stopWith)),
+    GaveUp: ({ summary }) =>
+      Effect.succeed(stopWith(`the Flake fixer gave up: ${summary}`)),
+    Discarded: ({ reason }) => Effect.succeed(carryOn(Option.some(reason))),
+    Committed: (committed) =>
+      Effect.gen(function* () {
+        yield* reportHeldBack(target, progress, committed);
+        yield* syncPr(target.pr, target.main, progress);
+
+        return carryOn(Option.none());
+      }),
+  });
+});
+
+/** One gate verdict, and one repair round if the stop rules allow it. */
 const step = Effect.fn("Updater.step")(function* (
   target: Target,
   state: Ref.Ref<Progress>,
@@ -380,23 +270,16 @@ const step = Effect.fn("Updater.step")(function* (
     return { done: true, stop: Option.none(), feedback: Option.none() };
   }
 
-  const failures = excerpts(verdict.failed);
+  const { failures, outsideGate } = readFailures(verdict.failed);
 
   const current = yield* Ref.updateAndGet(state, (progress) => ({
     ...progress,
     failures,
   }));
 
-  const outsideGate = Arr.filter(
-    verdict.failed,
-    (check) => !repairableCheck.test(check.name)
-  );
-
   if (Arr.isReadonlyArrayNonEmpty(outsideGate)) {
-    const names = Arr.map(outsideGate, (check) => check.name);
-
     return stopWith(
-      `checks outside the Build gate failed: ${Arr.join(names, ", ")}`
+      `checks outside the Build gate failed: ${Arr.join(outsideGate, ", ")}`
     );
   }
 
@@ -406,47 +289,20 @@ const step = Effect.fn("Updater.step")(function* (
     );
   }
 
-  const round = yield* Ref.updateAndGet(state, (progress) => ({
-    ...progress,
-    rounds: progress.rounds + 1,
-  }));
+  const round = current.rounds + 1;
 
-  const attempt = yield* runAgent(target, round, feedback).pipe(
-    Effect.map((repaired) => Result.succeed(repaired)),
-    Effect.catchTag("AgentError", (error) => Effect.succeed(Result.fail(error)))
-  );
+  yield* Ref.update(state, (progress) => ({ ...progress, rounds: round }));
 
-  if (Result.isFailure(attempt)) {
-    const { session } = attempt.failure;
+  const outcome = yield* repairRound({
+    pr: target.pr.number,
+    round,
+    main: target.main,
+    failures,
+    session: current.session,
+    feedback,
+  });
 
-    // Keep the session so the failure issue links to what the agent tried.
-    if (session !== undefined) {
-      yield* Ref.update(state, (latest) => ({
-        ...latest,
-        session: Option.some(session),
-      }));
-    }
-
-    return attempt.failure.pipe(agentFailure, stopWith);
-  }
-
-  const repaired = attempt.success;
-
-  const progress = yield* Ref.updateAndGet(state, (latest) => ({
-    ...latest,
-    session: Option.some(repaired.session),
-    summary: repaired.report.summary,
-  }));
-
-  if (repaired.report.outcome === "gave-up") {
-    return stopWith(`the Flake fixer gave up: ${repaired.report.summary}`);
-  }
-
-  return {
-    done: false,
-    stop: Option.none(),
-    feedback: yield* commitRound(target, progress, repaired),
-  };
+  return yield* settle(target, state, outcome);
 });
 
 /**
@@ -457,11 +313,7 @@ const repair = Effect.fn("Updater.repair")(function* (
   target: Target,
   state: Ref.Ref<Progress>
 ) {
-  let next: Step = {
-    done: false,
-    stop: Option.none(),
-    feedback: Option.none(),
-  };
+  let next = carryOn(Option.none());
 
   while (!next.done && Option.isNone(next.stop)) {
     next = yield* step(target, state, next.feedback);
@@ -517,7 +369,10 @@ export const run = Effect.fn("Updater.run")(function* () {
 
   yield* syncPr(pr, main, noProgress);
 
-  if (!settings.agent) {
+  // Repair rounds run only when the Flake fixer is configured.
+  const agent = yield* Effect.serviceOption(Agent);
+
+  if (Option.isNone(agent)) {
     return;
   }
 
@@ -525,6 +380,7 @@ export const run = Effect.fn("Updater.run")(function* () {
   const state = yield* Ref.make(noProgress);
 
   yield* repair(target, state).pipe(
+    Effect.provideService(Agent, agent.value),
     Effect.timeoutOrElse({
       duration: settings.deadline,
       orElse: () =>

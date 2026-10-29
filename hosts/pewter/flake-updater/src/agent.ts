@@ -1,8 +1,6 @@
 import type { Effect, Option } from "effect";
 import { Context, Schema } from "effect";
 
-import type { RepairReport } from "./report.ts";
-
 export class AgentError extends Schema.TaggedError<
   AgentError,
   { readonly brand: unique symbol }
@@ -12,6 +10,17 @@ export class AgentError extends Schema.TaggedError<
   message: Schema.String,
   /** The session the failure happened in, when one was opened. */
   session: Schema.optionalKey(Schema.String),
+}) {}
+
+/** What the Flake fixer says it did in one round. */
+export class RepairReport extends Schema.Class<
+  RepairReport,
+  { readonly brand: unique symbol }
+>("RepairReport")({
+  outcome: Schema.Literals(["fixed", "reverted", "gave-up"]),
+  revertedInputs: Schema.Array(Schema.String),
+  filesChanged: Schema.Array(Schema.String),
+  summary: Schema.String,
 }) {}
 
 export interface RepairRequest {
@@ -34,10 +43,15 @@ export interface RepairResult {
   readonly report: RepairReport;
 }
 
-/** The Flake fixer: an opencode agent editing a copy of the branch. */
+/**
+ * The Flake fixer: an opencode agent editing a copy of the branch. The
+ * Updater runs repair rounds only when this service is provided.
+ */
 export class Agent extends Context.Service<
   Agent,
   {
+    /** The directory the agent edits; nothing outside it is kept. */
+    readonly workspace: string;
     readonly repair: (
       request: RepairRequest
     ) => Effect.Effect<RepairResult, AgentError>;

@@ -1,28 +1,9 @@
 import { Array as Arr, Option, String as Str } from "effect";
 
-import type { FailureExcerpt } from "./gate-log.ts";
-import type { FailedCheck } from "./gate.ts";
+import { renderFailures } from "./repair-round.ts";
+import type { CheckFailure } from "./repair-round.ts";
 
 export const repairFailedTitle = "flake-update: repair failed";
-
-export interface CheckFailure {
-  readonly check: FailedCheck;
-  readonly excerpt: FailureExcerpt;
-}
-
-/** Failing checks as the agent and issues see them. */
-export const renderFailures = (failures: readonly CheckFailure[]): string =>
-  Arr.join(
-    Arr.map(failures, ({ check, excerpt }) => {
-      const text =
-        excerpt.text === ""
-          ? "(no Nix error block found; read the job log)"
-          : excerpt.text;
-
-      return `## ${check.name}\n${check.url}\n\n${text}`;
-    }),
-    "\n\n"
-  );
 
 const failingHosts = (failures: readonly CheckFailure[]) =>
   Arr.dedupe(Arr.flatMap(failures, ({ excerpt }) => excerpt.hosts));
