@@ -1,14 +1,17 @@
 // The Kiro plugin's RPC, between its server part (index.ts) and its sidebar
-// (tui.tsx). OpenCode checks calls against its JSON Schema; UsageAnswer is
-// the same answer in Effect's words, which index.ts builds and tui.tsx reads.
+// (tui.tsx). The Effect Schemas here are the whole contract: Rpc.define takes
+// them as Standard Schemas, which OpenCode checks calls against and types
+// both ends by.
 
 import { Rpc } from "@opencode/plugin/rpc";
 import { Schema } from "effect";
 
+// an allowance is one kind of usage the account has a limit for, credits today
 const Allowance = Schema.Struct({
   name: Schema.String,
   used: Schema.Number,
   limit: Schema.Number,
+  // what went over the limit, at the overage rate, when the account allows it
   overage: Schema.optional(
     Schema.Struct({
       credits: Schema.Number,
@@ -19,6 +22,7 @@ const Allowance = Schema.Struct({
       enabled: Schema.Boolean,
     })
   ),
+  // a free trial still running, with its own limit
   trial: Schema.optional(
     Schema.Struct({
       used: Schema.Number,
@@ -29,9 +33,9 @@ const Allowance = Schema.Struct({
 });
 export const AccountUsage = Schema.Struct({
   plan: Schema.String,
-  resetsAt: Schema.Number,
+  resetsAt: Schema.Number, // epoch ms, 0 when unknown
   allowances: Schema.Array(Allowance),
-  checkedAt: Schema.Number,
+  checkedAt: Schema.Number, // epoch ms
 });
 export const UsageAnswer = Schema.Struct({
   account: Schema.NullOr(AccountUsage),
@@ -42,82 +46,18 @@ export type AccountUsage = typeof AccountUsage.Type;
 export type Allowance = typeof Allowance.Type;
 export type UsageAnswer = typeof UsageAnswer.Type;
 
-const number = { type: "number" } as const;
-
-// an allowance is one kind of usage the account has a limit for, credits today
-const allowance = {
-  type: "object",
-  properties: {
-    name: { type: "string" },
-    used: number,
-    limit: number,
-    // what went over the limit, at the overage rate, when the account allows it
-    overage: {
-      type: "object",
-      properties: {
-        credits: number,
-        charges: number,
-        currency: { type: "string" },
-        rate: number,
-        cap: number,
-        enabled: { type: "boolean" },
-      },
-      required: ["credits", "charges", "currency", "rate", "cap", "enabled"],
-      additionalProperties: false,
-    },
-    // a free trial still running, with its own limit
-    trial: {
-      type: "object",
-      properties: { used: number, limit: number, expiresAt: number },
-      required: ["used", "limit"],
-      additionalProperties: false,
-    },
-  },
-  required: ["name", "used", "limit"],
-  additionalProperties: false,
-} as const;
-
 export const KiroRpc = Rpc.define({
   id: "kiro",
   methods: {
     // usage is the account's usage this month, and the credits each session
     // asked for has spent. error says why the account couldn't be read.
     usage: {
-      input: {
-        type: "object",
-        properties: { sessionIDs: { type: "array", items: { type: "string" } } },
-        required: ["sessionIDs"],
-        additionalProperties: false,
-      },
-      output: {
-        type: "object",
-        properties: {
-          account: {
-            anyOf: [
-              {
-                type: "object",
-                properties: {
-                  plan: { type: "string" },
-                  resetsAt: number, // epoch ms, 0 when unknown
-                  allowances: { type: "array", items: allowance },
-                  checkedAt: number, // epoch ms
-                },
-                required: ["plan", "resetsAt", "allowances", "checkedAt"],
-                additionalProperties: false,
-              },
-              { type: "null" },
-            ],
-          },
-          error: { type: "string" },
-          credits: { type: "object", additionalProperties: number },
-        },
-        required: ["account", "credits"],
-        additionalProperties: false,
-      },
+      input: Schema.toStandardSchemaV1(Schema.Struct({ sessionIDs: Schema.Array(Schema.String) })),
+      output: Schema.toStandardSchemaV1(UsageAnswer),
     },
   },
   events: {
     // the account or a session's credits changed: ask for usage again
-    updated: { schema: { type: "object", additionalProperties: false } },
+    updated: { schema: Schema.toStandardSchemaV1(Schema.Struct({})) },
   },
 });

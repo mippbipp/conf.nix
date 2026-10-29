@@ -46,9 +46,6 @@ const runtime = (region: string) => `https://runtime.${region}.kiro.dev`;
 // what each session has spent, kept in the plugin's storage
 const creditsKey = (sessionID: string) => `credits/${sessionID}`;
 const decodeCredits = Schema.decodeUnknownOption(Schema.Number);
-const decodeUsageInput = Schema.decodeUnknownEffect(
-  Schema.Struct({ sessionIDs: Schema.Array(Schema.String) })
-);
 
 // ---- models ----------------------------------------------------------------------
 
@@ -158,11 +155,8 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC API fails with unknown
   const registration = yield* ctx.rpc
     .register(KiroRpc, {
-      usage: (input) =>
+      usage: ({ sessionIDs }) =>
         Effect.gen(function* () {
-          const { sessionIDs } = yield* decodeUsageInput(input).pipe(
-            Effect.orElseSucceed(() => ({ sessionIDs: [] as readonly string[] }))
-          );
           const spent: Record<string, number> = {};
           for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
           const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };

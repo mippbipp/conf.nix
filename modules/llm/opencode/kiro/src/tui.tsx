@@ -17,18 +17,13 @@ import {
 
 import { type AccountUsage, type Allowance, KiroRpc, UsageAnswer } from "./rpc.ts";
 
+// the client passes the answer on unchecked, and a server still running an
+// older plugin checked it against that plugin's schema, not this one
 const decodeAnswer = Schema.decodeUnknownOption(UsageAnswer);
 
 const DAY = 24 * 60 * 60 * 1000;
 const amount = (n: number, digits = 1) =>
   n.toLocaleString("en-US", { maximumFractionDigits: digits });
-const money = (n: number, currency: string) => {
-  try {
-    return n.toLocaleString("en-US", { style: "currency", currency });
-  } catch {
-    return `${amount(n, 2)} ${currency}`;
-  }
-};
 const day = (ms: number) =>
   new Date(ms).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 // a session's credits are often under one, so they keep two decimals
