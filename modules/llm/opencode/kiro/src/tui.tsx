@@ -99,18 +99,16 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
 
   const allowanceLines = (a: Allowance) => {
     const unit = a.name.toLowerCase();
+    // the overage cap when there is one, else the plan's limit
+    const cap = a.overage?.cap || a.limit;
     return (
       <>
         <text fg={theme().text.muted}>
-          {amount(a.used)} / {amount(a.limit)} {unit}
+          {amount(a.used)} / {amount(cap)} {unit}
         </text>
-        <Show when={a.overage && a.overage.credits > 0 ? a.overage : undefined}>
+        <Show when={a.overage && a.overage.charges > 0 ? a.overage : undefined}>
           {(o: Accessor<NonNullable<Allowance["overage"]>>) => (
-            <text fg={theme().text.feedback.warning.base}>
-              Overage {amount(o().credits)} · {money(o().charges, o().currency)}
-              <br />
-              {o().cap ? `(cap ${amount(o().cap)})` : ""}
-            </text>
+            <text fg={theme().text.feedback.warning.base}>{money(o().charges, o().currency)}</text>
           )}
         </Show>
         <Show when={a.trial}>
