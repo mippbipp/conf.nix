@@ -6,7 +6,6 @@ import {
   Redacted,
   Schedule,
   Schema,
-  String as Str,
 } from "effect";
 
 import { Shell } from "../command.ts";
@@ -33,6 +32,21 @@ const Rollup = Schema.Struct({
   headRefOid: Schema.String,
   statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext])),
 });
+
+const RequiredChecks = Schema.Array(Schema.Struct({ context: Schema.String }));
+
+const RuleParameters = Schema.Struct({
+  required_status_checks: Schema.optionalKey(RequiredChecks),
+});
+
+// Only required_status_checks rules carry the list; the other rule types are
+// decoded so the filter below can drop them.
+const BranchRule = Schema.Struct({
+  type: Schema.String,
+  parameters: Schema.optionalKey(RuleParameters),
+});
+
+type Rule = typeof BranchRule.Type;
 
 type Check = typeof CheckRun.Type | typeof StatusContext.Type;
 
@@ -84,10 +98,26 @@ const retryPolicy = {
 
 const decodeRollup = Schema.decodeEffect(Schema.fromJsonString(Rollup));
 
-const isBuildCheck = (check: CheckState) =>
-  Str.startsWith("build ")(check.name);
+const decodeRules = Schema.decodeEffect(
+  Schema.fromJsonString(Schema.Array(BranchRule))
+);
 
-/** Polls the PR's status rollup until the Build gate has decided. */
+const contextsOf = (rule: Rule) =>
+  Arr.map(
+    rule.parameters?.required_status_checks ?? [],
+    (check) => check.context
+  );
+
+const requiredContexts = (rules: readonly Rule[]) => {
+  const statusRules = Arr.filter(
+    rules,
+    (rule) => rule.type === "required_status_checks"
+  );
+
+  return Arr.flatMap(statusRules, contextsOf);
+};
+
+/** Polls the PR's status rollup until every check main requires has finished. */
 export const layer = Layer.effect(
   Gate,
   Effect.gen(function* () {
@@ -96,14 +126,41 @@ export const layer = Layer.effect(
     const env = { GH_TOKEN: Redacted.value(host.token) };
 
     // GitHub's API has bad minutes; a poll should not fail the whole run.
-    const gh = (args: readonly string[]) => {
+    const request = (args: readonly string[]) => {
       const toError = fail(describe(args));
 
-      return run("gh", [...args, "--repo", host.repo], { env }).pipe(
+      return run("gh", args, { env }).pipe(
         Effect.retry(retryPolicy),
         Effect.mapError(toError)
       );
     };
+
+    const gh = (args: readonly string[]) =>
+      request([...args, "--repo", host.repo]);
+
+    // Read per verdict so a ruleset edit applies on the next round.
+    const required = Effect.fn("Gate.required")(function* () {
+      // `gh api` takes no --repo flag.
+      const output = yield* request([
+        "api",
+        `repos/${host.repo}/rules/branches/main`,
+      ]);
+
+      const rules = yield* decodeRules(output).pipe(
+        Effect.mapError(fail("reading main's ruleset"))
+      );
+
+      const contexts = requiredContexts(rules);
+
+      if (Arr.isReadonlyArrayEmpty(contexts)) {
+        return yield* GateError.make({
+          message: "main's ruleset requires no status checks",
+          cause: undefined,
+        });
+      }
+
+      return contexts;
+    });
 
     const rollup = Effect.fn("Gate.rollup")(function* (pr: PullRequest) {
       const output = yield* gh([
@@ -133,15 +190,20 @@ export const layer = Layer.effect(
       pr: PullRequest,
       sha: string
     ) {
-      yield* Effect.log(`waiting for the Build gate on ${sha}`);
+      const contexts = yield* required();
+
+      yield* Effect.log(`waiting for ${Arr.join(contexts, ", ")} on ${sha}`);
 
       for (;;) {
         const state = yield* rollup(pr);
         const checks = Arr.map(state.statusCheckRollup, describeCheck);
+        const names = Arr.map(checks, (check) => check.name);
 
+        // A check from another workflow can register after the gate's own
+        // checks finish, so wait until every required one is listed.
         const decided =
           state.headRefOid === sha &&
-          Arr.some(checks, isBuildCheck) &&
+          Arr.every(contexts, (context) => Arr.contains(names, context)) &&
           Arr.every(checks, (check) => check.done);
 
         if (decided) {

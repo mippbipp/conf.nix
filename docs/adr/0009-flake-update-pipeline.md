@@ -24,7 +24,7 @@ The sequence is:
 2. `flake-updater.service` runs as the configured pewter user, updates a clone in `/var/lib/flake-updater`, and maintains one `flake-update` branch and pull request. It is a TypeScript/Effect program in `hosts/pewter/flake-updater/`; the package's check phase runs its typecheck, tests, formatter and linter, so the `build aarch64-linux` gate job tests every change to it.
 3. GitHub Actions runs `.github/workflows/build-gate.yml` for every pull request. It builds every host's toplevel closure, one `build <system>` check per arch. Each arch job enumerates the flake's hosts for its system and builds them all in a single `/nix/store`, so derivations shared by same-arch hosts compile once; per-host failures are grouped as `build <host>` sections in that arch's job log.
 4. GitHub auto-merge is enabled by the Updater, but merge waits for all required `build <system>` checks to pass.
-5. With the Flake fixer enabled, the Updater waits for the gate on its own push and runs repair rounds while it is red.
+5. With the Flake fixer enabled, the Updater waits for the gate on its own push and runs repair rounds while it is red. It reads the required checks from main's ruleset (`gh api repos/<repo>/rules/branches/main`) and treats the gate as decided only once every one of them is on the head commit and every listed check has finished. A required check that has not registered yet keeps it waiting, and a ruleset with no required checks fails the run.
 6. `.github/workflows/watchdog.yml` runs on the 1st of each month at 09:00 UTC and fails when the latest `flake.lock` commit is more than thirty days old.
 
 ### Updater
