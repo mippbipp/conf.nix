@@ -171,7 +171,7 @@ in
           script = ''
             OPENCODE_SERVER_PASSWORD="$(< "$CREDENTIALS_DIRECTORY/password")"
             export OPENCODE_SERVER_PASSWORD
-            exec ${lib.getExe' pkgs.opencode2 "opencode2"} serve --hostname 127.0.0.1 --port ${toString fixerPort}
+            exec ${lib.getExe' pkgs.opencode "opencode"} serve --hostname 127.0.0.1 --port ${toString fixerPort}
           '';
           serviceConfig = {
             User = "flake-fixer";
