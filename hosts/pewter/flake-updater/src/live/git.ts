@@ -112,8 +112,9 @@ export const layer = Layer.effect(
       ]);
     });
 
+    // --force: a run killed before commitLock leaves flake.lock modified.
     const startFromMain = Effect.gen(function* () {
-      yield* git(["checkout", "-B", branch, mainRef]);
+      yield* git(["checkout", "--force", "-B", branch, mainRef]);
       yield* git(["reset", "--hard", mainRef]);
     });
 
@@ -132,7 +133,7 @@ export const layer = Layer.effect(
         return { mode: "fresh", dropped: [] } satisfies SyncOutcome;
       }
 
-      yield* git(["checkout", "-B", branch, remoteBranch]);
+      yield* git(["checkout", "--force", "-B", branch, remoteBranch]);
       yield* git(["reset", "--hard", remoteBranch]);
 
       const merged = yield* gitStatus([

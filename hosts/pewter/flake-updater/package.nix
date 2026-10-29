@@ -50,6 +50,9 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   # Node runs the TypeScript sources directly; there is nothing to compile.
   dontBuild = true;
 
+  # test/git.test.ts drives the checkout adapter against real git.
+  nativeCheckInputs = [ git ];
+
   # The Build gate builds pewter's closure, which includes this package, so
   # these checks gate every change to the Updater.
   doCheck = true;
