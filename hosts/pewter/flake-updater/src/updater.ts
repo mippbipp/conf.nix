@@ -290,7 +290,7 @@ const step = Effect.fn("Updater.step")(function* (
   yield* Ref.update(state, (progress) => ({ ...progress, rounds: round }));
 
   const outcome = yield* repairRound({
-    pr: target.pr.number,
+    pr: target.pr,
     round,
     main: target.main,
     failures,

@@ -18,6 +18,10 @@ const PullRequestJson = Schema.Struct({
   url: Schema.String,
 });
 
+const AutoMergeJson = Schema.Struct({
+  autoMergeRequest: Schema.NullOr(Schema.Unknown),
+});
+
 const IssueJson = Schema.Struct({
   number: Schema.Finite,
   title: Schema.String,
@@ -109,6 +113,47 @@ export const layer = Layer.effect(
       );
     });
 
+    const holdForReview = Effect.fn("GitHub.holdForReview")(function* (
+      pr: PullRequest
+    ) {
+      const number = `${pr.number}`;
+
+      if (host.dryRun) {
+        yield* Effect.log(`dry-run: would turn auto-merge off on #${number}`);
+
+        return;
+      }
+
+      // Fails when auto-merge was never on, so read the PR back instead.
+      yield* gh(["pr", "merge", number, "--disable-auto"]).pipe(
+        Effect.catchTag("GitHubError", () => Effect.void)
+      );
+
+      const state = yield* gh([
+        "pr",
+        "view",
+        number,
+        "--json",
+        "autoMergeRequest",
+      ]).pipe(
+        Effect.flatMap((output) =>
+          decodeJson(AutoMergeJson)(output).pipe(
+            Effect.mapError(fail("reading the PR's auto-merge state"))
+          )
+        )
+      );
+
+      yield* Effect.when(
+        Effect.fail(
+          GitHubError.make({
+            message: `auto-merge is still on for #${number}`,
+            cause: null,
+          })
+        ),
+        Effect.succeed(state.autoMergeRequest !== null)
+      );
+    });
+
     const updatePr = Effect.fn("GitHub.updatePr")(function* (
       pr: PullRequest,
       update: PullRequestUpdate
@@ -141,10 +186,7 @@ export const layer = Layer.effect(
       // Auto-merge still waits for every required gate check; squash keeps
       // main to one commit per update.
       if (update.needsReview) {
-        // Fails when auto-merge was never on, which is the state we want.
-        yield* gh(["pr", "merge", number, "--disable-auto"]).pipe(
-          Effect.catchTag("GitHubError", () => Effect.void)
-        );
+        yield* holdForReview(pr);
       } else {
         yield* gh(["pr", "merge", number, "--auto", "--squash"]);
       }
@@ -219,6 +261,7 @@ export const layer = Layer.effect(
       openPr,
       createPr,
       updatePr,
+      holdForReview,
       openIssues,
       createIssue,
       commentIssue,

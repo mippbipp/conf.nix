@@ -107,4 +107,5 @@ Off by default. To turn it on:
    GitHub ruleset's required checks.
 
 To try it without pushing:
-`flake-updater --dry-run --agent --repo-dir /tmp/flake-updater-dry`.
+`flake-updater --dry-run --agent --repo-dir /tmp/flake-updater-dry --work-dir /var/lib/flake-fixer/dry-work --context-dir /var/lib/flake-fixer/dry-context`.
+The separate workspace keeps it from clearing a scheduled run's.

@@ -4,6 +4,7 @@ import { Effect, Option } from "effect";
 import { AgentError } from "../src/agent.ts";
 import { parseFixerCommit } from "../src/branch-state.ts";
 import { readFailures } from "../src/gate-log.ts";
+import { GitHubError } from "../src/github.ts";
 import { FlakeLock, formatLock, parseLock, shortRev } from "../src/lock.ts";
 import { repairRound, roundOutcome } from "../src/repair-round.ts";
 import type { RoundOutcome } from "../src/repair-round.ts";
@@ -35,7 +36,7 @@ const roundIn = Effect.fn("roundIn")(function* (world: World) {
   const main = yield* parseLock(world.main.get("flake.lock") ?? "");
 
   return yield* repairRound({
-    pr: 42,
+    pr: { number: 42, url: "https://github.test/pull/42" },
     round: 1,
     main,
     failures: readFailures(failed("build x86_64-linux", gate232).failed)
@@ -117,6 +118,8 @@ describe("repair round", () => {
         "{ }\n"
       );
       assert.deepStrictEqual(world.pushes, [{ replace: false, sha: "c2" }]);
+      // Auto-merge is off before the fix reaches the branch.
+      assert.deepStrictEqual(world.timeline, ["hold #42", "push c2"]);
       assert.deepStrictEqual(
         lastCommit(world),
         Option.some({
@@ -156,6 +159,19 @@ describe("repair round", () => {
         assert.lengthOf(world.commits, 1);
         assert.deepStrictEqual(world.pushes, []);
       }
+    })
+  );
+
+  it.effect("does not push a fix it could not hold for review", () =>
+    Effect.gen(function* () {
+      const world = updated();
+      world.holdFails = true;
+      world.agent.push(edits({ "modules/a.nix": "a\n" }));
+
+      const error = yield* Effect.flip(roundIn(world));
+
+      assert.instanceOf(error, GitHubError);
+      assert.deepStrictEqual(world.pushes, []);
     })
   );
 

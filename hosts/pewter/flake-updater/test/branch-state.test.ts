@@ -177,6 +177,33 @@ describe("branch state", () => {
     })
   );
 
+  it.effect("gives the latest reason for an input held back twice", () =>
+    Effect.sync(() => {
+      const main = nestedLock("aaaaaaa", "aaaaaaa");
+
+      const state = deriveBranchState({
+        commits: [
+          fixerCommit("c1", "nixpkgs breaks gram", {
+            reviewRequired: false,
+            reverted: ["nixpkgs"],
+          }),
+          fixerCommit("c2", "nixpkgs breaks every host", {
+            reviewRequired: false,
+            reverted: ["nixpkgs"],
+          }),
+        ],
+        head: main,
+        main,
+        issues: [],
+      });
+
+      assert.deepStrictEqual(
+        Arr.map(state.heldBack, (input) => input.reason),
+        ["nixpkgs breaks every host"]
+      );
+    })
+  );
+
   it.effect(
     "reads review and held-back inputs from an earlier run's commits",
     () =>

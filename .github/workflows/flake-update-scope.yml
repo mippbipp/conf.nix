@@ -25,7 +25,9 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
           list="$(gh api -H 'Accept: application/vnd.github.raw+json' "repos/$GITHUB_REPOSITORY/contents/hosts/pewter/flake-updater/blocked-paths.json?ref=$BASE_REF")"
-          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[].filename')"
+          # A rename lists its old path too, so moving a file out of a blocked
+          # path counts as touching it.
+          files="$(gh api --paginate "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --jq '.[] | .filename, (.previous_filename // empty)')"
           blocked="$(printf '%s\n' "$files" | jq -Rr --argjson list "$list" '
             select(. as $path
               | any($list.prefixes[]; . as $prefix | $path | startswith($prefix))

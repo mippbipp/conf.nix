@@ -14,7 +14,7 @@ import { Gate } from "../src/gate.ts";
 import type { GateVerdict } from "../src/gate.ts";
 import { Git, mainRef } from "../src/git.ts";
 import type { SyncOutcome, BranchCommit } from "../src/git.ts";
-import { GitHub } from "../src/github.ts";
+import { GitHub, GitHubError } from "../src/github.ts";
 import type { Issue, PullRequest, PullRequestUpdate } from "../src/github.ts";
 import { Nix } from "../src/nix.ts";
 import { Settings } from "../src/settings.ts";
@@ -85,6 +85,9 @@ export class World {
   public readonly repairRequests: RepairRequest[] = [];
   /** Directories exportTree and importTree were given, in order. */
   public readonly workspaceDirs: string[] = [];
+  /** Ordered pushes and review holds, to check which came first. */
+  public readonly timeline: string[] = [];
+  public holdFails = false;
   public agentEnabled = true;
   public gateHangs = false;
   private readonly counters = new Map<string, number>();
@@ -175,6 +178,7 @@ const gitLayer = (world: World) =>
     push: (replace) =>
       Effect.sync(() => {
         world.pushes.push({ replace, sha: world.sha() });
+        world.timeline.push(`push ${world.sha()}`);
       }),
     exportTree: (dir) =>
       Effect.sync(() => {
@@ -219,6 +223,14 @@ const githubLayer = (world: World) =>
       Effect.sync(() => {
         world.prUpdates.push(update);
       }),
+    holdForReview: (pr) =>
+      world.holdFails
+        ? Effect.fail(
+            GitHubError.make({ message: "auto-merge stayed on", cause: null })
+          )
+        : Effect.sync(() => {
+            world.timeline.push(`hold #${pr.number}`);
+          }),
     openIssues: Effect.sync(() => [...world.issues]),
     createIssue: (title, body) =>
       Effect.sync(() => {

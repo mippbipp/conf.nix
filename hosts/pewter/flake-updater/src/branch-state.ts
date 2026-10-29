@@ -108,7 +108,7 @@ export const heldBackMarker = (main: FlakeLock, input: string): string =>
 
 /** What one run reads to derive the branch's state. */
 export interface Branch {
-  /** Non-merge commits on the branch that main does not have. */
+  /** Non-merge commits on the branch that main does not have, oldest first. */
   readonly commits: readonly BranchCommit[];
   readonly head: FlakeLock;
   readonly main: FlakeLock;

@@ -39,6 +39,13 @@ export class GitHub extends Context.Service<
       pr: PullRequest,
       update: PullRequestUpdate
     ) => Effect.Effect<void, GitHubError>;
+    /**
+     * Turns auto-merge off and confirms it is off, so a commit that needs
+     * review can be pushed without the Build gate merging it.
+     */
+    readonly holdForReview: (
+      pr: PullRequest
+    ) => Effect.Effect<void, GitHubError>;
     /** Open issues labelled `automated`. */
     readonly openIssues: Effect.Effect<readonly Issue[], GitHubError>;
     readonly createIssue: (

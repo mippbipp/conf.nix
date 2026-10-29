@@ -320,25 +320,28 @@ export const layer = Layer.effect(
       message: `the round ran past ${Duration.format(config.roundTimeout)}`,
     });
 
-    const runRound = Effect.fn("Agent.runRound")(function* (
-      sessionID: Session.ID,
-      text: string
-    ) {
-      yield* Effect.forkScoped(rejectAsks(sessionID));
-      yield* client.session
-        .prompt({ sessionID, text })
-        .pipe(Effect.mapError(toAgentError("sending the prompt")));
-      yield* client.session.wait({ sessionID }).pipe(
-        Effect.mapError(toAgentError("waiting for the round")),
-        Effect.timeoutOrElse({
-          duration: config.roundTimeout,
-          orElse: () =>
-            client.session
-              .interrupt({ sessionID })
-              .pipe(Effect.ignore, Effect.andThen(roundTimedOut)),
-        })
-      );
-    }, Effect.scoped);
+    const runRound = Effect.fn("Agent.runRound")(
+      function* (sessionID: Session.ID, text: string) {
+        yield* Effect.forkScoped(rejectAsks(sessionID));
+        yield* client.session
+          .prompt({ sessionID, text })
+          .pipe(Effect.mapError(toAgentError("sending the prompt")));
+        yield* client.session.wait({ sessionID }).pipe(
+          Effect.mapError(toAgentError("waiting for the round")),
+          Effect.timeoutOrElse({
+            duration: config.roundTimeout,
+            orElse: () => Effect.fail(roundTimedOut),
+          })
+        );
+      },
+      // Stop the agent on any unsuccessful end, including the Updater's own
+      // deadline, so it cannot keep editing the workspace after the round.
+      (round, sessionID) =>
+        Effect.onError(round, () =>
+          client.session.interrupt({ sessionID }).pipe(Effect.ignore)
+        ),
+      Effect.scoped
+    );
 
     const checkOutcome = Effect.fn("Agent.checkOutcome")(function* (
       sessionID: Session.ID

@@ -50,7 +50,7 @@ export class Git extends Context.Service<
     readonly commitLock: (message: string) => Effect.Effect<boolean, GitError>;
     readonly readLock: (rev: string) => Effect.Effect<string, GitError>;
     readonly head: Effect.Effect<string, GitError>;
-    /** Non-merge commits on the branch that main does not have. */
+    /** Non-merge commits on the branch that main does not have, oldest first. */
     readonly branchCommits: Effect.Effect<readonly BranchCommit[], GitError>;
     readonly changedFromMain: Effect.Effect<readonly string[], GitError>;
     /** `replace` rewrites the remote branch (with lease); otherwise fast-forward. */

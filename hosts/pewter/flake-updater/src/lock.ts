@@ -256,6 +256,8 @@ const copyChildren = (
     }
 
     const key = freshKey(nodes, ref);
+    // Claim the key before recursing so a grandchild cannot take it.
+    nodes.set(key, child);
     nodes.set(key, copyChildren(main, child, nodes));
 
     return key;
@@ -324,6 +326,12 @@ export const revertInputs = (
     if (!kept.has(key)) {
       nodes.delete(key);
     }
+  }
+
+  // Every swap target keeps its key, so reserve them all before copying
+  // children into the freed keys.
+  for (const { target, sourceNode } of swaps) {
+    nodes.set(target, sourceNode);
   }
 
   for (const { target, sourceNode } of swaps) {

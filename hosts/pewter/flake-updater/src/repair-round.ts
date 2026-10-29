@@ -7,6 +7,8 @@ import { renderFailures } from "./gate-log.ts";
 import type { CheckFailure } from "./gate-log.ts";
 import { Git, readFlakeLock } from "./git.ts";
 import type { ImportedTree } from "./git.ts";
+import { GitHub } from "./github.ts";
+import type { PullRequest } from "./github.ts";
 import {
   changedInputs,
   classifyLockChange,
@@ -17,7 +19,7 @@ import type { FlakeLock } from "./lock.ts";
 import { isBlocked } from "./scope.ts";
 
 export interface RoundRequest {
-  readonly pr: number;
+  readonly pr: PullRequest;
   readonly round: number;
   readonly main: FlakeLock;
   readonly failures: readonly CheckFailure[];
@@ -116,6 +118,7 @@ const commitRound = Effect.fn("RepairRound.commitRound")(function* (
   repaired: RepairResult
 ) {
   const git = yield* Git;
+  const github = yield* GitHub;
   const agent = yield* Agent;
   const { report, session } = repaired;
   const lock = revertInputs(before, request.main, report.revertedInputs);
@@ -144,6 +147,10 @@ const commitRound = Effect.fn("RepairRound.commitRound")(function* (
     })
   );
 
+  if (reviewRequired) {
+    yield* github.holdForReview(request.pr);
+  }
+
   yield* git.push(false);
 
   return roundOutcome.Committed({
@@ -171,9 +178,9 @@ export const repairRound = Effect.fn("RepairRound.run")(function* (
   const attempt = yield* Effect.result(
     agent.repair({
       session: request.session,
-      title: `flake-update #${request.pr}`,
+      title: `flake-update #${request.pr.number}`,
       round: request.round,
-      pr: request.pr,
+      pr: request.pr.number,
       failures: renderFailures(request.failures),
       changes: describeChanges(request.main, before),
       mainLock: formatLock(request.main),

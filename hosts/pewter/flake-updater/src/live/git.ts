@@ -48,9 +48,10 @@ export const layer = Layer.effect(
     const gitDir = path.join(host.repoDir, ".git");
 
     // gh's credential helper lives in the checkout's own config file, so the
-    // user's Home Manager git config stays untouched.
+    // user's Home Manager git config stays untouched. It sits inside .git,
+    // where no commit can replace it.
     const env = {
-      GIT_CONFIG_GLOBAL: path.join(host.repoDir, ".gitconfig"),
+      GIT_CONFIG_GLOBAL: path.join(gitDir, "updater.gitconfig"),
       GH_TOKEN: Redacted.value(host.token),
       GIT_TERMINAL_PROMPT: "0",
     };
@@ -190,6 +191,7 @@ export const layer = Layer.effect(
     const branchCommits = git([
       "log",
       "--no-merges",
+      "--reverse",
       "--format=%H%x1f%B%x1e",
       `${mainRef}..HEAD`,
     ]).pipe(

@@ -17,6 +17,9 @@ let
   fixerDir = "/var/lib/flake-fixer";
   workDir = "${fixerDir}/work";
   contextDir = "${fixerDir}/context";
+  # Dry runs get their own copies so they never clear a live run's workspace.
+  dryWorkDir = "${fixerDir}/dry-work";
+  dryContextDir = "${fixerDir}/dry-context";
   # Lives in the Updater's 0700 state directory: the Updater reads it, the
   # fixer's server gets it as a systemd credential, the agent never sees it.
   passwordFile = "${stateDir}/fixer-password";
@@ -116,6 +119,8 @@ in
           "d ${stateDir} 0700 ${username} users -"
           "d ${workDir} 2770 flake-fixer flake-fixer -"
           "d ${contextDir} 2770 flake-fixer flake-fixer -"
+          "d ${dryWorkDir} 2770 flake-fixer flake-fixer -"
+          "d ${dryContextDir} 2770 flake-fixer flake-fixer -"
         ];
 
         services.flake-fixer-password = {

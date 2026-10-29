@@ -29,7 +29,7 @@ The sequence is:
 
 ### Updater
 
-The Updater reads the GitHub token from the SOPS secret `github_token`. It keeps GitHub's credential helper in the updater checkout's `.gitconfig`, rather than changing the user's Home Manager-managed global Git configuration. It also sets the commit identity explicitly and runs git with hooks disabled.
+The Updater reads the GitHub token from the SOPS secret `github_token`. It keeps GitHub's credential helper in a config file inside the checkout's `.git`, where no commit can replace it, rather than changing the user's Home Manager-managed global Git configuration. It also sets the commit identity explicitly and runs git with hooks disabled.
 
 Each run:
 
@@ -49,7 +49,7 @@ ssh pewter 'sudo systemctl start flake-updater.service'
 ssh pewter 'sudo journalctl -u flake-updater.service -n 100 --no-pager'
 ```
 
-Use `--dry-run` before investigating an unexpected update. It updates a checkout, prints the PR body it would write, and reads GitHub without pushing, commenting, or opening anything. Point it at a scratch `--repo-dir` so it does not disturb the service's checkout. With `--agent` added, the dry run evaluates every host and `nix flake check --no-build` locally in place of the Build gate, and runs Flake fixer rounds against that result. It needs the fixer's server running and catches evaluation failures, not build failures.
+Use `--dry-run` before investigating an unexpected update. It updates a checkout, prints the PR body it would write, and reads GitHub without pushing, commenting, or opening anything. Point it at a scratch `--repo-dir` so it does not disturb the service's checkout. With `--agent` added, the dry run evaluates every host and `nix flake check --no-build` locally in place of the Build gate, and runs Flake fixer rounds against that result. It needs the fixer's server running and catches evaluation failures, not build failures. Pass `--work-dir /var/lib/flake-fixer/dry-work --context-dir /var/lib/flake-fixer/dry-context` too, so the dry run never clears the workspace of a scheduled run that is repairing at the same time.
 
 ### Flake fixer
 

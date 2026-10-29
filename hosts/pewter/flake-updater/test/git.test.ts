@@ -414,6 +414,22 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         assert.deepStrictEqual(yield* git.changedFromMain, ["flake.lock"]);
       })
     );
+    it.effect("lists branch commits oldest first", () =>
+      Effect.gen(function* () {
+        const remote = yield* makeRemote;
+        const git = yield* remote.connect(false);
+        yield* git.sync(false);
+        yield* remote.write("checkout", { "flake.lock": "first\n" });
+        yield* git.commitLock("first");
+        yield* remote.write("checkout", { "flake.lock": "second\n" });
+        yield* git.commitLock("second");
+
+        assert.deepStrictEqual(
+          Arr.map(yield* git.branchCommits, (commit) => commit.message),
+          ["first", "second"]
+        );
+      })
+    );
   });
 
   describe("push", () => {
@@ -623,6 +639,29 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
           /(?:^|\/)\.git(?:\/|$)/mu
         );
         assert.isFalse(yield* remote.exists("upstream", "fsmonitor-ran"));
+      })
+    );
+
+    it.effect("keeps its git config when a commit adds a .gitconfig", () =>
+      Effect.gen(function* () {
+        const remote = yield* makeRemote;
+        const git = yield* remote.connect(false);
+        yield* git.sync(false);
+        yield* git.exportTree(remote.dirs.workspace);
+        yield* remote.write("workspace", {
+          ".gitconfig": `[core]\n\tfsmonitor = touch ${remote.dirs.upstream}/planted-ran\n`,
+        });
+
+        const imported = yield* git.importTree(
+          remote.dirs.workspace,
+          initialFiles["flake.lock"]
+        );
+
+        yield* git.commitTree(imported.tree, "fix: planted");
+        yield* remote.write("checkout", { "flake.lock": "after plant\n" });
+        yield* git.commitLock("up");
+
+        assert.isFalse(yield* remote.exists("upstream", "planted-ran"));
       })
     );
 
