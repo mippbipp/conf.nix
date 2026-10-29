@@ -107,7 +107,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
             <text fg={theme().text.feedback.warning.base}>
               Overage {amount(o().credits)} · {money(o().charges, o().currency)}
               <br />
-              {o().cap ? ` (cap ${amount(o().cap)})` : ""}
+              {o().cap ? `(cap ${amount(o().cap)})` : ""}
             </text>
           )}
         </Show>
