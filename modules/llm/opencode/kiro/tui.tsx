@@ -106,6 +106,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
           {(o: Accessor<NonNullable<Allowance["overage"]>>) => (
             <text fg={theme().text.feedback.warning.base}>
               Overage {amount(o().credits)} · {money(o().charges, o().currency)}
+              <br />
               {o().cap ? ` (cap ${amount(o().cap)})` : ""}
             </text>
           )}
