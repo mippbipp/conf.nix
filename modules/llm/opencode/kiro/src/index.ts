@@ -13,7 +13,7 @@
 //
 // OpenCode loads this file as it is: Bun strips the types, and OpenCode
 // supplies `effect` and `@opencode/plugin` itself, so the plugin may import
-// only those, Bun's and Node's own modules, and its rpc.ts beside it. The
+// only those, Bun's and Node's own modules, and the files beside it. The
 // no-restricted-imports rule in ../oxlint.config.ts fails lint on any other.
 //
 // The sidebar (tui.tsx) shows the account's usage and what each session has
@@ -47,14 +47,9 @@ import {
   Stream,
   Tracer,
 } from "effect";
-import {
-  FetchHttpClient,
-  HttpClient,
-  HttpClientError,
-  HttpClientRequest,
-  HttpClientResponse,
-} from "effect/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
+import * as Failure from "./failure.ts";
 import { type AccountUsage, type Allowance, KiroRpc, type UsageAnswer } from "./rpc.ts";
 
 const ID = "kiro";
@@ -80,60 +75,8 @@ const isBuilderID = (provider: string | null | undefined) =>
 const env = (k: string) => process.env[k] ?? "";
 const home = () => env("HOME") || homedir();
 
-// ---- errors ----------------------------------------------------------------------
-
-// SignInError is a sign-in that is missing or that Kiro refused; OpenCode
-// is told 401.
-class SignInError extends Schema.TaggedError<SignInError>()("SignInError", {
-  message: Schema.String,
-}) {}
-
-// RefreshError is a refresh that got no usable answer; OpenCode is told 502
-// and retries.
-class RefreshError extends Schema.TaggedError<RefreshError>()("RefreshError", {
-  message: Schema.String,
-}) {}
-
-// KiroApiError is a call to Kiro's management API that failed: Kiro's
-// status and body when it answered, 502 when it didn't.
-class KiroApiError extends Schema.TaggedError<KiroApiError>()("KiroApiError", {
-  status: Schema.Number,
-  body: Schema.String,
-  message: Schema.String,
-}) {}
-
-// Kiro's error bodies, and its event stream's exceptions
-const ErrorBody = Schema.Struct({
-  message: Schema.optional(Schema.NullOr(Schema.String)),
-  Message: Schema.optional(Schema.NullOr(Schema.String)),
-  reason: Schema.optional(Schema.NullOr(Schema.String)),
-});
-const decodeErrorBody = Schema.decodeUnknownOption(Schema.fromJsonString(ErrorBody));
-
-const kiroApiError = (status: number, body: string) => {
-  const msg = Option.getOrUndefined(decodeErrorBody(body))?.message;
-  return KiroApiError.make({
-    status,
-    body,
-    message: msg ? `Kiro: ${msg} (HTTP ${status})` : `Kiro answered HTTP ${status}`,
-  });
-};
-
-const messageOf = (e: unknown) => (e instanceof Error && e.message) || String(e);
 const codeOf = (e: unknown) =>
   typeof e === "object" && e !== null && "code" in e ? e.code : undefined;
-
-// Failure is what OpenCode is told when a request fails. OpenCode reads the
-// status and message to decide what to do, and shows the message, while it
-// waits to retry too. retryAfter is Kiro's Retry-After, passed on for
-// OpenCode's backoff. retry is false for a failure that would only repeat,
-// which OpenCode would otherwise retry by its status.
-interface Failure {
-  status: number;
-  message: string;
-  retryAfter?: string;
-  retry?: false;
-}
 
 // Kiro's reply is dropped after this long with nothing from Kiro, the
 // default of kiro-cli's own watchdog (api.streamIdleHardTimeout). A 504
@@ -142,28 +85,6 @@ const IDLE_SECONDS = 300;
 // how long Kiro may take to answer a request this plugin sends itself
 // (the one resent with a refreshed token) before it starts the reply
 const HEADERS_SECONDS = 60;
-const stalled = (seconds: number): Failure => ({
-  status: 504,
-  message: `Kiro stopped responding: nothing arrived for ${seconds} seconds, so the reply was dropped`,
-});
-
-// failureOf is the status and message OpenCode is given for a failure.
-function failureOf(cause: Cause.Cause<unknown>): Failure {
-  const e = Cause.squash(cause);
-  if (Schema.is(SignInError)(e)) return { status: 401, message: e.message };
-  if (Schema.is(KiroApiError)(e)) return { status: e.status, message: e.message };
-  if (Schema.is(RefreshError)(e)) return { status: 502, message: e.message };
-  if (Cause.isTimeoutError(e)) return { status: 504, message: messageOf(e) };
-  if (HttpClientError.isHttpClientError(e))
-    return { status: 502, message: "Couldn't reach Kiro: " + e.message };
-  // anything else is this plugin failing on the request, and a retry would
-  // fail the same way
-  return {
-    status: 500,
-    message: "The Kiro plugin failed on this request: " + messageOf(e),
-    retry: false,
-  };
-}
 
 // ---- where kiro-cli and the Kiro IDE keep their sign-in -------------------------
 
@@ -457,14 +378,15 @@ const TokenAnswer = Schema.Struct({
 });
 
 const refreshFailed = (e: { message: string }) =>
-  RefreshError.make({ message: "Couldn't refresh Kiro's sign-in: " + e.message });
+  Failure.RefreshError.make({ message: "Couldn't refresh Kiro's sign-in: " + e.message });
 
 // tokenPost asks a token endpoint for a new token.
 const tokenPost = Effect.fnUntraced(function* (request: HttpClientRequest.HttpClientRequest) {
   const res = yield* send(HttpClientRequest.acceptJson(request), 30).pipe(
     Effect.mapError(refreshFailed)
   );
-  if ([400, 401, 403].includes(res.status)) return yield* SignInError.make({ message: EXPIRED });
+  if ([400, 401, 403].includes(res.status))
+    return yield* Failure.SignInError.make({ message: EXPIRED });
   if (res.status < 200 || res.status > 299)
     return yield* refreshFailed({
       message: `${new URL(request.url).host} answered HTTP ${res.status}`,
@@ -490,7 +412,7 @@ const kiroCli = (bin: string, args: string[]) =>
 // by kiro-cli first.
 const refresh = Effect.fnUntraced(function* (
   c: Cred
-): Effect.fn.Return<Cred, SignInError | RefreshError, HttpClient.HttpClient> {
+): Effect.fn.Return<Cred, Failure.SignInError | Failure.RefreshError, HttpClient.HttpClient> {
   if (c.dbKey) {
     const bin = yield* Effect.sync(kiroExecutable);
     if (bin) {
@@ -500,7 +422,7 @@ const refresh = Effect.fnUntraced(function* (
       if (n && n.dbKey === c.dbKey && n.access !== c.access && fresh(n, now)) return n;
     }
   }
-  if (!c.refresh) return yield* SignInError.make({ message: EXPIRED });
+  if (!c.refresh) return yield* Failure.SignInError.make({ message: EXPIRED });
   let profile = c.profile;
   let out: { access?: string | null; refresh?: string | null; expiresIn?: number | null };
   if (c.method === "social") {
@@ -528,7 +450,7 @@ const refresh = Effect.fnUntraced(function* (
     );
     out = { access: r.accessToken, refresh: r.refreshToken, expiresIn: r.expiresIn };
   } else {
-    if (!c.tokenURL) return yield* SignInError.make({ message: EXPIRED });
+    if (!c.tokenURL) return yield* Failure.SignInError.make({ message: EXPIRED });
     const r = yield* tokenPost(
       HttpClientRequest.post(c.tokenURL).pipe(
         HttpClientRequest.bodyUrlParams({
@@ -540,7 +462,7 @@ const refresh = Effect.fnUntraced(function* (
     );
     out = { access: r.access_token, refresh: r.refresh_token, expiresIn: r.expires_in };
   }
-  if (!out.access) return yield* SignInError.make({ message: EXPIRED });
+  if (!out.access) return yield* Failure.SignInError.make({ message: EXPIRED });
   const expiresIn = out.expiresIn && out.expiresIn > 0 ? out.expiresIn : 3600;
   const now = yield* Clock.currentTimeMillis;
   const n: Cred = { ...c, profile, access: out.access, expires: now + expiresIn * 1000 };
@@ -581,7 +503,7 @@ function managementCall<A>(
   method: string,
   query: Record<string, string> | null,
   body?: object
-): Effect.Effect<A, KiroApiError, HttpClient.HttpClient> {
+): Effect.Effect<A, Failure.KiroApiError, HttpClient.HttpClient> {
   return Effect.gen(function* () {
     const url = `${management(region)}/${method}`;
     const request = (
@@ -591,7 +513,7 @@ function managementCall<A>(
     ).pipe(HttpClientRequest.setHeaders(authHeaders(a)), HttpClientRequest.acceptJson);
     const res = yield* send(request, 20).pipe(
       Effect.mapError((e) =>
-        KiroApiError.make({
+        Failure.KiroApiError.make({
           status: 502,
           body: "",
           message: `Couldn't reach Kiro for ${method}: ${e.message}`,
@@ -599,11 +521,14 @@ function managementCall<A>(
       )
     );
     if (res.status < 200 || res.status > 299)
-      return yield* kiroApiError(res.status, yield* res.text.pipe(Effect.orElseSucceed(() => "")));
+      return yield* Failure.KiroApiError.fromReply(
+        res.status,
+        yield* res.text.pipe(Effect.orElseSucceed(() => ""))
+      );
     return yield* res.json.pipe(
       Effect.flatMap(decode),
       Effect.mapError((e) =>
-        KiroApiError.make({
+        Failure.KiroApiError.make({
           status: 502,
           body: "",
           message: `Kiro's ${method} answer didn't read as expected: ${e.message}`,
@@ -621,9 +546,9 @@ const decodeProfiles = Schema.decodeUnknownEffect(
 // or the first Kiro lists in either of its regions.
 const profileOf = Effect.fnUntraced(function* (
   c: Cred
-): Effect.fn.Return<string, KiroApiError, HttpClient.HttpClient> {
+): Effect.fn.Return<string, Failure.KiroApiError, HttpClient.HttpClient> {
   if (c.builderID) return BUILDER_ID_PROFILE;
-  let last: KiroApiError | undefined;
+  let last: Failure.KiroApiError | undefined;
   for (const region of ["us-east-1", "eu-central-1"]) {
     const out = yield* managementCall(
       decodeProfiles,
@@ -645,11 +570,15 @@ const profileOf = Effect.fnUntraced(function* (
   }
   return yield* (
     last ??
-      KiroApiError.make({ status: 502, body: "", message: "Kiro has no profile for this sign-in" })
+      Failure.KiroApiError.make({
+        status: 502,
+        body: "",
+        message: "Kiro has no profile for this sign-in",
+      })
   );
 });
 
-type AccountError = SignInError | RefreshError | KiroApiError;
+type AccountError = Failure.SignInError | Failure.RefreshError | Failure.KiroApiError;
 
 // KiroAccount hands out the credentials to call Kiro with, read fresh from
 // kiro-cli (or the IDE) each time and refreshed when near their end or
@@ -675,7 +604,7 @@ class KiroAccount extends Context.Service<
       const credentials = Effect.fn("KiroAccount.credentials")(
         function* (rejected?: string) {
           let c = (yield* readCLI()) ?? (yield* readIDE());
-          if (!c) return yield* SignInError.make({ message: NOT_SIGNED_IN });
+          if (!c) return yield* Failure.SignInError.make({ message: NOT_SIGNED_IN });
           for (let i = 0; i < 16; i++) {
             const n = after.get(c.access);
             if (!n) break;
@@ -958,7 +887,11 @@ const listModels = Effect.fnUntraced(function* (a: Auth) {
     if (!next) break;
   }
   if (!list.length)
-    return yield* KiroApiError.make({ status: 502, body: "", message: "Kiro listed no models" });
+    return yield* Failure.KiroApiError.make({
+      status: 502,
+      body: "",
+      message: "Kiro listed no models",
+    });
   const i = list.findIndex((m) => m.id === defaultModel);
   if (i > 0) list.unshift(...list.splice(i, 1));
   return list;
@@ -1609,93 +1542,6 @@ class Images extends Context.Service<
   });
 }
 
-// ---- failures OpenCode acts on ---------------------------------------------------------
-
-const kiroSaid = (msg: string) => (msg ? `. Kiro said: ${msg}` : "");
-
-// classify gives a Kiro failure the status and words OpenCode acts on, with
-// what Kiro said kept at the end. kind is the AWS error type, from the
-// x-amzn-errortype header or the event stream's exception. OpenCode
-// compacts the session on "prompt is too long", stops on a 402 or another
-// 4xx, and retries a 429 or a 5xx with backoff.
-function classify(status: number, msg: string, kind = ""): Failure {
-  const all = `${kind} ${msg}`;
-  if (/CONTENT_LENGTH_EXCEEDS_THRESHOLD|ContentLengthExceeds|input is too long/i.test(all))
-    return {
-      status: 400,
-      message: "prompt is too long for this model's context window" + kiroSaid(msg),
-    };
-  if (/MONTHLY_REQUEST_COUNT|MonthlyLimitReached|USAGE_LIMIT/i.test(all))
-    return { status: 402, message: "Kiro's monthly usage limit has been reached" + kiroSaid(msg) };
-  if (/DAILY_REQUEST_COUNT/i.test(all))
-    return { status: 402, message: "Kiro's daily request limit has been reached" + kiroSaid(msg) };
-  if (/INSUFFICIENT_MODEL_CAPACITY/i.test(all))
-    return {
-      status: 503,
-      message:
-        "Kiro has no capacity for this model right now. If it keeps happening, switch models" +
-        kiroSaid(msg),
-    };
-  if (/throttl/i.test(kind) || status === 429)
-    return { status: 429, message: "Kiro is rate limiting requests" + kiroSaid(msg) };
-  if (/validation/i.test(kind) || status === 400)
-    return { status: 400, message: "Kiro rejected the request" + kiroSaid(msg) };
-  if (/accessdenied/i.test(kind) || status === 401 || status === 403)
-    return {
-      status: status === 401 ? 401 : 403,
-      message:
-        "Kiro refused the request. If you signed out of kiro-cli or switched accounts, run `kiro-cli login`" +
-        kiroSaid(msg),
-    };
-  if (/unavailable/i.test(kind) || status === 503)
-    return { status: 503, message: "Kiro is unavailable right now" + kiroSaid(msg) };
-  if (status >= 500) return { status, message: "Kiro had a server error" + kiroSaid(msg) };
-  return { status, message: `Kiro answered HTTP ${status}` + kiroSaid(msg) };
-}
-
-// what Kiro's JSON error says: {"message": "...", "reason": "..."}
-function errorText(body: string) {
-  const e = Option.getOrUndefined(decodeErrorBody(body));
-  const msg = e?.message || e?.Message;
-  if (msg) return msg + (e?.reason ? ` (${e.reason})` : "");
-  return body.trim();
-}
-
-// failure is the status and message for an HTTP error Kiro answered with.
-// A Retry-After Kiro sent goes on to OpenCode.
-function failure(
-  status: number,
-  body: string,
-  headers: Readonly<Record<string, string | undefined>> = {}
-): Failure {
-  const kind = (headers["x-amzn-errortype"] ?? "").split(":")[0];
-  const f = classify(status, errorText(String(body ?? "")), kind);
-  const retryAfter = headers["retry-after"];
-  return retryAfter ? { ...f, retryAfter } : f;
-}
-
-const ERROR_TYPES: Record<number, string> = {
-  400: "invalid_request_error",
-  401: "authentication_error",
-  402: "billing_error",
-  403: "permission_error",
-  404: "not_found_error",
-  413: "request_too_large",
-  429: "rate_limit_error",
-  503: "overloaded_error",
-  529: "overloaded_error",
-};
-const errorType = (status: number) => ERROR_TYPES[status] ?? "api_error";
-const errorResponse = (f: Failure) => {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (f.retryAfter) headers["retry-after"] = f.retryAfter;
-  if (f.retry === false) headers["x-should-retry"] = "false";
-  return Response.json(
-    { type: "error", error: { type: errorType(f.status), message: f.message } },
-    { status: f.status, headers }
-  );
-};
-
 // ---- the reply: an AWS event stream → Messages ---------------------------------------
 
 // the size of each header value type that isn't a string or bytes
@@ -1725,17 +1571,6 @@ function frameHeaders(h: Uint8Array) {
     i += size;
   }
   return out;
-}
-
-// exception is the status and message for an error in the stream.
-function exception(kind: string | undefined, payload: Uint8Array): Failure {
-  const k = String(kind ?? "");
-  const msg = errorText(new TextDecoder().decode(payload));
-  if (/throttl/i.test(k)) return classify(429, msg, k);
-  if (/validation/i.test(k)) return classify(400, msg, k);
-  if (/accessdenied/i.test(k)) return classify(403, msg, k);
-  if (/unavailable/i.test(k)) return classify(503, msg, k);
-  return classify(500, k && k !== "error" ? `${k}: ${msg}` : msg, k);
 }
 
 // ThinkParser splits a reply that opens with <thinking>…</thinking> into its
@@ -1818,7 +1653,7 @@ type KiroEvent =
   | Said
   | { kind: "sig" | "toolArgs"; text: string }
   | { kind: "toolStart"; id: string; name: string }
-  | ({ kind: "error" } & Failure)
+  | ({ kind: "error" } & Failure.Failure)
   | { kind: "stop"; reason: string; usage: Usage };
 
 // what the payload of each event Kiro sends may hold
@@ -1877,7 +1712,7 @@ class ReplyDecoder {
   };
   private pct = 0;
   private said = 0;
-  private failed: Failure | undefined;
+  private failed: Failure.Failure | undefined;
   private ended = false;
 
   constructor(
@@ -1915,11 +1750,11 @@ class ReplyDecoder {
 
   // broke is the body failing before its end
   broke(message: string) {
-    this.fail({ status: 502, message: "Kiro's reply broke off before it finished: " + message });
+    this.fail(Failure.brokeOff(message));
   }
 
   // fail is the reply failing: the first failure is the one said
-  fail(f: Failure) {
+  fail(f: Failure.Failure) {
     this.failed ??= f;
   }
 
@@ -1950,12 +1785,15 @@ class ReplyDecoder {
   private message(headers: Record<string, string>, payload: Uint8Array, out: KiroEvent[]) {
     const type = headers[":message-type"];
     if (type === "exception" || type === "error") {
-      this.failed = exception(headers[":exception-type"] || headers[":error-code"], payload);
+      this.failed = Failure.fromException(
+        headers[":exception-type"] || headers[":error-code"],
+        new TextDecoder().decode(payload)
+      );
       return;
     }
     const kind = headers[":event-type"];
     if (kind && FAILURE_EVENTS.has(kind)) {
-      this.failed = exception(kind, payload);
+      this.failed = Failure.fromException(kind, new TextDecoder().decode(payload));
       return;
     }
     const m = Option.getOrUndefined(decodePayload(new TextDecoder().decode(payload)));
@@ -2029,9 +1867,7 @@ const events = (
       Stream.takeUntil(() => reader.done),
       Stream.flattenIterable,
       Stream.catchCause((cause) => {
-        const e = Cause.squash(cause);
-        if (Cause.isTimeoutError(e)) reader.fail(stalled(idleSeconds));
-        else reader.broke(messageOf(e));
+        reader.fail(Failure.fromBody(cause, idleSeconds));
         return Stream.empty;
       }),
       Stream.concat(Stream.suspend(() => Stream.fromIterable(reader.end())))
@@ -2133,7 +1969,7 @@ class MessagesEncoder {
         break;
       case "error":
         close();
-        sse("error", { error: { type: errorType(e.status), message: e.message } });
+        sse("error", { error: Failure.toError(e) });
         break;
       case "stop":
         close();
@@ -2171,9 +2007,7 @@ const reply = Effect.fnUntraced(function* (
   const first = Option.getOrUndefined(head);
   if (!first || first.kind === "error") {
     yield* Scope.close(scope, Exit.void);
-    return errorResponse(
-      first ?? { status: 502, message: "Kiro ended its reply without sending anything" }
-    );
+    return Failure.toResponse(first ?? Failure.emptyReply);
   }
   const body = Stream.concat(Stream.make(first), rest).pipe(
     Stream.takeUntil(isLast),
@@ -2199,7 +2033,7 @@ const standIn = () => new Request("data:application/json,%7B%7D", { method: "POS
 // what http.response needs to turn a call's answer back, by the call
 type Sent =
   | { req: MessagesRequest; model: string; thinking: Thinking; a: Auth; error?: never }
-  | { error: Failure };
+  | { error: Failure.Failure };
 
 // Host is the part of OpenCode's plugin context this plugin uses.
 type Host = {
@@ -2236,7 +2070,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   const accountNow = usageCached.pipe(
     Effect.map((usage): { account: AccountUsage | null; error?: string } => ({ account: usage })),
     Effect.catchCause((cause) =>
-      Effect.succeed({ account: null, error: failureOf(cause).message.slice(0, 200) })
+      Effect.succeed({ account: null, error: Failure.fromCause(cause).message.slice(0, 200) })
     )
   );
 
@@ -2345,7 +2179,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         Effect.catchCause(effect, (cause) =>
           Effect.sync(() => {
             const call = standIn();
-            sent.set(call, { error: failureOf(cause) });
+            sent.set(call, { error: Failure.fromCause(cause) });
             event.request = call;
           })
         )
@@ -2361,7 +2195,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         if (!p) return;
         sent.delete(event.request);
         if (p.error) {
-          event.response = errorResponse(p.error);
+          event.response = Failure.toResponse(p.error);
           return;
         }
         let res = HttpClientResponse.fromWeb(
@@ -2383,7 +2217,9 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         }
         if (res.status < 200 || res.status > 299) {
           const body = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-          event.response = errorResponse(failure(res.status, body.slice(0, 1 << 20), res.headers));
+          event.response = Failure.toResponse(
+            Failure.fromReply(res.status, body.slice(0, 1 << 20), res.headers)
+          );
           return;
         }
         const window = (yield* modelNamed(p.model))?.context ?? 0;
@@ -2399,7 +2235,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           Effect.provideService(HttpClient.HttpClient, http),
           Effect.catchCause((cause) =>
             Effect.sync(() => {
-              event.response = cause.pipe(failureOf, errorResponse);
+              event.response = cause.pipe(Failure.fromCause, Failure.toResponse);
             })
           )
         )
@@ -2420,8 +2256,8 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
       schedule: Schedule.exponential("5 seconds", 4),
       times: 3,
       while: (e) =>
-        Schema.is(RefreshError)(e) ||
-        (Schema.is(KiroApiError)(e) && (e.status === 429 || e.status >= 500)),
+        Schema.is(Failure.RefreshError)(e) ||
+        (Schema.is(Failure.KiroApiError)(e) && (e.status === 429 || e.status >= 500)),
     }),
     Effect.catchCause((cause) =>
       Effect.logWarning("Kiro: listing the account's models failed", cause)
@@ -2452,7 +2288,6 @@ export const _internal = {
   thinkingOf,
   kiroRequest,
   events,
-  failure,
   toolName,
   toolNames,
 };

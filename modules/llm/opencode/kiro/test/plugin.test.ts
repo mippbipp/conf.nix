@@ -1168,30 +1168,13 @@ test.each([401, 403])(
   }
 );
 
-test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
+test("hooks: an error Kiro answers with, or an exception before the answer, is a status", async () => {
   signIn({ access: "tok" });
   const { hook } = await load();
   const answered = async (response: Response) => {
     const res = await ask(hook, response);
     return { status: res.status, headers: res.headers, error: await errorOf(res) };
   };
-  // OpenCode compacts the session on "prompt is too long"
-  const overflow = await answered(
-    Response.json(
-      { message: "Input is too long.", reason: "CONTENT_LENGTH_EXCEEDS_THRESHOLD" },
-      { status: 400 }
-    )
-  );
-  expect(overflow.status).toBe(400);
-  expect(overflow.error.message).toBe(
-    "prompt is too long for this model's context window. Kiro said: Input is too long. (CONTENT_LENGTH_EXCEEDS_THRESHOLD)"
-  );
-  // and doesn't retry a spent allowance
-  const limit = await answered(
-    Response.json({ message: "no", reason: "MONTHLY_REQUEST_COUNT" }, { status: 429 })
-  );
-  expect(limit.status).toBe(402);
-  expect(limit.error.type).toBe("billing_error");
   // a 429 keeps Kiro's Retry-After, which OpenCode waits for
   const throttled = await answered(
     Response.json(
@@ -1211,11 +1194,6 @@ test("hooks: Kiro's failures keep their meaning for OpenCode", async () => {
     type: "rate_limit_error",
     message: "Kiro is rate limiting requests. Kiro said: Too many requests",
   });
-  const busy = await answered(
-    Response.json({ message: "busy", reason: "INSUFFICIENT_MODEL_CAPACITY" }, { status: 429 })
-  );
-  expect(busy.status).toBe(503);
-  expect(busy.error.message).toStartWith("Kiro has no capacity for this model right now");
   // an exception before any of the answer is a status too
   const streamed = await answered(
     stream(frame("ThrottlingException", { message: "slow down" }, "exception"))
@@ -1399,29 +1377,6 @@ test("hooks: an exception after the answer began ends the stream with an error e
   ]);
   expect(out[2].delta.text).toBe("Hello");
   expect(out[4].error.type).toBe("rate_limit_error");
-});
-
-test("hooks: a validation exception before the answer is a 400, compacting one that is too long", async () => {
-  signIn({ access: "tok" });
-  const { hook } = await load();
-  const exception = (message: string) =>
-    stream(frame("ValidationException", { message }, "exception"));
-  const long = await ask(hook, exception("Input is too long."));
-  expect(long.status).toBe(400);
-  expect((await errorOf(long)).message).toStartWith(
-    "prompt is too long for this model's context window"
-  );
-  const bad = await ask(hook, exception("bad field"));
-  expect(bad.status).toBe(400);
-  expect(await errorOf(bad)).toEqual({
-    type: "invalid_request_error",
-    message: "Kiro rejected the request. Kiro said: bad field",
-  });
-});
-
-test("an error Kiro gives no words for still says what it was", () => {
-  expect(k.failure(500, "")).toEqual({ status: 500, message: "Kiro had a server error" });
-  expect(k.failure(418, "")).toEqual({ status: 418, message: "Kiro answered HTTP 418" });
 });
 
 // the account's credentials, or why there are none

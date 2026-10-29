@@ -78,6 +78,8 @@ export default defineConfig({
     "anti-slop-effect/prefer-effect-match": "error",
     // Maintainers rule aimed at published API stability; this plugin is private.
     "effecttsgo/api-stability-leak": "off",
+    // dual (pipeable) signatures are for published libraries; this plugin's modules have one caller
+    "effecttsgo/missing-pipeable-signature": "off",
 
     // --- not applicable in codebase ---
 

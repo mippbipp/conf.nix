@@ -8,20 +8,23 @@ For APIs it doesn't cover, search `node_modules/effect/src`.
 ## Layout
 
 - `src/` holds what OpenCode loads, and nothing else: `index.ts` (the server
-  part), `rpc.ts` (the RPC between it and the sidebar) and `tui.tsx` (the
-  sidebar). `modules/llm/opencode/app.nix` installs `src/` as it is to
+  part) and the modules it imports, each named for what it owns (such as
+  `failure.ts`), `rpc.ts` (the RPC between it and the sidebar) and `tui.tsx`
+  (the sidebar). `modules/llm/opencode/app.nix` installs `src/` as it is to
   `~/.config/opencode/plugins/kiro`, where OpenCode finds the parts by file
   name. Bun strips the types and there is no bundler.
 - `test/plugin.test.ts` tests the server part through `src/index.ts`'s
-  `_internal` export.
+  `_internal` export; `test/<module>.test.ts` tests a module of `src/`
+  through its exports.
 - The dev config stays outside `src/`: `package.json`, `tsconfig.json`,
   `oxlint.config.ts`, `oxfmt.config.ts`, `bun.lock`, and the vendored
   anti-slop lint plugin in `tools/oxlint/anti-slop` (see its `UPSTREAM.md`).
 
 At runtime OpenCode supplies `effect` and `@opencode/plugin` itself, so
-`src/index.ts` and `src/rpc.ts` import only those, `bun:*`, `node:*` and files
-in `src/`. `src/tui.tsx` may also import `solid-js` and `@opentui/*`. The
-`no-restricted-imports` rule in `oxlint.config.ts` fails lint on any other.
+`src/index.ts`, its modules and `src/rpc.ts` import only those, `bun:*`,
+`node:*` and files in `src/`. `src/tui.tsx` may also import `solid-js` and
+`@opentui/*`. The `no-restricted-imports` rule in `oxlint.config.ts` fails
+lint on any other.
 
 ## Commands
 
