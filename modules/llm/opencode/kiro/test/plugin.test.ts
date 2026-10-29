@@ -6,38 +6,23 @@
 // empty so kiro-cli is never run. The plugin reads both on each call. Its
 // HTTP goes to the fake client below, never the network.
 
-import { Database } from "bun:sqlite";
-import { afterAll, expect, test } from "bun:test";
+import { expect, test } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
 import { deflateSync } from "node:zlib";
 
-import { Effect, Layer, Option, type Scope, Stream } from "effect";
+import { Effect, Layer, type Scope, Stream } from "effect";
 import {
   HttpClient,
   HttpClientError,
   type HttpClientRequest,
   HttpClientResponse,
-  UrlParams,
 } from "effect/http";
 import { TestClock } from "effect/testing";
 
 import { _internal as k } from "../src/index.ts";
+import { PROFILE, throwawayHome } from "./signin.ts";
 
-const was = { HOME: process.env.HOME, PATH: process.env.PATH };
-const HOME = mkdtempSync(join(tmpdir(), "kiro-test-"));
-process.env.HOME = HOME;
-process.env.PATH = "";
-afterAll(() => {
-  Object.assign(process.env, was);
-  rmSync(HOME, { recursive: true, force: true });
-});
-
-const PROFILE = "arn:aws:codewhisperer:us-east-1:111111111111:profile/TEST";
-const dbDir = join(HOME, ".local", "share", "kiro-cli");
-const dbPath = join(dbDir, "data.sqlite3");
+const { signIn, signOut } = throwawayHome();
 
 // the fake network: each test sets how it answers
 type Answer = (request: HttpClientRequest.HttpClientRequest) => Promise<Response>;
@@ -62,47 +47,6 @@ const run = <A, E>(effect: Effect.Effect<A, E, Layer.Success<typeof layer> | Sco
   return result.finally(() => {
     answer = offline;
   });
-};
-const textOf = (request: HttpClientRequest.HttpClientRequest) =>
-  request.body._tag === "Uint8Array" ? new TextDecoder().decode(request.body.body) : "";
-
-// signIn writes a kiro-cli IAM Identity Center sign-in, as kiro-cli keeps it,
-// in place of any before it. A null start or profile leaves it out.
-function signIn({
-  access = "old",
-  expires = Date.now() + 60 * 60_000,
-  refresh = "r1",
-  start = "https://example.awsapps.com/start" as string | null,
-  profile = PROFILE as string | null,
-} = {}) {
-  rmSync(dbPath, { force: true });
-  mkdirSync(dbDir, { recursive: true });
-  const db = new Database(dbPath, { create: true });
-  db.run("CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT)");
-  db.run("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value BLOB)");
-  const put = (table: "auth_kv" | "state", key: string, value: object) =>
-    db
-      .query(`INSERT OR REPLACE INTO ${table} (key, value) VALUES (?, ?)`)
-      .run(key, JSON.stringify(value));
-  put("auth_kv", "kirocli:odic:token", {
-    access_token: access,
-    refresh_token: refresh,
-    expires_at: new Date(expires).toISOString(),
-    region: "us-east-1",
-    ...(start ? { start_url: start } : {}),
-    scopes: ["codewhisperer:conversations"],
-  });
-  put("auth_kv", "kirocli:odic:device-registration", { client_id: "cid", client_secret: "secret" });
-  if (profile) put("state", "api.codewhisperer.profile", { arn: profile, profile_name: "TEST" });
-  db.close();
-}
-const stored = () => {
-  const db = new Database(dbPath, { readonly: true });
-  const row = db
-    .query<{ value: string }, [string]>("SELECT value FROM auth_kv WHERE key = ?")
-    .get("kirocli:odic:token");
-  db.close();
-  return JSON.parse(row?.value ?? "null");
 };
 
 // an AWS event stream message; the parser doesn't check the checksums
@@ -251,46 +195,6 @@ async function ask(
   await hook("http.response").fn(res);
   return res.response!;
 }
-
-test("reads kiro-cli's sign-in, with the profile kiro-cli keeps apart from the token", async () => {
-  signIn();
-  const c = await run(k.readCLI());
-  expect(c).toMatchObject({
-    access: "old",
-    method: "idc",
-    profile: PROFILE,
-    clientId: "cid",
-    builderID: false,
-  });
-});
-
-test("a token near its end is refreshed at AWS and written back for kiro-cli", async () => {
-  signIn({ expires: Date.now() + 30_000 });
-  const seen: [string, unknown][] = [];
-  answer = async (request) => {
-    seen.push([request.url, JSON.parse(textOf(request))]);
-    return Response.json({ accessToken: "new", refreshToken: "r2", expiresIn: 3600 });
-  };
-  const a = await run(
-    Effect.gen(function* () {
-      const account = yield* k.KiroAccount;
-      return yield* account.credentials();
-    })
-  );
-  expect(a).toMatchObject({ token: "new", profile: PROFILE, region: "us-east-1" });
-  expect(seen[0]![0]).toBe("https://oidc.us-east-1.amazonaws.com/token");
-  expect(seen[0]![1]).toMatchObject({
-    clientId: "cid",
-    refreshToken: "r1",
-    grantType: "refresh_token",
-  });
-  // written back with the fields kiro-cli keeps that the plugin doesn't read
-  expect(stored()).toMatchObject({
-    access_token: "new",
-    refresh_token: "r2",
-    scopes: ["codewhisperer:conversations"],
-  });
-});
 
 test("models: each takes the thinking Kiro lists request fields for", () => {
   const claude = k.modelOf({
@@ -1295,7 +1199,7 @@ test("models: a listing Kiro fails is tried again, 5 and then 20 seconds later",
 });
 
 test("hooks: with no sign-in, the request answers with why instead of reaching Kiro", async () => {
-  rmSync(dbPath, { force: true });
+  signOut();
   const { hook } = await load();
   const event: HookEvent = {
     request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
@@ -1379,85 +1283,6 @@ test("hooks: an exception after the answer began ends the stream with an error e
   expect(out[4].error.type).toBe("rate_limit_error");
 });
 
-// the account's credentials, or why there are none
-const credentials = (rejected?: string) =>
-  run(Effect.flatMap(k.KiroAccount, (a) => a.credentials(rejected)));
-const credentialsError = (rejected?: string) =>
-  run(Effect.flip(Effect.flatMap(k.KiroAccount, (a) => a.credentials(rejected))));
-const OIDC = "https://oidc.us-east-1.amazonaws.com/token";
-
-test("one refresh at a time: two requests at once spend the refresh token once", async () => {
-  signIn({ expires: Date.now() - 1000 });
-  const refreshes: unknown[] = [];
-  answer = async (request) => {
-    refreshes.push(JSON.parse(textOf(request)));
-    await Bun.sleep(30);
-    return Response.json({ accessToken: "new", refreshToken: "r2", expiresIn: 3600 });
-  };
-  const both = await run(
-    Effect.gen(function* () {
-      const account = yield* k.KiroAccount;
-      return yield* Effect.all([account.credentials(), account.credentials()], {
-        concurrency: 2,
-      });
-    })
-  );
-  expect(both.map((a) => a.token)).toEqual(["new", "new"]);
-  expect(refreshes).toHaveLength(1);
-});
-
-test("a refresh whose write-back failed isn't repeated with the refresh token it spent", async () => {
-  signIn({ expires: Date.now() - 1000 });
-  const refreshes: unknown[] = [];
-  answer = async (request) => {
-    refreshes.push(JSON.parse(textOf(request)));
-    return Response.json({ accessToken: "new", refreshToken: "r2", expiresIn: 3600 });
-  };
-  // a database the plugin may read but not write: the write-back can't land
-  chmodSync(dbPath, 0o444);
-  try {
-    const tokens = await run(
-      Effect.gen(function* () {
-        const account = yield* k.KiroAccount;
-        const a = yield* account.credentials();
-        const b = yield* account.credentials();
-        return [a.token, b.token];
-      })
-    );
-    expect(tokens).toEqual(["new", "new"]);
-    expect(refreshes).toHaveLength(1);
-  } finally {
-    chmodSync(dbPath, 0o644);
-  }
-  expect(stored().access_token).toBe("old");
-});
-
-test("a refresh that fails says why: a refused one asks for a sign-in, another is retried", async () => {
-  signIn({ expires: Date.now() - 1000 });
-  for (const status of [400, 401, 403]) {
-    answer = async () => Response.json({ error: "invalid_grant" }, { status });
-    expect(await credentialsError()).toMatchObject({
-      _tag: "SignInError",
-      message: "Kiro's sign-in has expired. Run `kiro-cli login`, then try again.",
-    });
-  }
-  answer = async () => new Response("", { status: 503 });
-  expect(await credentialsError()).toMatchObject({
-    _tag: "RefreshError",
-    message: "Couldn't refresh Kiro's sign-in: oidc.us-east-1.amazonaws.com answered HTTP 503",
-  });
-  answer = offline;
-  const unreachable = await credentialsError();
-  expect(unreachable._tag).toBe("RefreshError");
-  expect(unreachable.message).toStartWith("Couldn't refresh Kiro's sign-in: ");
-  // with no refresh token there is nothing to ask AWS with
-  signIn({ expires: Date.now() - 1000, refresh: "" });
-  answer = async () => {
-    throw new Error("AWS was asked");
-  };
-  expect(await credentialsError()).toMatchObject({ _tag: "SignInError" });
-});
-
 test("hooks: a refresh failing after Kiro turned the token down is a status, not a stream", async () => {
   signIn({ access: "stale" });
   const { hook } = await load();
@@ -1466,106 +1291,12 @@ test("hooks: a refresh failing after Kiro turned the token down is a status, not
   expect(retried.status).toBe(502);
   expect((await errorOf(retried)).message).toStartWith("Couldn't refresh Kiro's sign-in");
   answer = async (request) =>
-    request.url === OIDC ? Response.json({}, { status: 400 }) : new Response("", { status: 500 });
+    request.url === "https://oidc.us-east-1.amazonaws.com/token"
+      ? Response.json({}, { status: 400 })
+      : new Response("", { status: 500 });
   const refused = await ask(hook, new Response("{}", { status: 403 }));
   expect(refused.status).toBe(401);
   expect((await errorOf(refused)).message).toContain("kiro-cli login");
-});
-
-// A Builder ID sign-in has no profile of its own and Kiro won't list one for
-// it; it is asked with the service profile kiro-cli and the IDE use
-// (magpie-community/plugins#16: a Kiro Student account was offered Auto alone).
-const BUILDER_ID = "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX";
-const IDC = "arn:aws:codewhisperer:us-east-1:222222222222:profile/IDC";
-const STUDENT = [
-  { modelId: "auto", modelName: "auto" },
-  { modelId: "claude-opus-5.5", modelName: "claude-opus-5.5" },
-];
-const path = (request: HttpClientRequest.HttpClientRequest) => new URL(request.url).pathname;
-
-// management is Kiro's management API as a sign-in with no profile sees it:
-// profiles listed (or a 403 for Builder ID), and models only for a profile
-function management(profiles?: { arn: string }[]) {
-  const seen = { profiles: 0, listedWith: [] as (string | undefined)[] };
-  answer = async (request) => {
-    if (path(request) === "/List-Available-Profiles") {
-      seen.profiles++;
-      if (profiles) return Response.json({ profiles });
-      const message = "AWS Builder ID is not supported for this operation";
-      return Response.json({ message, reason: null }, { status: 403 });
-    }
-    if (path(request) === "/List-Available-Models") {
-      const p = Option.getOrUndefined(UrlParams.getFirst(request.urlParams, "profileArn"));
-      seen.listedWith.push(p);
-      if (p === BUILDER_ID || p === IDC) return Response.json({ models: STUDENT });
-      return Response.json({ message: "profileArn is required" }, { status: 400 });
-    }
-    throw new Error("unexpected request to " + request.url);
-  };
-  return seen;
-}
-
-test("kiro-cli's Builder ID sign-in (its start URL, or none) is asked with Builder ID's profile", async () => {
-  for (const start of ["https://view.awsapps.com/start", null]) {
-    signIn({ start, profile: null });
-    const seen = management();
-    expect(await credentials()).toMatchObject({ profile: BUILDER_ID, region: "us-east-1" });
-    expect(seen.profiles).toBe(0);
-  }
-});
-
-test("models: a Builder ID account's own models are listed under Builder ID's profile", async () => {
-  signIn({ start: null, profile: null });
-  const seen = management();
-  const { ctx, saved } = fakeHost();
-  await run(
-    Effect.gen(function* () {
-      yield* k.make(ctx);
-      for (let i = 0; i < 100 && !saved.length; i++) yield* Effect.sleep("10 millis");
-    })
-  );
-  expect(seen.listedWith).toEqual([BUILDER_ID]);
-  expect((saved[0] as { id: string }[]).map((m) => m.id)).toEqual(["auto", "claude-opus-5.5"]);
-});
-
-test("an Identity Center sign-in with no profile has its own listed", async () => {
-  signIn({ profile: null });
-  const seen = management([{ arn: IDC }]);
-  expect(await credentials()).toMatchObject({ profile: IDC });
-  expect(seen.profiles).toBe(1);
-});
-
-test("an AWS sign-in whose profiles Kiro won't list for Builder ID takes Builder ID's profile", async () => {
-  signIn({ profile: null });
-  const seen = management();
-  expect(await credentials()).toMatchObject({ profile: BUILDER_ID });
-  expect(seen.profiles).toBe(1);
-});
-
-test("the Kiro IDE's Builder ID sign-in is asked with Builder ID's profile", async () => {
-  rmSync(dbPath, { force: true });
-  const ide = join(HOME, ".aws", "sso", "cache");
-  mkdirSync(ide, { recursive: true });
-  try {
-    writeFileSync(
-      join(ide, "kiro-auth-token.json"),
-      JSON.stringify({
-        accessToken: "ide",
-        refreshToken: "r",
-        expiresAt: new Date(Date.now() + 60 * 60_000).toISOString(),
-        authMethod: "IdC",
-        provider: "BuilderId",
-        region: "us-east-1",
-        clientIdHash: "h",
-      })
-    );
-    writeFileSync(join(ide, "h.json"), JSON.stringify({ clientId: "c", clientSecret: "s" }));
-    const seen = management();
-    expect(await credentials()).toMatchObject({ token: "ide", profile: BUILDER_ID });
-    expect(seen.profiles).toBe(0);
-  } finally {
-    rmSync(join(HOME, ".aws"), { recursive: true, force: true });
-  }
 });
 
 // ---- usage: the sidebar's credits ------------------------------------------------
@@ -1614,16 +1345,12 @@ const PRO_USAGE = {
 // Kiro's management API answering usage (or a status)
 const withPlugin = <A>(
   usage: object | number,
-  use: (
-    p: ReturnType<typeof fakeHost> & { asked: Record<string, string>[] }
-  ) => Effect.Effect<A, unknown, any>,
+  use: (p: ReturnType<typeof fakeHost>) => Effect.Effect<A, unknown, any>,
   host = fakeHost()
 ) => {
-  const asked: Record<string, string>[] = [];
   answer = async (request) => {
     const url = new URL(request.url);
     if (!url.pathname.endsWith("/Get-Usage-Limits")) throw new Error("unexpected " + url.pathname);
-    asked.push(UrlParams.toRecord(request.urlParams) as Record<string, string>);
     return typeof usage === "number"
       ? Response.json({ message: "Not allowed", reason: null }, { status: usage })
       : Response.json(usage);
@@ -1631,7 +1358,7 @@ const withPlugin = <A>(
   return run(
     Effect.gen(function* () {
       yield* k.make(host.ctx);
-      return yield* use({ ...host, asked });
+      return yield* use(host);
     })
   );
 };
@@ -1656,7 +1383,7 @@ const metering = (usage: number) =>
 
 test("usage: a reply's meteringEvents add up, and a session's replies add up in storage", async () => {
   signIn({ access: "tok" });
-  const { store, emitted, credits } = await withPlugin(PRO_USAGE, (p) =>
+  const { store, emitted, account, credits } = await withPlugin(PRO_USAGE, (p) =>
     Effect.gen(function* () {
       yield* replyIn(
         p,
@@ -1673,9 +1400,10 @@ test("usage: a reply's meteringEvents add up, and a session's replies add up in 
         metering(0.05)
       );
       const out = yield* usageOfRpc(p, ["ses_a", "ses_b"]);
-      return { ...p, credits: out.credits };
+      return { ...p, account: out.account, credits: out.credits };
     })
   );
+  expect(account).toMatchObject({ plan: "Kiro Pro", resetsAt: 1793491200000 });
   expect(store.get("credits/ses_a")).toBeCloseTo(0.341);
   expect(store.has("credits/ses_b")).toBe(false);
   expect(credits.ses_a).toBeCloseTo(0.341);
@@ -1704,83 +1432,6 @@ test("usage: a session's credits from an earlier run are read from storage", asy
   );
   expect(out.credits.ses_old).toBeCloseTo(13.4);
   expect(host.store.get("credits/ses_old")).toBeCloseTo(13.4);
-});
-
-test("usage: Get-Usage-Limits reads as the plan, its credits and the overage, and nothing of the user", async () => {
-  signIn({ access: "tok" });
-  const { out, asked } = await withPlugin(PRO_USAGE, (p) =>
-    Effect.map(usageOfRpc(p), (usage) => ({ out: usage, asked: p.asked }))
-  );
-  expect(asked).toHaveLength(1);
-  expect(asked[0]).toEqual({
-    origin: "KIRO_CLI",
-    profileArn: PROFILE,
-    resourceType: "CREDIT",
-  });
-  expect(out).toEqual({
-    account: {
-      plan: "Kiro Pro",
-      resetsAt: 1793491200000,
-      allowances: [
-        {
-          name: "Credits",
-          used: 8978.62,
-          limit: 1000,
-          overage: {
-            credits: 7978.62,
-            charges: 319.144848378096,
-            currency: "USD",
-            rate: 0.04,
-            cap: 40000,
-            enabled: true,
-          },
-        },
-      ],
-      checkedAt: expect.any(Number),
-    },
-    credits: {},
-  });
-  expect(JSON.stringify(out)).not.toContain("someone@example.com");
-  expect(JSON.stringify(out)).not.toContain("user-1");
-});
-
-test("usage: a free account shows its active trial, and a limit of 0 is left out", async () => {
-  signIn({ access: "tok" });
-  const free = {
-    nextDateReset: 1793491200,
-    overageConfiguration: { overageStatus: "DISABLED" },
-    subscriptionInfo: { subscriptionTitle: "KIRO FREE" },
-    usageBreakdownList: [
-      {
-        displayNamePlural: "Credits",
-        currentUsageWithPrecision: 12.5,
-        usageLimitWithPrecision: 50,
-        freeTrialInfo: {
-          freeTrialStatus: "ACTIVE",
-          currentUsageWithPrecision: 120.25,
-          usageLimitWithPrecision: 500,
-          freeTrialExpiry: 1794000000,
-        },
-      },
-      { displayNamePlural: "Agentic requests", usageLimit: 0, currentUsage: 0 },
-      {
-        displayNamePlural: "Old trial",
-        usageLimit: 10,
-        freeTrialInfo: { freeTrialStatus: "EXPIRED", usageLimit: 100 },
-      },
-    ],
-  };
-  const out = await withPlugin(free, (p) => usageOfRpc(p));
-  expect(out.account.plan).toBe("Kiro Free");
-  expect(out.account.allowances).toEqual([
-    {
-      name: "Credits",
-      used: 12.5,
-      limit: 50,
-      trial: { used: 120.25, limit: 500, expiresAt: 1794000000000 },
-    },
-    { name: "Old trial", used: 0, limit: 10 },
-  ]);
 });
 
 test("usage: an account Kiro won't show is an error, not a failure", async () => {
