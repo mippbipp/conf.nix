@@ -27,6 +27,11 @@
     };
   };
 
-  # OpenCode loads file in ~/.config/opencode/plugins as a plugin of its own.
-  home.file.".config/opencode/plugins/kiro.ts".source = ./kiro/kiro.ts;
+  # OpenCode loads a directory in ~/.config/opencode/plugins as one plugin
+  home.file.".config/opencode/plugins/kiro".source = pkgs.runCommand "opencode-kiro" { } ''
+    mkdir $out
+    cp ${./kiro/index.ts} $out/index.ts
+    cp ${./kiro/tui.tsx} $out/tui.tsx
+    cp ${./kiro/rpc.ts} $out/rpc.ts
+  '';
 }

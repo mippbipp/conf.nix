@@ -13,7 +13,10 @@
 //
 // OpenCode loads this file as it is: Bun strips the types, and OpenCode
 // supplies `effect` and `@opencode/plugin` itself, so the plugin may import
-// only those, Bun's and Node's own modules.
+// only those, Bun's and Node's own modules, and its rpc.ts beside it.
+//
+// The sidebar (tui.tsx) shows the account's usage and what each session has
+// spent, which it asks for over the RPC in rpc.ts.
 import { Database } from "bun:sqlite";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFile } from "node:child_process";
@@ -48,6 +51,7 @@ import {
   HttpClientResponse,
 } from "effect/http";
 import type { Model, Plugin, Provider } from "@opencode/plugin/effect";
+import { type AccountUsage, type Allowance, KiroRpc, type UsageAnswer } from "./rpc.ts";
 
 const ID = "kiro";
 const PACKAGE = "@opencode/ai/providers/anthropic";
@@ -696,6 +700,120 @@ class KiroAccount extends Context.Service<
     }),
   );
 }
+
+// ---- usage -----------------------------------------------------------------------
+
+// Get-Usage-Limits is the account's usage this month, as kiro-cli's /usage
+// shows it. Its userInfo (email, user id) is never read.
+const amount = field(Schema.Number);
+const when = field(Schema.Union([Schema.Number, Schema.String])); // epoch seconds, or a date
+const Breakdown = Schema.Struct({
+  displayName: field(Schema.String),
+  displayNamePlural: field(Schema.String),
+  resourceType: field(Schema.String),
+  currency: field(Schema.String),
+  currentUsage: amount,
+  currentUsageWithPrecision: amount,
+  usageLimit: amount,
+  usageLimitWithPrecision: amount,
+  currentOverages: amount,
+  currentOveragesWithPrecision: amount,
+  overageCharges: amount,
+  overageRate: amount,
+  overageCap: amount,
+  overageCapWithPrecision: amount,
+  nextDateReset: when,
+  freeTrialInfo: field(
+    Schema.Struct({
+      freeTrialStatus: field(Schema.String),
+      currentUsage: amount,
+      currentUsageWithPrecision: amount,
+      usageLimit: amount,
+      usageLimitWithPrecision: amount,
+      freeTrialExpiry: when,
+    }),
+  ),
+});
+const decodeUsageLimits = Schema.decodeUnknownEffect(
+  Schema.Struct({
+    nextDateReset: when,
+    overageConfiguration: field(Schema.Struct({ overageStatus: field(Schema.String) })),
+    subscriptionInfo: field(Schema.Struct({ subscriptionTitle: field(Schema.String) })),
+    usageBreakdownList: field(Schema.Array(Breakdown)),
+  }),
+);
+
+const millis = (t: number | string | null | undefined) => {
+  if (typeof t === "number") return t > 1e12 ? t : t * 1000;
+  const ms = typeof t === "string" ? Date.parse(t) : NaN;
+  return Number.isFinite(ms) ? ms : 0;
+};
+// "KIRO PRO" is Kiro Pro
+const planName = (title: string | null | undefined) =>
+  (title || "Kiro")
+    .toLowerCase()
+    .replace(/\b\p{L}/gu, (c) => c.toUpperCase());
+
+function accountUsage(
+  u: Effect.Success<ReturnType<typeof decodeUsageLimits>>,
+  checkedAt: number,
+): AccountUsage {
+  const enabled = u.overageConfiguration?.overageStatus === "ENABLED";
+  const allowances: Allowance[] = [];
+  let resetsAt = millis(u.nextDateReset);
+  for (const b of u.usageBreakdownList ?? []) {
+    if (!b) continue;
+    const t = b.freeTrialInfo;
+    const trial =
+      t && t.freeTrialStatus === "ACTIVE"
+        ? {
+            used: t.currentUsageWithPrecision ?? t.currentUsage ?? 0,
+            limit: t.usageLimitWithPrecision ?? t.usageLimit ?? 0,
+            ...(millis(t.freeTrialExpiry) ? { expiresAt: millis(t.freeTrialExpiry) } : {}),
+          }
+        : undefined;
+    const limit = b.usageLimitWithPrecision ?? b.usageLimit ?? 0;
+    if (!limit && !trial?.limit) continue;
+    const over = b.currentOveragesWithPrecision ?? b.currentOverages ?? 0;
+    allowances.push({
+      name: b.displayNamePlural || b.displayName || b.resourceType || "Credits",
+      used: b.currentUsageWithPrecision ?? b.currentUsage ?? 0,
+      limit,
+      ...(enabled || over > 0 || b.overageCharges
+        ? {
+            overage: {
+              credits: over,
+              charges: b.overageCharges ?? 0,
+              currency: b.currency || "USD",
+              rate: b.overageRate ?? 0,
+              cap: b.overageCapWithPrecision ?? b.overageCap ?? 0,
+              enabled,
+            },
+          }
+        : {}),
+      ...(trial ? { trial } : {}),
+    });
+    resetsAt ||= millis(b.nextDateReset);
+  }
+  return { plan: planName(u.subscriptionInfo?.subscriptionTitle), resetsAt, allowances, checkedAt };
+}
+
+// readUsage reads the account's usage from Kiro
+const readUsage = Effect.fnUntraced(function* (a: Auth) {
+  const u = yield* managementCall(decodeUsageLimits, a.region, a, "Get-Usage-Limits", {
+    origin: "KIRO_CLI",
+    profileArn: a.profile,
+    resourceType: "CREDIT",
+  });
+  return accountUsage(u, yield* Clock.currentTimeMillis);
+});
+
+// what each session has spent, kept in the plugin's storage
+const creditsKey = (sessionID: string) => `credits/${sessionID}`;
+const decodeCredits = Schema.decodeUnknownOption(Schema.Number);
+const decodeUsageInput = Schema.decodeUnknownEffect(
+  Schema.Struct({ sessionIDs: Schema.Array(Schema.String) }),
+);
 
 // ---- models ----------------------------------------------------------------------
 
@@ -1682,6 +1800,7 @@ interface Usage {
   cacheRead: number;
   cacheWrite: number;
   reported: boolean; // Kiro sent token counts
+  credits: number; // what the reply cost, from its meteringEvents
 }
 
 // KiroEvent is a piece of Kiro's reply, as reply turns it into Messages events.
@@ -1703,6 +1822,7 @@ const Payload = Schema.Struct({
   input: Schema.optional(Schema.Unknown),
   stopReason: field(Schema.String),
   contextUsagePercentage: count,
+  usage: count, // a meteringEvent's credits
   tokenUsage: field(
     Schema.Struct({
       uncachedInputTokens: count,
@@ -1743,6 +1863,7 @@ class ReplyDecoder {
     cacheRead: 0,
     cacheWrite: 0,
     reported: false,
+    credits: 0,
   };
   private pct = 0;
   private said = 0;
@@ -1872,6 +1993,8 @@ class ReplyDecoder {
     } else if (kind === "contextUsageEvent") {
       if (m.contextUsagePercentage && m.contextUsagePercentage > 0)
         this.pct = m.contextUsagePercentage;
+    } else if (kind === "meteringEvent") {
+      if (m.usage && m.usage > 0) this.usage.credits += m.usage;
     }
   }
 }
@@ -2018,11 +2141,12 @@ class MessagesEncoder {
 const isLast = (e: KiroEvent) => e.kind === "error" || e.kind === "stop";
 
 // reply answers the Messages request from Kiro's events, as a stream of
-// Messages events.
+// Messages events. finished is told the usage of a reply that ends well.
 const reply = Effect.fnUntraced(function* (
   kiro: Stream.Stream<KiroEvent>,
   model: string,
   names: Map<string, string>,
+  finished: (usage: Usage) => Effect.Effect<void>,
 ) {
   // the first event is read before answering: an error before any of the
   // answer is a status, so OpenCode can retry it or say why. The rest of
@@ -2043,6 +2167,7 @@ const reply = Effect.fnUntraced(function* (
   }
   const body = Stream.concat(Stream.make(first), rest).pipe(
     Stream.takeUntil(isLast),
+    Stream.tap((e) => (e.kind === "stop" ? finished(e.usage) : Effect.void)),
     Stream.mapAccum(
       () => new MessagesEncoder(model, names),
       (encoder, e) => [encoder, encoder.encode(e)] as const,
@@ -2071,6 +2196,7 @@ type Host = {
   readonly storage: Pick<Plugin.Context["storage"], "get" | "set">;
   readonly provider: Pick<Plugin.Context["provider"], "transform" | "reload">;
   readonly session: Pick<Plugin.Context["session"], "hook">;
+  readonly rpc: Pick<Plugin.Context["rpc"], "register">;
 };
 
 const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
@@ -2085,6 +2211,87 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   );
   const modelNamed = (id: string) =>
     Ref.get(models).pipe(Effect.map((list) => list.find((m) => m.id === id)));
+  // where work outlives the request that started it: the plugin's own scope.
+  // A reply's stream ends its fibers with its body.
+  const scope = yield* Effect.scope;
+
+  // the account's usage, read at most once a minute (a failure, every 10
+  // seconds), and a short reason when it can't be
+  const [usageCached, usageStale] = yield* Effect.cachedInvalidateWithTTL(
+    account.credentials().pipe(
+      Effect.flatMap(readUsage),
+      Effect.provideService(HttpClient.HttpClient, http),
+    ),
+    (exit) => (Exit.isSuccess(exit) ? "60 seconds" : "10 seconds"),
+  );
+  const accountNow = usageCached.pipe(
+    Effect.map((account): { account: AccountUsage | null; error?: string } => ({ account })),
+    Effect.catchCause((cause) =>
+      Effect.succeed({ account: null, error: failureOf(cause).message.slice(0, 200) }),
+    ),
+  );
+
+  // the credits each session has spent: storage's, and what was added since
+  const credits = new Map<string, number>();
+  const creditLock = yield* Semaphore.make(1);
+  const creditsOf = Effect.fnUntraced(function* (sessionID: string) {
+    const known = credits.get(sessionID);
+    if (known !== undefined) return known;
+    const saved = Option.getOrElse(
+      decodeCredits(yield* ctx.storage.get(creditsKey(sessionID))),
+      () => 0,
+    );
+    credits.set(sessionID, saved);
+    return saved;
+  });
+  const addCredits = (sessionID: string, n: number) =>
+    creditLock.withPermits(1)(
+      Effect.gen(function* () {
+        const total = (yield* creditsOf(sessionID)) + n;
+        credits.set(sessionID, total);
+        yield* ctx.storage.set(creditsKey(sessionID), total);
+      }),
+    );
+
+  // without the RPC the sidebar shows nothing, and Kiro still answers
+  const registration = yield* ctx.rpc.register(KiroRpc, {
+    usage: (input) =>
+      Effect.gen(function* () {
+        const { sessionIDs } = yield* decodeUsageInput(input).pipe(
+          Effect.orElseSucceed(() => ({ sessionIDs: [] as readonly string[] })),
+        );
+        const spent: Record<string, number> = {};
+        for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
+        const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };
+        return answer;
+      }),
+  }).pipe(
+    Effect.catchCause((cause) =>
+      Effect.logWarning("Kiro: registering the usage RPC failed", cause).pipe(Effect.as(undefined)),
+    ),
+  );
+  const emitUpdated = registration ? registration.events.emit("updated", {}) : Effect.void;
+
+  // after a reply, the account read again and the sidebar told. One read
+  // runs at a time; a reply ending during one is in what it tells.
+  const refreshing = yield* Semaphore.make(1);
+  const refresh = usageStale.pipe(
+    Effect.andThen(accountNow),
+    Effect.andThen(emitUpdated),
+    Effect.ignore,
+    refreshing.withPermitsIfAvailable(1),
+  );
+  const finished = (sessionID: string | undefined) => (usage: Usage) =>
+    Effect.gen(function* () {
+      if (sessionID && usage.credits > 0) yield* addCredits(sessionID, usage.credits);
+      yield* refresh;
+    }).pipe(
+      Effect.catchCause((cause) =>
+        Effect.logWarning("Kiro: counting a reply's credits failed", cause),
+      ),
+      Effect.forkIn(scope),
+      Effect.asVoid,
+    );
 
   const kiroBody = (req: MessagesRequest, model: string, profile: string, thinking: Thinking) =>
     images
@@ -2166,6 +2373,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           events(res.stream, window, p.thinking.budget),
           p.model,
           toolNames(p.req),
+          finished(event.sessionID),
         );
       },
       (effect, event) =>
