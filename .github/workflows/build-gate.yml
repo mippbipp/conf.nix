@@ -98,7 +98,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v6
         with:
-          # GITHUB_TOKEN cannot read the private repos, so submodules stay uninitialized here.
+          # No check reads submodule content, so submodules stay uninitialized here.
           submodules: false
           persist-credentials: false
 

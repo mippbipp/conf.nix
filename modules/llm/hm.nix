@@ -12,7 +12,7 @@
   ];
 
   home = {
-    # Shared agent skills live in a private submodule of this repo, so the
+    # Shared agent skills live in a submodule of this repo, so the
     # checkout is the single source of truth.
     file.".agents/skills".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/skills";
