@@ -83,6 +83,10 @@
         home-manager.follows = "home-manager";
       };
     };
+    omasnap = {
+      url = "github:vsgoulart/omasnap-flake";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
