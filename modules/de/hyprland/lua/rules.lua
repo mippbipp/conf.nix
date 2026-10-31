@@ -99,20 +99,10 @@ hl.layer_rule({
 	ignore_alpha = 0,
 })
 
-hl.window_rule({
-	match = { class = "flameshot" },
+-- Don't add no_screen_share: it blacks out the scroll-capture overlay's live region.
+hl.layer_rule({
+	name = "omasnap",
+	match = { namespace = "^omasnap$" },
 	no_anim = true,
-	pin = true,
-	float = true,
-	decorate = false,
-	no_blur = true,
-	no_shadow = true,
-})
-hl.window_rule({
-	match = { class = "flameshot", title = "flameshot" },
-	move = { 0, 0 },
-})
-hl.window_rule({
-	match = { class = "flameshot", title = "flameshot-pin" },
-	move = { "cursor_x-(window_w*0.5)", "cursor_y-(window_h*0.5)" },
+	animation = "none",
 })

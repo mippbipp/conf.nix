@@ -1,7 +1,7 @@
 { config, ... }: {
   imports = [
     ./apps/hm/vicinae.nix
-    ./apps/hm/flameshot.nix
+    ./apps/hm/omasnap
     ./apps/networkmanager/hm.nix
   ];
 

@@ -7,9 +7,6 @@
   environment.systemPackages = with pkgs; [
     wev
 
-    normcap
-    grim # wayland support for normcap
-
     wl-clipboard
     hyprpicker
     hyprland-qtutils
