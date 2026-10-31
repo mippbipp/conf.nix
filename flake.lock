@@ -856,6 +856,26 @@
         "type": "github"
       }
     },
+    "omasnap": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793831918,
+        "narHash": "sha256-WLpuReujssTpNqvMymbr5v3pT0se+JYYkTCeuzdDF7U=",
+        "owner": "vsgoulart",
+        "repo": "omasnap-flake",
+        "rev": "90d724c7d62485c1779585edee9e19ca4419421a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "vsgoulart",
+        "repo": "omasnap-flake",
+        "type": "github"
+      }
+    },
     "pre-commit": {
       "inputs": {
         "flake-compat": "flake-compat",
@@ -913,6 +933,7 @@
         "nix-index-database": "nix-index-database",
         "nixos-wsl": "nixos-wsl",
         "nixpkgs": "nixpkgs_4",
+        "omasnap": "omasnap",
         "rust-overlay": "rust-overlay",
         "sops-nix": "sops-nix",
         "stylix": "stylix",
