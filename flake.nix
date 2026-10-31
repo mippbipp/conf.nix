@@ -79,6 +79,13 @@
       url = "github:herdrdev/herdr";
       inputs.rust-overlay.follows = "rust-overlay";
     };
+    hex = {
+      url = "github:anomalyco/hex";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        home-manager.follows = "home-manager";
+      };
+    };
   };
 
   outputs =

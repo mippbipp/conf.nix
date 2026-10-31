@@ -78,6 +78,12 @@ hl.bind(mod .. " + U", hl.dsp.workspace.toggle_special())
 hl.bind(mod .. " + Space", hl.dsp.exec_cmd("vicinae vicinae://toggle"))
 hl.bind(mod .. " + V", hl.dsp.exec_cmd("vicinae vicinae://launch/clipboard/history?toggle=true"))
 
+-- Hex dictation
+hl.bind("End", hl.dsp.global("anomaly.hex:dictation-ALT-space"))
+hl.bind("F9", hl.dsp.global("anomaly.hex:paste-last-CTRL-ALT-v"))
+hl.bind(mod .. " + Escape", hl.dsp.global("anomaly.hex:cancel-dictation"))
+hl.bind("F10", hl.dsp.global("anomaly.hex:capture-F9"))
+
 hl.bind("XF86MonBrightnessDown", hl.dsp.exec_cmd("caelestia shell brightness set 5%-"), { repeating = true })
 hl.bind("XF86MonBrightnessUp", hl.dsp.exec_cmd("caelestia shell brightness set +5%"), { repeating = true })
 
