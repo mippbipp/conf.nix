@@ -30,7 +30,11 @@
           discord
           code-cursor
           inputs.xmcl.packages.${pkgs.stdenv.hostPlatform.system}.default
-          onlyoffice-desktopeditors
+          # https://wiki.nixos.org/wiki/LibreOffice
+          libreoffice
+          hunspell
+          hunspellDicts.en_US
+          hyphenDicts.en_US
         ];
         openssh.authorizedKeys.keys = [ ];
       };
