@@ -9,7 +9,7 @@
 
     wl-clipboard
     hyprpicker
-    hyprland-qtutils
+    hyprland-guiutils
     wl-mirror
   ];
 

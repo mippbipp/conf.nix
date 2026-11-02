@@ -1,4 +1,4 @@
-{ username, pkgs, ... }:
+{ pkgs, ... }:
 {
   # Needed For Some Steam Games
   boot.kernel.sysctl = {
@@ -22,21 +22,7 @@
   };
   programs.gamemode.enable = true;
 
-  # https://wiki.nixos.org/wiki/Lutris
   environment.systemPackages = with pkgs; [
-    lutris
     r2modman # mods
   ];
-  systemd.settings.Manager.DefaultLimitNOFILE = 524288;
-  security.pam = {
-    loginLimits = [
-      {
-        domain = "${username}";
-        type = "hard";
-        item = "nofile";
-        value = "524288";
-      }
-    ];
-  };
-
 }

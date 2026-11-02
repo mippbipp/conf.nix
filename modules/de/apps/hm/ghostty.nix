@@ -13,6 +13,7 @@ in
     settings = {
       background = "000000";
       inherit background-opacity;
+      background-blur = true;
       confirm-close-surface = false;
       window-decoration = "none";
       window-padding-x = 4;
