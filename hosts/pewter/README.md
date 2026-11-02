@@ -95,7 +95,8 @@ not part of the Nix configuration or shell history.
 
 ## Flake fixer
 
-Off by default. To turn it on:
+Off by default, and it needs the Updater on (`services.flake-updater.enable`,
+already set in `config.nix`). To turn it on:
 
 1. Set `services.flake-updater.agent.enable = true;` in `config.nix` (and
    `services.flake-updater.agent.model` if the default free model is out of
