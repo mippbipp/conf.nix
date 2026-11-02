@@ -46,26 +46,39 @@ let
   ];
 in
 {
-  options.services.flake-updater.agent = {
-    enable = lib.mkEnableOption "Flake fixer repair rounds when the Build gate is red";
-    model = lib.mkOption {
-      type = lib.types.str;
-      default = "opencode/deepseek-v4.1-flash-free";
-      description = ''
-        `provider/model` the Flake fixer runs on. Its provider is the only one
-        the fixer's server allows, so an unavailable model fails the run
-        instead of falling back.
-      '';
-    };
-    httpsPort = lib.mkOption {
-      type = lib.types.port;
-      default = 8444;
-      description = "Tailnet HTTPS port for the fixer server's web UI.";
+  options.services.flake-updater = {
+    enable = lib.mkEnableOption "the weekly Updater that maintains the flake-update PR";
+    agent = {
+      enable = lib.mkEnableOption "Flake fixer repair rounds when the Build gate is red";
+      model = lib.mkOption {
+        type = lib.types.str;
+        default = "opencode/deepseek-v4.1-flash-free";
+        description = ''
+          `provider/model` the Flake fixer runs on. Its provider is the only one
+          the fixer's server allows, so an unavailable model fails the run
+          instead of falling back.
+        '';
+      };
+      httpsPort = lib.mkOption {
+        type = lib.types.port;
+        default = 8444;
+        description = "Tailnet HTTPS port for the fixer server's web UI.";
+      };
     };
   };
 
   config = lib.mkMerge [
     {
+      # The fixer only runs inside an Updater run; alone it is an idle server.
+      assertions = [
+        {
+          assertion = cfg.agent.enable -> cfg.enable;
+          message = "services.flake-updater.agent.enable requires services.flake-updater.enable.";
+        }
+      ];
+    }
+
+    (lib.mkIf cfg.enable {
       environment.systemPackages = [ updater ];
 
       systemd = {
@@ -101,9 +114,9 @@ in
           };
         };
       };
-    }
+    })
 
-    (lib.mkIf cfg.agent.enable {
+    (lib.mkIf (cfg.enable && cfg.agent.enable) {
       users = {
         users.flake-fixer = {
           isSystemUser = true;

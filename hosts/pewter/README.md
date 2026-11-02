@@ -95,15 +95,22 @@ not part of the Nix configuration or shell history.
 
 ## Flake fixer
 
-Off by default. To turn it on:
+Both options default to off in the module. Pewter's `config.nix` turns on the
+Updater (`services.flake-updater.enable`) and the fixer
+(`services.flake-updater.agent.enable`). The fixer needs the Updater, so
+evaluation fails if only `agent.enable` is set.
 
-1. Set `services.flake-updater.agent.enable = true;` in `config.nix` (and
-   `services.flake-updater.agent.model` if the default free model is out of
-   quota), then `nrs pewter`.
-2. Check `systemctl status flake-fixer.service flake-fixer-password.service`.
-3. Open `https://pewter.<tailnet>:8444` from a tailnet device, user `opencode`,
+To turn the fixer off, set `agent.enable = false;` in `config.nix` and run
+`nrs pewter`. The Updater keeps opening and updating the PR without repair
+rounds. To change the model, for example when the default free model is out of
+quota, set `services.flake-updater.agent.model`.
+
+After the first deploy with the fixer on:
+
+1. Check `systemctl status flake-fixer.service flake-fixer-password.service`.
+2. Open `https://pewter.<tailnet>:8444` from a tailnet device, user `opencode`,
    password from `sudo cat /var/lib/flake-updater/fixer-password`.
-4. After the first update PR shows a `flake-update-scope` check, add it to the
+3. After the first update PR shows a `flake-update-scope` check, add it to the
    GitHub ruleset's required checks.
 
 To try it without pushing:
