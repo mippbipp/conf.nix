@@ -17,7 +17,7 @@ hl.window_rule({
 hl.window_rule({
 	name = "games-workspace3",
 	match = {
-		class = "^(xmcl|steam|net.lutris.Lutris|lunarclient|Lunar\\s+Client.*|Minecraft.*)$",
+		class = "^(xmcl|steam|lunarclient|Lunar\\s+Client.*|Minecraft.*)$",
 	},
 	workspace = 3,
 })
