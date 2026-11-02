@@ -32,6 +32,10 @@ pkgs.writeShellApplication {
         target_host="$1"
         shift
     fi
+    # Naming this machine is a local switch, not an ssh to ourselves.
+    if [ "$target_host" = "${host}" ]; then
+        target_host=""
+    fi
 
     rebuild() {
         action="$1"
