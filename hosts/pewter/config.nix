@@ -24,6 +24,11 @@
     ./flake-updater
   ];
 
+  services.flake-updater = {
+    enable = true;
+    agent.enable = true;
+  };
+
   security.sudo.wheelNeedsPassword = false;
   services.fstrim.enable = false; # managed by Oracle's underlying SAN
 

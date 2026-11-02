@@ -53,7 +53,7 @@ Use `--dry-run` before investigating an unexpected update. It updates a checkout
 
 ### Flake fixer
 
-The Flake fixer is the `flake-fixer` opencode agent on a dedicated server, enabled with `services.flake-updater.agent.enable` in pewter's config. Its model is `services.flake-updater.agent.model`, `opencode/deepseek-v4.1-flash-free` by default.
+The Flake fixer is the `flake-fixer` opencode agent on a dedicated server, enabled with `services.flake-updater.agent.enable` in pewter's config. It requires the Updater itself, `services.flake-updater.enable`, and evaluation fails if only the fixer is on. Its model is `services.flake-updater.agent.model`, `opencode/deepseek-v4.1-flash-free` by default.
 
 When the gate is red, each round:
 
