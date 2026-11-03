@@ -79,6 +79,12 @@
       url = "github:herdrdev/herdr";
       inputs.rust-overlay.follows = "rust-overlay";
     };
+    # Not following nixpkgs: the package's pnpm deps hash is pinned against
+    # axonometric's own nixpkgs.
+    axonometric = {
+      url = "github:mippbipp/axonometric";
+      inputs.llm-agents.follows = "llm-agents";
+    };
     hex = {
       url = "github:anomalyco/hex";
       inputs = {
