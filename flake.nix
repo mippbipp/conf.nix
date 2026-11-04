@@ -63,10 +63,6 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    llm-agents = {
-      url = "github:numtide/llm-agents.nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -79,12 +75,7 @@
       url = "github:herdrdev/herdr";
       inputs.rust-overlay.follows = "rust-overlay";
     };
-    # Not following nixpkgs: the package's pnpm deps hash is pinned against
-    # axonometric's own nixpkgs.
-    axonometric = {
-      url = "github:mippbipp/axonometric";
-      inputs.llm-agents.follows = "llm-agents";
-    };
+    axonometric.url = "github:mippbipp/axonometric";
     hex = {
       url = "github:anomalyco/hex";
       inputs = {

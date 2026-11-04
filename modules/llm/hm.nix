@@ -23,9 +23,7 @@
       [
         kiro-cli
         inputs.axonometric.packages.${pkgs.stdenv.hostPlatform.system}.default
-      ]
-      ++ lib.optionals (!globals.hosts.${host}.isServer) [
-        t3code.desktop
+        t3code
       ];
   };
 }
