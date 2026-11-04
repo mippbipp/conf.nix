@@ -5,10 +5,42 @@
   globals,
   ...
 }:
+let
+  hostRecord = globals.hosts.${host};
+in
 {
-  programs.opencode = lib.mkIf (!globals.hosts.${host}.isWorkPc) {
+  programs.opencode = lib.mkIf (!hostRecord.isWorkPc) {
     enable = true;
-    package = pkgs.opencode;
+    settings = {
+      compaction = {
+        buffer = "45%";
+        keep.tokens = 20000;
+      };
+      tool_output = {
+        max_lines = 500;
+        max_bytes = 20480;
+      };
+    }
+    // lib.optionalAttrs (hostRecord.hasDE || hostRecord.isServer) {
+      mcp.servers.browse = {
+        type = "local";
+        command = [
+          "${pkgs.nodejs}/bin/npx"
+          "-y"
+          "@opencode/browse@0.0.14"
+          "mcp"
+        ];
+        environment = {
+          # Its self-updater runs `npm install -g`, which can't write to the Nix store.
+          OPENCODE_BROWSER_AUTO_UPDATE = "off";
+          PATH = lib.makeBinPath [
+            pkgs.nodejs
+            pkgs.bash
+            pkgs.coreutils
+          ];
+        };
+      };
+    };
     context = ''
       # Global
 
@@ -27,9 +59,12 @@
     };
   };
 
-  # OpenCode loads a directory in ~/.config/opencode/plugins as one plugin.
-  # Only kiro/src goes in, which holds just the plugin's runtime files. The
-  # dev config beside it (package.json, tsconfig.json, lint and format
-  # config) could change how OpenCode and Bun load it.
   home.file.".config/opencode/plugins/kiro".source = ./kiro/src;
+
+  # Same as `browse set hostname 0.0.0.0`. Remote peers reach only the
+  # extension's WebSocket, which requires pairing, and pewter's firewall
+  # admits port 19988 from tailscale0 only.
+  xdg.configFile."browse/config.json" = lib.mkIf hostRecord.isServer {
+    text = builtins.toJSON { hostname = "0.0.0.0"; };
+  };
 }

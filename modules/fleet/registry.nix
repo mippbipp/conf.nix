@@ -20,6 +20,11 @@ let
         default = false;
         description = "Role flag: always-on server";
       };
+      hasDE = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Role flag: runs a desktop environment";
+      };
       isWorkPc = lib.mkOption {
         type = lib.types.bool;
         default = false;
@@ -96,6 +101,7 @@ in
       syncId = "STSZHNC-PHDMSOV-LLJUNMR-VZHVO5X-NERCW7A-OIEO36S-Y4YVMVK-H7FRKAP";
       unlocksPewter = true;
       isPersonalHost = true;
+      hasDE = true;
     };
     harpe = {
       isPersonalHost = true;
