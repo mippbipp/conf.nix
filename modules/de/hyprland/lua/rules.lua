@@ -33,11 +33,6 @@ hl.window_rule({
 })
 
 hl.window_rule({
-	name = "polkit",
-	match = { class = "^(org.kde.polkit-kde-authentication-agent-1)$" },
-	float = true,
-})
-hl.window_rule({
 	name = "zoom",
 	match = { class = "zoom" },
 	float = true,
@@ -99,7 +94,6 @@ hl.layer_rule({
 	ignore_alpha = 0,
 })
 
--- Don't add no_screen_share: it blacks out the scroll-capture overlay's live region.
 hl.layer_rule({
 	name = "omasnap",
 	match = { namespace = "^omasnap$" },

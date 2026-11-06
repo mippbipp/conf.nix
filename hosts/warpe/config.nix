@@ -11,11 +11,12 @@
 }:
 {
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  system.stateVersion = "24.05";
 
   imports = [
+    ../../modules/system/config/wsl
     ./users.nix
     ./work.nix
-    ../../modules/system/config/wsl
     ../../modules/theme/system.nix
   ];
 }

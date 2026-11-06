@@ -54,12 +54,6 @@
       bar = {
         persistent = false;
         showOnHover = false;
-        workspaces = {
-          label = "●";
-          occupiedLabel = "󰊠";
-          activeLabel = "󰮯";
-          showWindows = false;
-        };
         statusIcons = [
           {
             id = "lockStatus";
@@ -90,41 +84,12 @@
             enabled = true;
           }
         ];
-        entries = [
-          {
-            id = "logo";
-            enabled = true;
-          }
-          {
-            id = "workspaces";
-            enabled = true;
-          }
-          {
-            id = "spacer";
-            enabled = true;
-          }
-          {
-            id = "tray";
-            enabled = true;
-          }
-          {
-            id = "clock";
-            enabled = true;
-          }
-          {
-            id = "statusIcons";
-            enabled = true;
-          }
-          {
-            id = "power";
-            enabled = true;
-          }
-        ];
       };
       dashboard = {
         showMedia = false;
       };
       launcher = {
+        enabled = false;
         vimKeybinds = true;
       };
       border = {

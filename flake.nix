@@ -104,7 +104,6 @@
       mkHostConfig =
         {
           host,
-          nixosModules ? [ ],
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
@@ -156,8 +155,6 @@
                   useGlobalPkgs = true;
                   useUserPackages = true;
                   backupFileExtension = "backup";
-                  # fleet/hm.nix selects the Home Manager side of the Role
-                  # flags, so host files carry no role imports.
                   users.${username} = {
                     imports = [
                       ./hosts/${host}/home.nix
@@ -171,68 +168,17 @@
                 ];
               }
             )
-          ]
-          ++ nixosModules;
+          ];
         };
       nixosConfigurations = {
         gram = mkHostConfig {
           host = "gram";
-          nixosModules = [
-            lanzaboote.nixosModules.lanzaboote
-            (
-              { pkgs, lib, ... }:
-              {
-                nixpkgs.overlays = [
-                  inputs.nix-cachyos-kernel.overlays.pinned
-                ];
-
-                environment.systemPackages = [
-                  # For debugging and troubleshooting Secure Boot.
-                  pkgs.sbctl
-                ];
-
-                # Lanzaboote currently replaces the systemd-boot module.
-                # This setting is usually set to true in configuration.nix
-                # generated at installation time. So we force it to false
-                # for now.
-                boot.loader.systemd-boot.enable = lib.mkForce false;
-
-                boot.lanzaboote = {
-                  enable = true;
-                  pkiBundle = "/var/lib/sbctl";
-                  settings.timeout = 1;
-                };
-              }
-            )
-          ];
         };
         harpe = mkHostConfig {
           host = "harpe";
-          nixosModules = [
-            nixos-wsl.nixosModules.default
-            (
-              { username, ... }:
-              {
-                system.stateVersion = "24.05";
-                wsl.enable = true;
-                wsl.defaultUser = username;
-              }
-            )
-          ];
         };
         warpe = mkHostConfig {
           host = "warpe";
-          nixosModules = [
-            nixos-wsl.nixosModules.default
-            (
-              { username, ... }:
-              {
-                system.stateVersion = "24.05";
-                wsl.enable = true;
-                wsl.defaultUser = username;
-              }
-            )
-          ];
         };
         pewter = mkHostConfig {
           host = "pewter";
