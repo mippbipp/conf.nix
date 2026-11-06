@@ -1,12 +1,19 @@
-# NixOS-WSL specific system config, shared by the WSL hosts.
 {
+  inputs,
   pkgs,
   username,
   lib,
   ...
 }:
 {
+  imports = [
+    inputs.nixos-wsl.nixosModules.default
+    ../secret.nix
+  ];
+
   wsl = {
+    enable = true;
+    defaultUser = username;
     # Cold boot took ~18s (HM 6.5s + nftables 6s + tailscaled 2s, see
     # `systemd-analyze blame`), but WSL only waits 10s for /sbin/init by
     # default (`WaitForBootProcess ... failed to start within 10000ms`),
@@ -55,9 +62,6 @@
     settings.Resolve.FallbackDNS = [ "10.255.255.254" ]; # cat /etc/resolv.conf, default for WSL
   };
 
-  imports = [
-    ../secret.nix
-  ];
   environment.systemPackages = with pkgs; [
     wl-clipboard
   ];

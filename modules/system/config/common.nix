@@ -90,9 +90,6 @@
     network.wait-online.enable = false; # Don't wait for network before considering boot complete
     sockets.avahi-daemon.wantedBy = [ "sockets.target" ]; # Will start automatically when needed via socket activation
 
-    # Disable core dumps (slight performance improvement)
-    coredump.enable = lib.mkDefault false;
-
     # Reduce default timeouts for all services
     settings.Manager = {
       DefaultTimeoutStartSec = 30;

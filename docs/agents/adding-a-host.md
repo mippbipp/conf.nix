@@ -12,9 +12,11 @@ hostname and finish every applicable item before considering the host added.
    Home Manager profile and local user definition. Copy the smallest existing
    host shape that matches the machine; WSL hosts also need their WSL module
    in `flake.nix`.
-3. Add a `nixosConfigurations.<host>` declaration to `flake.nix`. Keep the
-   attribute name and the `host = "<host>"` argument identical. Add host-only
-   flake modules in this declaration, such as `nixos-wsl` or `lanzaboote`.
+3. Add `"<host>"` to the host list in `nixosConfigurations` in `flake.nix`.
+   `genAttrs` turns each name into both the attribute name and the `host`
+   argument of `mkHostConfig`. Import host-only flake modules, such as
+   `nixos-wsl` or `lanzaboote`, from the host's own files through `inputs`
+   (see `hosts/gram/boot.nix`).
 4. Add `hosts.<host>` to `modules/fleet/registry.nix`. Use an empty record when
    no other machine needs facts about it; add only cross-host facts and Role
    flags that shared modules consume. A Role flag selects its own

@@ -1,9 +1,6 @@
 {
-  lib,
   pkgs,
   config,
-  host,
-  globals,
   inputs,
   ...
 }:
@@ -18,12 +15,10 @@
     file.".agents/skills".source =
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/skills";
 
-    packages =
-      with pkgs;
-      [
-        kiro-cli
-        inputs.axonometric.packages.${pkgs.stdenv.hostPlatform.system}.default
-        t3code
-      ];
+    packages = with pkgs; [
+      kiro-cli
+      inputs.axonometric.packages.${pkgs.stdenv.hostPlatform.system}.default
+      t3code
+    ];
   };
 }
