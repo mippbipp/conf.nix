@@ -51,7 +51,7 @@ const expectOutcome =
   (outcome: RoundOutcome) =>
     roundOutcome.$is(tag)(outcome)
       ? Effect.succeed(outcome)
-      : Effect.die(`expected ${tag}, got ${JSON.stringify(outcome)}`);
+      : Effect.die(`expected ${tag}`);
 
 const lastCommit = (world: World) =>
   parseFixerCommit(world.commits.at(-1)?.message ?? "");

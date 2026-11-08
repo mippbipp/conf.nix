@@ -1,0 +1,76 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "futureFlags": {
+    // Root Tasks below run a `command` instead of a package.json script.
+    "experimentalTaskCommand": true,
+  },
+  "ui": "stream",
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"],
+    },
+    "test": {
+      "dependsOn": ["^build"],
+    },
+    // oxlint and oxfmt run once from the repo root, so they are Root Tasks.
+    // Both take the workspace packages and root config files explicitly: the
+    // rest of the repo is Nix and other configuration they don't own.
+    // `lint` and `format` are independent checks and stay parallel; only the
+    // fixing variants are ordered, because `lint:fix` rewrites files that
+    // `format:fix` then formats.
+    "//#lint": {
+      "command": [
+        "oxlint",
+        "hosts/gram/x-blocklist",
+        "hosts/pewter/flake-updater",
+        "*.config.ts",
+      ],
+    },
+    "//#lint:fix": {
+      "command": [
+        "oxlint",
+        "--fix",
+        "--fix-suggestions",
+        "hosts/gram/x-blocklist",
+        "hosts/pewter/flake-updater",
+        "*.config.ts",
+      ],
+      "cache": false,
+    },
+    "//#format": {
+      "command": [
+        "oxfmt",
+        "--check",
+        "hosts/gram/x-blocklist",
+        "hosts/pewter/flake-updater",
+        "*.config.ts",
+        "turbo.jsonc",
+        "tsconfig*.json",
+        "package.json",
+      ],
+    },
+    "//#format:fix": {
+      "command": [
+        "oxfmt",
+        "--write",
+        "hosts/gram/x-blocklist",
+        "hosts/pewter/flake-updater",
+        "*.config.ts",
+        "turbo.jsonc",
+        "tsconfig*.json",
+        "package.json",
+      ],
+      "dependsOn": ["//#lint:fix"],
+      "cache": false,
+    },
+    // Full `tsc --noEmit` for the root-owned config files.
+    "//#typecheck": {
+      "command": ["tsc", "--noEmit", "-p", "tsconfig.json"],
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck"],
+      "with": ["//#typecheck"],
+    },
+  },
+}

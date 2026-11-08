@@ -216,14 +216,16 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(false);
 
         assert.deepStrictEqual(outcome, { mode: "fresh", dropped: [] });
-        assert.strictEqual(
-          yield* git.head,
-          yield* remote.git("checkout", ["rev-parse", mainRef])
-        );
-        assert.strictEqual(
-          yield* remote.git("checkout", ["branch", "--show-current"]),
-          "flake-update"
-        );
+        const head = yield* git.head;
+        const mainSha = yield* remote.git("checkout", ["rev-parse", mainRef]);
+        assert.strictEqual(head, mainSha);
+
+        const current = yield* remote.git("checkout", [
+          "branch",
+          "--show-current",
+        ]);
+
+        assert.strictEqual(current, "flake-update");
       })
     );
 
@@ -235,10 +237,9 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(true);
 
         assert.deepStrictEqual(outcome, { mode: "fresh", dropped: [] });
-        assert.strictEqual(
-          yield* git.head,
-          yield* remote.git("checkout", ["rev-parse", mainRef])
-        );
+        const head = yield* git.head;
+        const mainSha = yield* remote.git("checkout", ["rev-parse", mainRef]);
+        assert.strictEqual(head, mainSha);
       })
     );
 
@@ -263,11 +264,16 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(true);
 
         assert.deepStrictEqual(outcome, { mode: "continued", dropped: [] });
-        assert.strictEqual(
-          yield* remote.git("checkout", ["rev-parse", "HEAD^1", "HEAD^2"]),
-          `${branch}\n${main}`
-        );
-        assert.deepStrictEqual(yield* git.changedFromMain, ["fix.nix"]);
+
+        const parents = yield* remote.git("checkout", [
+          "rev-parse",
+          "HEAD^1",
+          "HEAD^2",
+        ]);
+
+        assert.strictEqual(parents, `${branch}\n${main}`);
+        const changed = yield* git.changedFromMain;
+        assert.deepStrictEqual(changed, ["fix.nix"]);
       })
     );
 
@@ -285,20 +291,21 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(true);
 
         assert.deepStrictEqual(outcome, { mode: "continued", dropped: [] });
-        assert.strictEqual(yield* git.readLock("HEAD"), "newer lock\n");
-        assert.deepStrictEqual(yield* git.changedFromMain, ["fix.nix"]);
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
-        assert.isFalse(
-          yield* remote.succeeds("checkout", [
-            "rev-parse",
-            "--verify",
-            "--quiet",
-            "MERGE_HEAD",
-          ])
-        );
+        const lock = yield* git.readLock("HEAD");
+        assert.strictEqual(lock, "newer lock\n");
+        const changed = yield* git.changedFromMain;
+        assert.deepStrictEqual(changed, ["fix.nix"]);
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
+
+        const merging = yield* remote.succeeds("checkout", [
+          "rev-parse",
+          "--verify",
+          "--quiet",
+          "MERGE_HEAD",
+        ]);
+
+        assert.isFalse(merging);
       })
     );
 
@@ -331,14 +338,11 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
           ),
           [true, true]
         );
-        assert.strictEqual(
-          yield* git.head,
-          yield* remote.git("checkout", ["rev-parse", mainRef])
-        );
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
+        const head = yield* git.head;
+        const mainSha = yield* remote.git("checkout", ["rev-parse", mainRef]);
+        assert.strictEqual(head, mainSha);
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
       })
     );
 
@@ -353,11 +357,10 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(false);
 
         assert.strictEqual(outcome.mode, "fresh");
-        assert.strictEqual(yield* git.readLock("HEAD"), "newer lock\n");
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
+        const lock = yield* git.readLock("HEAD");
+        assert.strictEqual(lock, "newer lock\n");
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
       })
     );
 
@@ -376,11 +379,10 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const outcome = yield* git.sync(true);
 
         assert.strictEqual(outcome.mode, "continued");
-        assert.strictEqual(yield* git.readLock("HEAD"), "pr lock\n");
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
+        const lock = yield* git.readLock("HEAD");
+        assert.strictEqual(lock, "pr lock\n");
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
       })
     );
   });
@@ -393,8 +395,10 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         yield* git.sync(false);
         const before = yield* git.head;
 
-        assert.isFalse(yield* git.commitLock("up"));
-        assert.strictEqual(yield* git.head, before);
+        const committed = yield* git.commitLock("up");
+        assert.isFalse(committed);
+        const head = yield* git.head;
+        assert.strictEqual(head, before);
       })
     );
 
@@ -406,12 +410,18 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const before = yield* git.head;
         yield* remote.write("checkout", { "flake.lock": "updated lock\n" });
 
-        assert.isTrue(yield* git.commitLock("up"));
-        assert.strictEqual(
-          yield* remote.git("checkout", ["log", "-1", "--format=%P %s"]),
-          `${before} up`
-        );
-        assert.deepStrictEqual(yield* git.changedFromMain, ["flake.lock"]);
+        const committed = yield* git.commitLock("up");
+        assert.isTrue(committed);
+
+        const last = yield* remote.git("checkout", [
+          "log",
+          "-1",
+          "--format=%P %s",
+        ]);
+
+        assert.strictEqual(last, `${before} up`);
+        const changed = yield* git.changedFromMain;
+        assert.deepStrictEqual(changed, ["flake.lock"]);
       })
     );
     it.effect("lists branch commits oldest first", () =>
@@ -424,8 +434,9 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         yield* remote.write("checkout", { "flake.lock": "second\n" });
         yield* git.commitLock("second");
 
+        const commits = yield* git.branchCommits;
         assert.deepStrictEqual(
-          Arr.map(yield* git.branchCommits, (commit) => commit.message),
+          Arr.map(commits, (commit) => commit.message),
           ["first", "second"]
         );
       })
@@ -444,7 +455,9 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         yield* git.push(false);
 
-        assert.strictEqual(yield* originBranch(remote), yield* git.head);
+        const pushed = yield* originBranch(remote);
+        const head = yield* git.head;
+        assert.strictEqual(pushed, head);
       })
     );
 
@@ -455,7 +468,8 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const error = yield* Effect.flip(git.push(false));
 
         assert.instanceOf(error, GitError);
-        assert.strictEqual(yield* originBranch(remote), remoteSha);
+        const pushed = yield* originBranch(remote);
+        assert.strictEqual(pushed, remoteSha);
       })
     );
 
@@ -467,7 +481,9 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
           yield* git.push(true);
 
-          assert.strictEqual(yield* originBranch(remote), yield* git.head);
+          const pushed = yield* originBranch(remote);
+          const head = yield* git.head;
+          assert.strictEqual(pushed, head);
         })
     );
 
@@ -484,7 +500,8 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const error = yield* Effect.flip(git.push(true));
 
         assert.instanceOf(error, GitError);
-        assert.strictEqual(yield* originBranch(remote), moved);
+        const pushed = yield* originBranch(remote);
+        assert.strictEqual(pushed, moved);
       })
     );
 
@@ -495,7 +512,8 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         yield* git.push(true);
         yield* git.push(false);
 
-        assert.strictEqual(yield* originBranch(remote), remoteSha);
+        const pushed = yield* originBranch(remote);
+        assert.strictEqual(pushed, remoteSha);
       })
     );
   });
@@ -510,14 +528,16 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         yield* git.exportTree(remote.dirs.workspace);
 
-        assert.deepStrictEqual(
-          Arr.sort(yield* remote.list("workspace"), Str.Order),
-          ["README.md", "flake.lock", "modules", gitlink, "old.nix"]
-        );
-        assert.strictEqual(
-          yield* remote.read("workspace", "README.md"),
-          "readme\n"
-        );
+        const listed = yield* remote.list("workspace");
+        assert.deepStrictEqual(Arr.sort(listed, Str.Order), [
+          "README.md",
+          "flake.lock",
+          "modules",
+          gitlink,
+          "old.nix",
+        ]);
+        const readme = yield* remote.read("workspace", "README.md");
+        assert.strictEqual(readme, "readme\n");
       })
     );
 
@@ -545,18 +565,17 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
           "new/file.nix",
           "old.nix",
         ]);
-        assert.strictEqual(
-          yield* remote.git("checkout", [
-            "show",
-            `${imported.tree}:flake.lock`,
-          ]),
-          "fixed lock"
-        );
-        assert.strictEqual(yield* git.head, before);
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
+
+        const lock = yield* remote.git("checkout", [
+          "show",
+          `${imported.tree}:flake.lock`,
+        ]);
+
+        assert.strictEqual(lock, "fixed lock");
+        const head = yield* git.head;
+        assert.strictEqual(head, before);
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
       })
     );
 
@@ -574,10 +593,13 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         assert.deepStrictEqual(imported.files, []);
         assert.deepStrictEqual(imported.gitlinks, []);
-        assert.strictEqual(
-          imported.tree,
-          yield* remote.git("checkout", ["rev-parse", "HEAD^{tree}"])
-        );
+
+        const headTree = yield* remote.git("checkout", [
+          "rev-parse",
+          "HEAD^{tree}",
+        ]);
+
+        assert.strictEqual(imported.tree, headTree);
       })
     );
 
@@ -621,24 +643,25 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         // A nested repository becomes a gitlink, never its .git contents.
         assert.deepStrictEqual(imported.files, ["vendor/evil"]);
         assert.deepStrictEqual(imported.gitlinks, ["vendor/evil"]);
-        assert.include(
-          yield* remote.git("checkout", [
-            "ls-tree",
-            imported.tree,
-            "vendor/evil",
-          ]),
-          `160000 commit ${nestedHead}`
-        );
-        assert.notMatch(
-          yield* remote.git("checkout", [
-            "ls-tree",
-            "-r",
-            "--name-only",
-            imported.tree,
-          ]),
-          /(?:^|\/)\.git(?:\/|$)/mu
-        );
-        assert.isFalse(yield* remote.exists("upstream", "fsmonitor-ran"));
+
+        const entry = yield* remote.git("checkout", [
+          "ls-tree",
+          imported.tree,
+          "vendor/evil",
+        ]);
+
+        assert.include(entry, `160000 commit ${nestedHead}`);
+
+        const paths = yield* remote.git("checkout", [
+          "ls-tree",
+          "-r",
+          "--name-only",
+          imported.tree,
+        ]);
+
+        assert.notMatch(paths, /(?:^|\/)\.git(?:\/|$)/mu);
+        const ran = yield* remote.exists("upstream", "fsmonitor-ran");
+        assert.isFalse(ran);
       })
     );
 
@@ -661,7 +684,8 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         yield* remote.write("checkout", { "flake.lock": "after plant\n" });
         yield* git.commitLock("up");
 
-        assert.isFalse(yield* remote.exists("upstream", "planted-ran"));
+        const ran = yield* remote.exists("upstream", "planted-ran");
+        assert.isFalse(ran);
       })
     );
 
@@ -681,13 +705,17 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         const sha = yield* git.commitTree(imported.tree, "fix: readme\n\nWhy.");
 
-        assert.strictEqual(yield* git.head, sha);
+        const head = yield* git.head;
+        assert.strictEqual(head, sha);
+
+        const commit = yield* remote.git("checkout", [
+          "log",
+          "-1",
+          "--format=%P%n%T%n%an <%ae>%n%cn%n%B",
+        ]);
+
         assert.strictEqual(
-          yield* remote.git("checkout", [
-            "log",
-            "-1",
-            "--format=%P%n%T%n%an <%ae>%n%cn%n%B",
-          ]),
+          commit,
           Arr.join(
             [
               before,
@@ -701,14 +729,10 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
             "\n"
           )
         );
-        assert.strictEqual(
-          yield* remote.read("checkout", "README.md"),
-          "edited\n"
-        );
-        assert.strictEqual(
-          yield* remote.git("checkout", ["status", "--porcelain"]),
-          ""
-        );
+        const readme = yield* remote.read("checkout", "README.md");
+        assert.strictEqual(readme, "edited\n");
+        const status = yield* remote.git("checkout", ["status", "--porcelain"]);
+        assert.strictEqual(status, "");
       })
     );
   });

@@ -93,8 +93,6 @@ ssh pewter 'sudo journalctl -u flake-fixer.service -n 100 --no-pager'
 
 To try the agent on the current state without pushing, run the dry run with `--agent` (see Updater).
 
-`hosts/pewter/flake-updater/` has its own `package.json`, pinned through `pnpm-lock.yaml` and the `pnpmDeps` hash in `package.nix`. A dependency change needs a new hash; the Updater never edits either, so npm dependencies only move in your own PRs.
-
 ### Build gate
 
 The Build gate builds each system's full toplevel closure:

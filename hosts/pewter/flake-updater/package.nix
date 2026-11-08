@@ -12,32 +12,48 @@
   gnutar,
   nix,
 }:
+let
+  # The pnpm workspace root; this package builds from there.
+  root = ../../..;
+in
 stdenvNoCC.mkDerivation (finalAttrs: {
   pname = "flake-updater";
   version = "0.0.0";
 
   src = lib.fileset.toSource {
-    root = ./.;
+    inherit root;
     fileset = lib.fileset.unions [
+      (root + "/package.json")
+      (root + "/pnpm-lock.yaml")
+      (root + "/pnpm-workspace.yaml")
+      (root + "/tsconfig.base.json")
+      (root + "/oxlint.config.ts")
+      (root + "/oxfmt.config.ts")
+      (root + "/tools/oxlint")
+      # pnpm resolves every workspace package, so the others' manifests must
+      # be present even though only this one is installed.
+      (root + "/hosts/gram/x-blocklist/package.json")
       ./package.json
       ./blocked-paths.json
-      ./pnpm-lock.yaml
-      ./pnpm-workspace.yaml
       ./tsconfig.json
-      ./oxlint.config.ts
-      ./oxfmt.config.ts
       ./vitest.config.ts
       ./src
       ./test
-      ./tools
     ];
   };
 
+  pnpmWorkspaces = [ "flake-updater" ];
+
   pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs) pname version src;
+    inherit (finalAttrs)
+      pname
+      version
+      src
+      pnpmWorkspaces
+      ;
     inherit pnpm;
     fetcherVersion = 5;
-    hash = "sha256-v75xjetYmKBU7uCJGzcFUhcBEHzDHr6sas2fvHAIC+U=";
+    hash = "sha256-KJn2BjqUua4G0//NwwoJBHkhwDUsYvux5MQdDdJc+Q0=";
   };
 
   nativeBuildInputs = [
@@ -59,22 +75,20 @@ stdenvNoCC.mkDerivation (finalAttrs: {
   checkPhase = ''
     runHook preCheck
     pnpm run prepare
-    pnpm run typecheck
-    pnpm run test
-    pnpm run format
-    pnpm run lint
+    pnpm --filter flake-updater run typecheck
+    pnpm --filter flake-updater run test
+    pnpm exec oxfmt --check hosts/pewter/flake-updater
+    pnpm exec oxlint hosts/pewter/flake-updater
     runHook postCheck
   '';
 
   installPhase = ''
     runHook preInstall
-    # `pnpm prune` re-verifies the lockfile over the network, and installing
-    # over the dev tree leaves its packages in node_modules/.pnpm. A clean
-    # offline install from the hook's store keeps only production packages.
-    rm -rf node_modules
-    pnpm install --offline --prod --ignore-scripts --frozen-lockfile
-    mkdir -p $out/lib/flake-updater $out/bin
-    cp -r package.json blocked-paths.json src node_modules $out/lib/flake-updater/
+    # A self-contained copy of the package with only its production
+    # dependencies, installed offline from the hook's store.
+    pnpm --filter flake-updater deploy --prod --offline --ignore-scripts deploy
+    mkdir -p $out/lib $out/bin
+    cp -r deploy $out/lib/flake-updater
     makeWrapper ${lib.getExe nodejs_24} $out/bin/flake-updater \
       --add-flags $out/lib/flake-updater/src/main.ts \
       --prefix PATH : ${

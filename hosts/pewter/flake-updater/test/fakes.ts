@@ -7,6 +7,7 @@ import {
   Record as Rec,
   String as Str,
 } from "effect";
+import type { Schema } from "effect";
 
 import { Agent, AgentError, RepairReport } from "../src/agent.ts";
 import type { RepairRequest, RepairResult } from "../src/agent.ts";
@@ -36,20 +37,25 @@ const lockedNode = (name: string, rev: string) => ({
   original: { owner: "upstream", repo: name, type: "github" },
 });
 
+/** Fake API and file content: plain JSON values, so stringify cannot throw. */
+export const toJson = (value: Schema.Json): string =>
+  // oxlint-disable-next-line effecttsgo/global-json -- see above
+  JSON.stringify(value);
+
+const toPrettyJson = (value: Schema.Json): string =>
+  // oxlint-disable-next-line effecttsgo/global-json -- see above
+  JSON.stringify(value, null, 2);
+
 /** A flake.lock whose root inputs sit at the given seven-character revisions. */
 export const lockAt = (revs: Readonly<Record<string, string>>): string =>
-  `${JSON.stringify(
-    {
-      nodes: {
-        ...Rec.map(revs, (rev, name) => lockedNode(name, rev)),
-        root: { inputs: Rec.map(revs, (_rev, name) => name) },
-      },
-      root: "root",
-      version: 7,
+  `${toPrettyJson({
+    nodes: {
+      ...Rec.map(revs, (rev, name) => lockedNode(name, rev)),
+      root: { inputs: Rec.map(revs, (_rev, name) => name) },
     },
-    null,
-    2
-  )}\n`;
+    root: "root",
+    version: 7,
+  })}\n`;
 
 export type AgentStep = (
   request: RepairRequest,

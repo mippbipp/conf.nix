@@ -28,9 +28,13 @@ const StatusContext = Schema.Struct({
   targetUrl: Schema.String,
 });
 
+const RollupEntry = Schema.Union([CheckRun, StatusContext]);
+
+type Check = typeof RollupEntry.Type;
+
 const Rollup = Schema.Struct({
   headRefOid: Schema.String,
-  statusCheckRollup: Schema.Array(Schema.Union([CheckRun, StatusContext])),
+  statusCheckRollup: Schema.Array(RollupEntry),
 });
 
 const RequiredChecks = Schema.Array(Schema.Struct({ context: Schema.String }));
@@ -47,8 +51,6 @@ const BranchRule = Schema.Struct({
 });
 
 type Rule = typeof BranchRule.Type;
-
-type Check = typeof CheckRun.Type | typeof StatusContext.Type;
 
 const failedConclusions = new Set([
   "FAILURE",

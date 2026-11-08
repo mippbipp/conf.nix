@@ -72,7 +72,9 @@ type Flags = Command.Command.Config.Infer<typeof flags>;
 const readSecret = Effect.fn("readSecret")(function* (file: string) {
   const fs = yield* FileSystem.FileSystem;
 
-  return Redacted.make(Str.trim(yield* fs.readFileString(file)));
+  const contents = yield* fs.readFileString(file);
+
+  return Redacted.make(Str.trim(contents));
 });
 
 const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
@@ -129,7 +131,7 @@ const update = Command.make(
 
     const agent = yield* agentLayer(options);
 
-    yield* run().pipe(Effect.provide(Layer.mergeAll(live, settings, agent)));
+    yield* run().pipe(Effect.provide([live, settings, agent]));
   })
 ).pipe(
   Command.withDescription(
@@ -148,8 +150,10 @@ const revertLock = Command.make(
   },
   Effect.fn("revertLock")(function* (options) {
     const fs = yield* FileSystem.FileSystem;
-    const main = yield* parseLock(yield* fs.readFileString(options.main));
-    const branch = yield* parseLock(yield* fs.readFileString(options.lock));
+    const mainText = yield* fs.readFileString(options.main);
+    const main = yield* parseLock(mainText);
+    const branchText = yield* fs.readFileString(options.lock);
+    const branch = yield* parseLock(branchText);
 
     yield* fs.writeFileString(
       options.lock,

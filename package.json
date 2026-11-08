@@ -1,0 +1,24 @@
+{
+  "name": "conf-nix",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "effect-tsgo patch --oxlint",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "ox": "turbo run lint format typecheck",
+    "ox:fix": "turbo run typecheck format:fix"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "catalog:tooling",
+    "@oxlint/plugins": "catalog:tooling",
+    "@types/node": "catalog:",
+    "effect": "catalog:effect",
+    "oxfmt": "catalog:tooling",
+    "oxlint": "catalog:tooling",
+    "oxlint-tsgolint": "catalog:tooling",
+    "turbo": "catalog:tooling",
+    "typescript": "catalog:"
+  },
+  "packageManager": "pnpm@12.9.0"
+}

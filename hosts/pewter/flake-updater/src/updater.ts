@@ -90,10 +90,9 @@ const syncPr = Effect.fn("Updater.syncPr")(function* (
 const findIssue = Effect.fn("Updater.findIssue")(function* (title: string) {
   const github = yield* GitHub;
 
-  return Arr.findFirst(
-    yield* github.openIssues,
-    (issue) => issue.title === title
-  );
+  const issues = yield* github.openIssues;
+
+  return Arr.findFirst(issues, (issue) => issue.title === title);
 });
 
 /** One open issue per subject: later reports become comments. */
@@ -115,7 +114,8 @@ const closeLandedIssues = Effect.fn("Updater.closeLandedIssues")(function* (
   main: FlakeLock
 ) {
   const github = yield* GitHub;
-  const landed = landedIssues(main, yield* github.openIssues);
+  const issues = yield* github.openIssues;
+  const landed = landedIssues(main, issues);
 
   for (const { issue, input } of landed) {
     yield* github.closeIssue(
@@ -258,7 +258,8 @@ const step = Effect.fn("Updater.step")(function* (
   const git = yield* Git;
   const gate = yield* Gate;
   const settings = yield* Settings;
-  const verdict = yield* gate.verdict(target.pr, yield* git.head);
+  const head = yield* git.head;
+  const verdict = yield* gate.verdict(target.pr, head);
 
   if (Arr.isReadonlyArrayEmpty(verdict.failed)) {
     yield* closeRepairIssue(target.pr);
@@ -316,7 +317,9 @@ const repair = Effect.fn("Updater.repair")(function* (
   }
 
   if (Option.isSome(next.stop)) {
-    yield* reportRepairFailure(target, yield* Ref.get(state), next.stop.value);
+    const progress = yield* Ref.get(state);
+
+    yield* reportRepairFailure(target, progress, next.stop.value);
   }
 });
 
@@ -350,7 +353,9 @@ export const run = Effect.fn("Updater.run")(function* () {
   yield* nix.update;
   yield* git.commitLock("up");
 
-  if (Arr.isReadonlyArrayEmpty(yield* git.changedFromMain)) {
+  const changed = yield* git.changedFromMain;
+
+  if (Arr.isReadonlyArrayEmpty(changed)) {
     yield* Effect.log("flake.lock is already current");
 
     return;

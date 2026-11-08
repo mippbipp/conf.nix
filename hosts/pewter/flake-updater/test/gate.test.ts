@@ -6,6 +6,7 @@ import { Shell } from "../src/command.ts";
 import { Gate, GateError } from "../src/gate.ts";
 import { layer as liveGate } from "../src/live/gate.ts";
 import { Host } from "../src/settings.ts";
+import { toJson } from "./fakes.ts";
 
 const sha = "c1";
 
@@ -30,7 +31,7 @@ const failing = (name: string): FakeCheck => ({
 });
 
 const rollup = (checks: readonly FakeCheck[]) =>
-  JSON.stringify({
+  toJson({
     headRefOid: sha,
     statusCheckRollup: Arr.map(checks, (check, index) => ({
       ...check,
@@ -39,7 +40,7 @@ const rollup = (checks: readonly FakeCheck[]) =>
   });
 
 const ruleset = (contexts: readonly string[]) =>
-  JSON.stringify([
+  toJson([
     { type: "deletion", ruleset_id: 1 },
     {
       type: "pull_request",

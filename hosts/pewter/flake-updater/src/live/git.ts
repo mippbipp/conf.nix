@@ -73,8 +73,10 @@ export const layer = Layer.effect(
       const toError = fail(describe(rest));
 
       return exec("git", withoutHooks(rest), options).pipe(
-        Effect.map((output) => output.exitCode),
-        Effect.mapError(toError)
+        Effect.mapBoth({
+          onSuccess: (output) => output.exitCode,
+          onFailure: toError,
+        })
       );
     };
 
@@ -149,9 +151,8 @@ export const layer = Layer.effect(
         return { mode: "continued", dropped: [] } satisfies SyncOutcome;
       }
 
-      const conflicts = lines(
-        yield* git(["diff", "--name-only", "--diff-filter=U"])
-      );
+      const unmerged = yield* git(["diff", "--name-only", "--diff-filter=U"]);
+      const conflicts = lines(unmerged);
 
       // flake.lock is regenerated right after this anyway.
       if (Arr.join(conflicts, "\n") === "flake.lock") {
@@ -162,14 +163,14 @@ export const layer = Layer.effect(
         return { mode: "continued", dropped: [] } satisfies SyncOutcome;
       }
 
-      const dropped = lines(
-        yield* git([
-          "rev-list",
-          "--no-merges",
-          "--abbrev-commit",
-          `${mainRef}..${remoteBranch}`,
-        ])
-      );
+      const revList = yield* git([
+        "rev-list",
+        "--no-merges",
+        "--abbrev-commit",
+        `${mainRef}..${remoteBranch}`,
+      ]);
+
+      const dropped = lines(revList);
 
       yield* git(["merge", "--abort"]);
       yield* startFromMain;
@@ -295,10 +296,12 @@ export const layer = Layer.effect(
         { cwd: dir, env: { ...env, ...index } }
       ).pipe(Effect.mapError(fail(`staging ${dir}`)));
 
-      const tree = Str.trim(yield* git(["write-tree"], index));
+      const written = yield* git(["write-tree"], index);
+      const tree = Str.trim(written);
 
       // `:<old mode> <new mode> <old sha> <new sha> <status>\t<path>`
-      const raw = lines(yield* git(["diff-tree", "-r", "--raw", "HEAD", tree]));
+      const diff = yield* git(["diff-tree", "-r", "--raw", "HEAD", tree]);
+      const raw = lines(diff);
       const files = Arr.map(raw, (line) => Str.split(line, "\t")[1] ?? "");
 
       const changedGitlinks = Arr.flatMap(raw, (line) =>
@@ -314,12 +317,12 @@ export const layer = Layer.effect(
       tree: string,
       message: string
     ) {
-      const sha = Str.trim(
-        yield* git(
-          ["commit-tree", tree, "-p", "HEAD", "-m", message],
-          fixerAuthor
-        )
+      const committed = yield* git(
+        ["commit-tree", tree, "-p", "HEAD", "-m", message],
+        fixerAuthor
       );
+
+      const sha = Str.trim(committed);
 
       yield* git(["reset", "--hard", sha]);
 

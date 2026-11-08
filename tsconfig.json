@@ -1,0 +1,6 @@
+{
+  "extends": "./tsconfig.base.json",
+  // Root-owned files only; each package has its own tsconfig.json.
+  "include": ["*.config.ts"],
+  "exclude": ["node_modules"]
+}

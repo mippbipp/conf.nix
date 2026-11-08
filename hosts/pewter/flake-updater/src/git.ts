@@ -76,5 +76,7 @@ export const readFlakeLock = Effect.fn("Git.readFlakeLock")(function* (
 ) {
   const git = yield* Git;
 
-  return yield* parseLock(yield* git.readLock(rev));
+  const raw = yield* git.readLock(rev);
+
+  return yield* parseLock(raw);
 });

@@ -52,6 +52,10 @@ _Avoid_: ephemeral vm
 The rebuild command for this flake. It switches the current host by default and `nrs <host>` for another, substituting from Attic; `nrs --push` publishes. It builds from the `~/conf.nix` checkout; repo-relative Home Manager files (e.g. nvim, hyprland) symlink out-of-store into it. See ADR 0020.
 _Avoid_: rebuild, deploy
 
+**Workspace package**:
+A TypeScript program in the repo's pnpm workspace, kept beside the Nix module that runs it and built and checked by its own Nix package. See ADR 0022.
+_Avoid_: app, project
+
 ## Globals
 
 **Globals**:
@@ -127,6 +131,20 @@ _Avoid_: override dns
 **Tailnet expose**:
 A loopback-only listener made reachable over the tailnet; tailscaled terminates tailnet TLS and proxies to it (Tailscale Serve).
 _Avoid_: serve, mapping
+
+## X blocklist
+
+**Clankwall**:
+The public list at clankwall.vogel.dev of X accounts flagged for spam or AI-written replies. The daily run on gram uses only its AI-flagged accounts. Someone else runs it and decides who is flagged.
+_Avoid_: blocklist, source list
+
+**Block sync**:
+The daily run that makes the personal X account's blocked list equal to Clankwall's AI-flagged accounts: it blocks flagged accounts and unblocks every other blocked account, including ones blocked by hand.
+_Avoid_: blocklist run
+
+**Confirmed change**:
+A block or unblock X answered with success and the intended account's handle. A Block sync only counts confirmed changes as done.
+_Avoid_: successful block
 
 ## Things sync
 

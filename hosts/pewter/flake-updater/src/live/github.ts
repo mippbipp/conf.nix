@@ -221,20 +221,20 @@ export const layer = Layer.effect(
         return { number: 0, title, body, url: "(dry run)" };
       }
 
-      const url = Str.trim(
-        yield* gh([
-          "issue",
-          "create",
-          "--title",
-          title,
-          "--body",
-          body,
-          "--label",
-          "needs-triage",
-          "--label",
-          "automated",
-        ])
-      );
+      const created = yield* gh([
+        "issue",
+        "create",
+        "--title",
+        title,
+        "--body",
+        body,
+        "--label",
+        "needs-triage",
+        "--label",
+        "automated",
+      ]);
+
+      const url = Str.trim(created);
 
       const number = Number(issueNumber.exec(url)?.groups?.number ?? "0");
 

@@ -2,7 +2,8 @@ import { recommended } from "@effect/tsgo/oxlint-presets";
 import { defineConfig } from "oxlint";
 
 // Adapted from the sourdough template: same categories and anti-slop rules,
-// minus the React, shadcn and turbo plugins this project has no use for.
+// minus the React, shadcn and turbo plugins this repo has no use for. It lints
+// the pnpm workspace packages listed in pnpm-workspace.yaml.
 export default defineConfig({
   extends: [recommended],
   options: {
@@ -149,22 +150,22 @@ export default defineConfig({
   },
   overrides: [
     {
-      files: ["*.config.ts"],
+      files: ["**/*.config.ts"],
       rules: {
         "node/no-process-env": "off",
       },
     },
     {
-      // CLI entrypoint: the top-level runMain launches the process,
+      // CLI entrypoints and build tools: the top-level runMain launches the process,
       // it is not test setup code, and it is where layers get provided
-      files: ["src/main.ts"],
+      files: ["**/src/main.ts", "**/tools/*.ts"],
       rules: {
         "vitest/require-hook": "off",
         "effecttsgo/strict-effect-provide": "off",
       },
     },
     {
-      files: ["**/*.test.ts", "test/**/*.ts"],
+      files: ["**/*.test.ts", "**/test/**/*.ts"],
       rules: {
         // @effect/vitest layer() owns setup and teardown internally
         "vitest/no-importing-vitest-globals": "off",
@@ -191,7 +192,7 @@ export default defineConfig({
   ignorePatterns: [
     // The Nix build has no .gitignore, and type-aware linting of
     // node_modules exhausts memory.
-    "node_modules/**",
+    "**/node_modules/**",
     // agent tooling dirs (installed skills/hooks) and the vendored plugin
     // itself are not application source
     ".agent/**",
@@ -206,7 +207,13 @@ export default defineConfig({
     ".roo/**",
     ".windsurf/**",
     "tools/oxlint/anti-slop/**",
-    // captured CI output kept verbatim as test data
-    "test/fixtures/**",
+    // captured CI and API output kept verbatim as test data
+    "**/test/fixtures/**",
+    // build output
+    "**/dist/**",
+    // Bun-based, outside the pnpm workspace, with its own lint setup
+    "modules/llm/opencode/kiro/**",
+    // skills submodule
+    "modules/llm/skills/**",
   ],
 });

@@ -78,6 +78,9 @@ const describeRef = (
     ([name, child]) => [name, describeRef(lock, child)]
   );
 
+  // Plain strings, numbers and booleans cannot make stringify throw, and the
+  // exact output feeds entryFingerprint, which must stay stable.
+  // oxlint-disable-next-line effecttsgo/global-json -- see above
   return JSON.stringify([
     sortedAttrs(node.locked),
     sortedAttrs(node.original),
@@ -362,6 +365,8 @@ const formatNode = (node: LockNode) => ({
 
 /** Serializes a lock the way Nix writes flake.lock: sorted keys, 2 spaces. */
 export const formatLock = (lock: FlakeLock): string =>
+  // A decoded FlakeLock is plain JSON data, so stringify cannot throw.
+  // oxlint-disable-next-line effecttsgo/global-json -- see above
   `${JSON.stringify(
     {
       nodes: Rec.map(sortRecord(lock.nodes), formatNode),

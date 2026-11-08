@@ -310,8 +310,10 @@ export const layer = Layer.effect(
               permissions: [...sessionRules(config.contextDir)],
             })
             .pipe(
-              Effect.map((session) => session.id),
-              Effect.mapError(toAgentError("creating the session"))
+              Effect.mapBoth({
+                onSuccess: (session) => session.id,
+                onFailure: toAgentError("creating the session"),
+              })
             ),
       });
 

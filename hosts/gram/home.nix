@@ -15,5 +15,6 @@ _: {
     ../../modules/de/apps/hm/mpv.nix
     ../../modules/de/apps/hm/discord.nix
     ../../modules/de/apps/hm/hex.nix
+    ./x-blocklist
   ];
 }

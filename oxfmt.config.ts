@@ -6,8 +6,13 @@ export default defineConfig({
     "*.nix",
     // vendored oxlint plugin: don't reformat third-party-owned source
     "tools/oxlint/anti-slop/**",
-    // captured CI output kept verbatim as test data
-    "test/fixtures/**",
+    // captured CI and API output kept verbatim as test data
+    "**/test/fixtures/**",
+    "**/dist/**",
+    // Bun-based, outside the pnpm workspace, with its own format setup
+    "modules/llm/opencode/kiro/**",
+    // skills submodule
+    "modules/llm/skills/**",
   ],
   printWidth: 80,
   tabWidth: 2,
