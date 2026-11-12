@@ -11,8 +11,7 @@ let
   run = pkgs.writeShellApplication {
     name = "x-blocklist";
     runtimeInputs = [
-      pkgs.nodejs
-      pkgs.bash
+      pkgs.opencode-browse
       pkgs.coreutils
       pkgs.jq
       pkgs.procps
@@ -20,7 +19,6 @@ let
     ];
     text = ''
       mkdir -p ${lib.escapeShellArg stateDir}
-      browse() { npx -y @opencode/browse@0.0.14 "$@"; }
 
       # Start Chrome if it isn't running, and quit it afterwards. A Chrome
       # you already had open is left alone. It needs a window: with
@@ -61,7 +59,6 @@ in
     Service = {
       Type = "oneshot";
       ExecStart = lib.getExe run;
-      Environment = [ "OPENCODE_BROWSER_AUTO_UPDATE=off" ];
       Restart = "on-failure";
       RestartSec = "1h";
     };

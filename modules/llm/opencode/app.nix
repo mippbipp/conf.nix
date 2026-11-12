@@ -25,20 +25,9 @@ in
       mcp.servers.browse = {
         type = "local";
         command = [
-          "${pkgs.nodejs}/bin/npx"
-          "-y"
-          "@opencode/browse@0.0.14"
+          (lib.getExe pkgs.opencode-browse)
           "mcp"
         ];
-        environment = {
-          # Its self-updater runs `npm install -g`, which can't write to the Nix store.
-          OPENCODE_BROWSER_AUTO_UPDATE = "off";
-          PATH = lib.makeBinPath [
-            pkgs.nodejs
-            pkgs.bash
-            pkgs.coreutils
-          ];
-        };
       };
     };
     context = ''
