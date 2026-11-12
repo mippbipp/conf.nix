@@ -42,5 +42,18 @@ in
       oci_region.owner = username;
       oci_budget_alert_email.owner = username;
     };
+    templates = lib.mkIf isPersonalHost {
+      "gh-hosts.yml" = {
+        owner = username;
+        content = ''
+          github.com:
+            user: ${username}
+            git_protocol: ssh
+            oauth_token: ${config.sops.placeholder.github_token}
+            users:
+              ${username}: {}
+        '';
+      };
+    };
   };
 }
