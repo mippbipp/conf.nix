@@ -19,6 +19,7 @@
     ../../modules/system/config/printing.nix
     ../../modules/de/apps/system/obs.nix
     ../../modules/de/apps/system/gaming.nix
+    ../../modules/de/apps/system/chromium.nix
     ../../modules/de/system
     ../../modules/de/hyprland/system.nix
     ../../modules/de/apps/thunar/system.nix

@@ -21,6 +21,21 @@ in
   DontCheckDefaultBrowser = true;
   NoDefaultBookmarks = true;
   OfferToSaveLogins = false;
+  # Keyed by add-on ID, valued by its addons.mozilla.org slug. Keep in step with
+  # programs.chromium.extensions in ../../system/chromium.nix.
+  ExtensionSettings =
+    builtins.mapAttrs
+      (_: slug: {
+        install_url = "https://addons.mozilla.org/firefox/downloads/latest/${slug}/latest.xpi";
+        installation_mode = "force_installed";
+      })
+      {
+        "uBlock0@raymondhill.net" = "ublock-origin";
+        "{446900e4-71c2-419f-a6a7-df9c091e268b}" = "bitwarden-password-manager";
+        "{d7742d87-e61d-4b78-b8a1-b469842139fa}" = "vimium-ff";
+        "{74145f27-f039-47ce-a470-a662b129930a}" = "clearurls";
+        "addon@karakeep.app" = "karakeep";
+      };
   EnableTrackingProtection = {
     Value = true;
     Locked = true;

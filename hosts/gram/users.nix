@@ -21,7 +21,6 @@
         ignoreShellProgramCheck = true;
         packages = with pkgs; [
           rclone
-          google-chrome
           qbittorrent
           lunar-client
           yt-dlp
