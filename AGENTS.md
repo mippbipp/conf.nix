@@ -22,6 +22,12 @@ When changing, diagnosing, or operating the flake update pipeline, read
 `docs/adr/0009-flake-update-pipeline.md`. It defines the updater, Build gate,
 watchdog, state directories, and recovery evidence to collect.
 
+## TypeScript workspace
+
+`bun.lock` changes must be committed together with the regenerated `bun.nix`.
+`bun install` regenerates it through the root `postinstall` when `bun2nix` is
+on `PATH` (`nix develop` provides it). Otherwise run `bun2nix -o bun.nix`.
+
 ## Encrypted secrets
 
 Before editing `secrets/me.yaml`, set `SOPS_AGE_KEY_FILE=<filepath from modules/system/config/sops.nix>` in the command environment. Verify the encrypted diff afterward and keep decrypted values out of command output.

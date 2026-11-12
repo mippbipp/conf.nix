@@ -4,6 +4,7 @@
   config,
   globals,
   host,
+  inputs,
   lib,
   pkgs,
   username,
@@ -11,7 +12,9 @@
 }:
 let
   cfg = config.services.flake-updater;
-  updater = pkgs.callPackage ./package.nix { };
+  updater = pkgs.callPackage ./package.nix {
+    bun2nix = inputs.bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
 
   stateDir = "/var/lib/flake-updater";
   fixerDir = "/var/lib/flake-fixer";

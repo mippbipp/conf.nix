@@ -3,7 +3,7 @@ import { defineConfig } from "oxlint";
 
 // Adapted from the sourdough template: same categories and anti-slop rules,
 // minus the React, shadcn and turbo plugins this repo has no use for. It lints
-// the pnpm workspace packages listed in pnpm-workspace.yaml.
+// the Bun workspace packages listed in package.json.
 export default defineConfig({
   extends: [recommended],
   options: {
@@ -211,7 +211,7 @@ export default defineConfig({
     "**/test/fixtures/**",
     // build output
     "**/dist/**",
-    // Bun-based, outside the pnpm workspace, with its own lint setup
+    // separate Bun project outside the workspace, with its own lint setup
     "modules/llm/opencode/kiro/**",
     // skills submodule
     "modules/llm/skills/**",

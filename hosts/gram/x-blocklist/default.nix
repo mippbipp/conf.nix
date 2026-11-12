@@ -2,12 +2,16 @@
   pkgs,
   lib,
   config,
+  inputs,
   ...
 }:
 let
   stateDir = "${config.xdg.stateHome}/x-blocklist";
   # The Effect program in src/, bundled into one `browse execute` script.
-  script = "${pkgs.callPackage ./package.nix { }}/share/x-blocklist/block.js";
+  package = pkgs.callPackage ./package.nix {
+    bun2nix = inputs.bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
+  script = "${package}/share/x-blocklist/block.js";
   run = pkgs.writeShellApplication {
     name = "x-blocklist";
     runtimeInputs = [

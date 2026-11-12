@@ -22,7 +22,7 @@ out the changes from both lists again.
 ## Dev
 
 ```sh
-pnpm --filter x-blocklist run build
+bun run --filter x-blocklist build
 sed 's/dryRun: false,/dryRun: true,/' dist/block.js > /tmp/opencode/dry.js
 browse execute --rm --json --timeout-ms 150000 --file /tmp/opencode/dry.js
 ```

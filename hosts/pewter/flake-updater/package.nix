@@ -1,10 +1,8 @@
 {
   lib,
   stdenvNoCC,
-  nodejs_24,
-  pnpm,
-  fetchPnpmDeps,
-  pnpmConfigHook,
+  bun2nix,
+  bun,
   makeWrapper,
   coreutils,
   gh,
@@ -13,10 +11,10 @@
   nix,
 }:
 let
-  # The pnpm workspace root; this package builds from there.
+  # The Bun workspace root; this package builds from there.
   root = ../../..;
 in
-stdenvNoCC.mkDerivation (finalAttrs: {
+stdenvNoCC.mkDerivation {
   pname = "flake-updater";
   version = "0.0.0";
 
@@ -24,14 +22,14 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     inherit root;
     fileset = lib.fileset.unions [
       (root + "/package.json")
-      (root + "/pnpm-lock.yaml")
-      (root + "/pnpm-workspace.yaml")
+      (root + "/bun.lock")
+      (root + "/bunfig.toml")
       (root + "/tsconfig.base.json")
       (root + "/oxlint.config.ts")
       (root + "/oxfmt.config.ts")
       (root + "/tools/oxlint")
-      # pnpm resolves every workspace package, so the others' manifests must
-      # be present even though only this one is installed.
+      # bun reads every workspace manifest, so the others must be present
+      # even though only this one is built.
       (root + "/hosts/gram/x-blocklist/package.json")
       ./package.json
       ./blocked-paths.json
@@ -42,55 +40,52 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     ];
   };
 
-  pnpmWorkspaces = [ "flake-updater" ];
-
-  pnpmDeps = fetchPnpmDeps {
-    inherit (finalAttrs)
-      pname
-      version
-      src
-      pnpmWorkspaces
-      ;
-    inherit pnpm;
-    fetcherVersion = 5;
-    hash = "sha256-KJn2BjqUua4G0//NwwoJBHkhwDUsYvux5MQdDdJc+Q0=";
+  bunDeps = bun2nix.fetchBunDeps {
+    bunNix = ../../../bun.nix;
   };
 
   nativeBuildInputs = [
-    nodejs_24
-    pnpm
-    pnpmConfigHook
+    bun2nix.hook
     makeWrapper
   ];
 
-  # Node runs the TypeScript sources directly; there is nothing to compile.
-  dontBuild = true;
+  # The root `postinstall` would run bun2nix; checkPhase runs `prepare`.
+  dontRunLifecycleScripts = true;
+
+  # One file with every dependency inlined, so the output needs no
+  # node_modules.
+  buildPhase = ''
+    runHook preBuild
+    bun build hosts/pewter/flake-updater/src/main.ts \
+      --target=bun \
+      --outfile=dist/flake-updater.js
+    runHook postBuild
+  '';
 
   # test/git.test.ts drives the checkout adapter against real git.
   nativeCheckInputs = [ git ];
 
   # The Build gate builds pewter's closure, which includes this package, so
-  # these checks gate every change to the Updater.
+  # these checks gate every change to the Updater. `bun --bun` runs every
+  # `#!/usr/bin/env node` script with Bun, so the checks need no Node.js.
   doCheck = true;
   checkPhase = ''
     runHook preCheck
-    pnpm run prepare
-    pnpm --filter flake-updater run typecheck
-    pnpm --filter flake-updater run test
-    pnpm exec oxfmt --check hosts/pewter/flake-updater
-    pnpm exec oxlint hosts/pewter/flake-updater
+    bun --bun run prepare
+    bun --bun run --cwd hosts/pewter/flake-updater typecheck
+    bun --bun run --cwd hosts/pewter/flake-updater test
+    bun --bun x oxfmt --check hosts/pewter/flake-updater
+    bun --bun x oxlint hosts/pewter/flake-updater
     runHook postCheck
   '';
 
   installPhase = ''
     runHook preInstall
-    # A self-contained copy of the package with only its production
-    # dependencies, installed offline from the hook's store.
-    pnpm --filter flake-updater deploy --prod --offline --ignore-scripts deploy
-    mkdir -p $out/lib $out/bin
-    cp -r deploy $out/lib/flake-updater
-    makeWrapper ${lib.getExe nodejs_24} $out/bin/flake-updater \
-      --add-flags $out/lib/flake-updater/src/main.ts \
+    install -Dm644 dist/flake-updater.js $out/lib/flake-updater/flake-updater.js
+    # --no-env-file: Bun would otherwise load a .env from the working
+    # directory, which Node never did.
+    makeWrapper ${lib.getExe bun} $out/bin/flake-updater \
+      --add-flags "--no-env-file $out/lib/flake-updater/flake-updater.js" \
       --prefix PATH : ${
         lib.makeBinPath [
           coreutils
@@ -107,4 +102,4 @@ stdenvNoCC.mkDerivation (finalAttrs: {
     description = "Bump flake inputs, wait for the Build gate, and repair failed updates";
     mainProgram = "flake-updater";
   };
-})
+}
