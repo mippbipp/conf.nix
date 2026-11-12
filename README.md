@@ -18,21 +18,23 @@ Shared bootstrap for the NixOS-WSL guests lives beside the module: [modules/syst
 
 ## TypeScript packages
 
-The repo root is a pnpm workspace with turbo. Its packages sit next to the Nix modules that run them, and `pnpm-workspace.yaml` lists them:
+The repo root is a Bun workspace with turbo. Its packages sit next to the Nix modules that run them, and `workspaces` in the root `package.json` lists them:
 
 * [`hosts/pewter/flake-updater/`](./hosts/pewter/flake-updater/): the Updater (ADR 0009)
 * [`hosts/gram/x-blocklist/`](./hosts/gram/x-blocklist/): the X blocklist job on gram
 
-`modules/llm/opencode/kiro/` is a Bun project with its own setup and stays outside the workspace. Versions shared across packages, Effect included, are pinned in the catalogs in `pnpm-workspace.yaml`.
+`modules/llm/opencode/kiro/` is a separate Bun project with its own setup and stays outside the workspace. Versions shared across packages, Effect included, are pinned in the catalogs in the root `package.json`.
+
+Run `nix develop` first for Bun and bun2nix.
 
 ```sh
-pnpm install
-pnpm test      # every package's tests
-pnpm ox        # lint, format check and typecheck
-pnpm ox:fix    # fix lint and format issues
+bun install       # also regenerates bun.nix when bun2nix is on PATH
+bun run test      # every package's tests
+bun run ox        # lint, format check and typecheck
+bun run ox:fix    # fix lint and format issues
 ```
 
-Nix never runs turbo. Each package's `package.nix` builds from the repo root and runs the same checks for that package, so the Build gate tests every package in a host's closure. See ADR 0022. After a dependency change, set that package's `pnpmDeps.hash` to `lib.fakeHash`, build, and copy the hash from the error.
+Nix never runs turbo. Each package's `package.nix` builds from the repo root and runs the same checks for that package, so the Build gate tests every package in a host's closure. See ADR 0022. The Nix builds install dependencies from `bun.nix`, which bun2nix generates from `bun.lock`. Commit `bun.nix` with every lockfile change; outside `nix develop`, run `bun2nix -o bun.nix`.
 
 ## References & Resources
 

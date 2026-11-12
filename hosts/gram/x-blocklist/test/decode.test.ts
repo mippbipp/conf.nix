@@ -1,4 +1,4 @@
-import { NodeServices } from "@effect/platform-node";
+import { BunServices } from "@effect/platform-bun";
 import { assert, describe, it } from "@effect/vitest";
 import { Effect, FileSystem, Option } from "effect";
 
@@ -11,7 +11,7 @@ const fixture = (name: string) =>
     const fs = yield* FileSystem.FileSystem;
 
     return yield* fs.readFileString(`${import.meta.dirname}/fixtures/${name}`);
-  }).pipe(Effect.provide(NodeServices.layer));
+  }).pipe(Effect.provide(BunServices.layer));
 
 describe("blockedAccountsAll decoding", () => {
   // Captured from X, cut down to two accounts' IDs and handles.

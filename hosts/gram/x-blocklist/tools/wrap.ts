@@ -4,7 +4,7 @@
 // inner function that receives browse's `page` and `context` as parameters,
 // because its own top-level names (Effect declares a `context`) would
 // otherwise shadow them.
-import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { BunRuntime, BunServices } from "@effect/platform-bun";
 import { Effect, FileSystem, String as Str } from "effect";
 
 const exportLine = /^export \{\s*main\s*\};\s*$/mu;
@@ -25,8 +25,8 @@ const wrap = Effect.fn("wrap")(function* (input: string, output: string) {
   );
 });
 
-NodeRuntime.runMain(
+BunRuntime.runMain(
   wrap("dist/bundle.js", "dist/block.js").pipe(
-    Effect.provide(NodeServices.layer)
+    Effect.provide(BunServices.layer)
   )
 );

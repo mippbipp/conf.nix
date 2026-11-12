@@ -19,7 +19,7 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noEmit": true,
-    "types": ["node"],
+    "types": ["bun"],
     "plugins": [
       {
         "name": "@effect/language-service",
@@ -30,7 +30,7 @@
           "effect/Path",
           "effect/PlatformError",
           "effect/process",
-          "@effect/platform-node",
+          "@effect/platform-bun",
           "@effect/vitest"
         ]
       }

@@ -19,13 +19,15 @@
       opencode-browse = final.writeShellApplication {
         name = "browse";
         runtimeInputs = [
+          final.bun
+          # The CLI's shebang is `node` and it uses node:sqlite, so bunx runs it with node.
           final.nodejs
           final.bash
           final.coreutils
         ];
         # Its self-updater runs `npm install -g`, which can't write to the Nix store.
         runtimeEnv.OPENCODE_BROWSER_AUTO_UPDATE = "off";
-        text = ''exec npx -y @opencode/browse@0.0.14 "$@"'';
+        text = ''exec bunx @opencode/browse@0.0.14 "$@"'';
       };
     })
   ];

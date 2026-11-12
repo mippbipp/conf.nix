@@ -13,7 +13,7 @@
     [
       eza
       sccache
-      pnpm
+      bun
       nodejs
       python312
       rust-bin.stable.latest.default
