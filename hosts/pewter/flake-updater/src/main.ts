@@ -1,4 +1,4 @@
-import { NodeRuntime, NodeServices } from "@effect/platform-node";
+import { BunRuntime, BunServices } from "@effect/platform-bun";
 import {
   Duration,
   Effect,
@@ -169,7 +169,7 @@ const revertLock = Command.make(
 const main = update.pipe(
   Command.withSubcommands([revertLock]),
   Command.run({ version: "0.0.0" }),
-  Effect.provide(NodeServices.layer)
+  Effect.provide(BunServices.layer)
 );
 
-NodeRuntime.runMain(main);
+BunRuntime.runMain(main);

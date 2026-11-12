@@ -4,18 +4,18 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node src/main.ts",
-    "test": "vitest run",
+    "start": "bun src/main.ts",
+    "test": "bun --bun vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@effect/platform-node": "catalog:effect",
+    "@effect/platform-bun": "catalog:effect",
     "@opencode/client": "^2.2.6",
     "effect": "catalog:effect"
   },
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
-    "@types/node": "catalog:",
+    "@types/bun": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

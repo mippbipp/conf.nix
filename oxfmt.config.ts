@@ -9,7 +9,7 @@ export default defineConfig({
     // captured CI and API output kept verbatim as test data
     "**/test/fixtures/**",
     "**/dist/**",
-    // Bun-based, outside the pnpm workspace, with its own format setup
+    // separate Bun project outside the workspace, with its own format setup
     "modules/llm/opencode/kiro/**",
     // skills submodule
     "modules/llm/skills/**",

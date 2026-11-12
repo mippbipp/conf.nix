@@ -1,9 +1,37 @@
 {
   "name": "conf-nix",
   "private": true,
+  "workspaces": {
+    "packages": [
+      "hosts/gram/x-blocklist",
+      "hosts/pewter/flake-updater"
+    ],
+    "catalog": {
+      "@types/bun": "^1.4.4",
+      "typescript": "^7.0.2",
+      "vitest": "^5.1.0"
+    },
+    "catalogs": {
+      "effect": {
+        "@effect/platform-bun": "4.1.2",
+        "@effect/vitest": "4.1.2",
+        "effect": "4.1.2"
+      },
+      "tooling": {
+        "@effect/tsgo": "^0.67.4",
+        "@oxlint/plugins": "~1.91.0",
+        "esbuild": "^0.28.2",
+        "oxfmt": "~0.76.0",
+        "oxlint": "~1.91.0",
+        "oxlint-tsgolint": "^7.0.2006",
+        "turbo": "^2.11.10"
+      }
+    }
+  },
   "type": "module",
   "scripts": {
     "prepare": "effect-tsgo patch --oxlint",
+    "postinstall": "command -v bun2nix >/dev/null || exit 0; bun2nix -o bun.nix",
     "build": "turbo run build",
     "test": "turbo run test",
     "ox": "turbo run lint format typecheck",
@@ -12,7 +40,7 @@
   "devDependencies": {
     "@effect/tsgo": "catalog:tooling",
     "@oxlint/plugins": "catalog:tooling",
-    "@types/node": "catalog:",
+    "@types/bun": "catalog:",
     "effect": "catalog:effect",
     "oxfmt": "catalog:tooling",
     "oxlint": "catalog:tooling",
@@ -20,5 +48,11 @@
     "turbo": "catalog:tooling",
     "typescript": "catalog:"
   },
-  "packageManager": "pnpm@12.9.0"
+  "overrides": {
+    "effect": "4.1.2"
+  },
+  "packageManager": "bun@1.4.4",
+  "trustedDependencies": [
+    "esbuild"
+  ]
 }

@@ -1,4 +1,4 @@
-import { NodeServices } from "@effect/platform-node";
+import { BunServices } from "@effect/platform-bun";
 import { assert, layer, describe } from "@effect/vitest";
 import {
   Array as Arr,
@@ -36,7 +36,7 @@ const offlineShell = Layer.effect(
   })
 ).pipe(Layer.provide(Shell.layer));
 
-const services = offlineShell.pipe(Layer.provideMerge(NodeServices.layer));
+const services = offlineShell.pipe(Layer.provideMerge(BunServices.layer));
 
 type Where = "origin" | "upstream" | "checkout" | "workspace";
 

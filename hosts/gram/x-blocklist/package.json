@@ -4,17 +4,17 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --format=esm --platform=neutral --main-fields=module,main --target=es2022 --outfile=dist/bundle.js --log-level=warning && node tools/wrap.ts",
-    "test": "vitest run",
+    "build": "esbuild src/main.ts --bundle --format=esm --platform=neutral --main-fields=module,main --target=es2022 --outfile=dist/bundle.js --log-level=warning && bun tools/wrap.ts",
+    "test": "bun --bun vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "effect": "catalog:effect"
   },
   "devDependencies": {
-    "@effect/platform-node": "catalog:effect",
+    "@effect/platform-bun": "catalog:effect",
     "@effect/vitest": "catalog:effect",
-    "@types/node": "catalog:",
+    "@types/bun": "catalog:",
     "esbuild": "catalog:tooling",
     "typescript": "catalog:",
     "vitest": "catalog:"

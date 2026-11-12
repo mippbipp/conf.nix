@@ -53,7 +53,7 @@ The rebuild command for this flake. It switches the current host by default and 
 _Avoid_: rebuild, deploy
 
 **Workspace package**:
-A TypeScript program in the repo's pnpm workspace, kept beside the Nix module that runs it and built and checked by its own Nix package. See ADR 0022.
+A TypeScript program in the repo's Bun workspace, kept beside the Nix module that runs it and built and checked by its own Nix package. See ADR 0022.
 _Avoid_: app, project
 
 ## Globals

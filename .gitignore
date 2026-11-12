@@ -10,7 +10,7 @@ terraform/**/*.tfvars.json
 # Engineering-skill scratch: atlases, local specs, research
 .scratch/
 
-# pnpm workspace (see pnpm-workspace.yaml)
+# Bun workspace (see package.json)
 node_modules/
 .turbo/
 dist/
