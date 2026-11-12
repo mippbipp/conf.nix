@@ -34,7 +34,17 @@ stdenvNoCC.mkDerivation {
   };
 
   bunDeps = bun2nix.fetchBunDeps {
-    bunNix = ../../../bun.nix;
+    # bun.nix copies every workspace package into the dependency set, so an
+    # edit to one package would rebuild the others. Bun links workspace
+    # packages from the source tree, so drop them: fetchBunDeps keeps only
+    # entries that are store paths.
+    bunNix =
+      {
+        fetchurl,
+        fetchFromGitHub,
+        fetchgit,
+      }@args:
+      import ../../../bun.nix (args // { copyPathToStore = _: null; });
   };
 
   nativeBuildInputs = [ bun2nix.hook ];

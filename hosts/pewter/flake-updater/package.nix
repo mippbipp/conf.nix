@@ -41,7 +41,17 @@ stdenvNoCC.mkDerivation {
   };
 
   bunDeps = bun2nix.fetchBunDeps {
-    bunNix = ../../../bun.nix;
+    # bun.nix copies every workspace package into the dependency set, so an
+    # edit to one package would rebuild the others. Bun links workspace
+    # packages from the source tree, so drop them: fetchBunDeps keeps only
+    # entries that are store paths.
+    bunNix =
+      {
+        fetchurl,
+        fetchFromGitHub,
+        fetchgit,
+      }@args:
+      import ../../../bun.nix (args // { copyPathToStore = _: null; });
   };
 
   nativeBuildInputs = [
@@ -82,10 +92,11 @@ stdenvNoCC.mkDerivation {
   installPhase = ''
     runHook preInstall
     install -Dm644 dist/flake-updater.js $out/lib/flake-updater/flake-updater.js
-    # --no-env-file: Bun would otherwise load a .env from the working
-    # directory, which Node never did.
+    # Bun would otherwise read a bunfig.toml and a .env from the working
+    # directory. The Flake fixer runs `flake-updater revert-lock` in a
+    # workspace it can edit, so a bunfig `preload` there would run its code.
     makeWrapper ${lib.getExe bun} $out/bin/flake-updater \
-      --add-flags "--no-env-file $out/lib/flake-updater/flake-updater.js" \
+      --add-flags "--config=/dev/null --no-env-file $out/lib/flake-updater/flake-updater.js" \
       --prefix PATH : ${
         lib.makeBinPath [
           coreutils
