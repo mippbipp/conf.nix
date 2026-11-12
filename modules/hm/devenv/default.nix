@@ -97,13 +97,6 @@
               source $HOME/.zshrc-personal
             fi
 
-            # gh CLI auth from sops-managed token (see modules/sops); requires personal sops secrets
-            ${lib.optionalString (sopsSecrets ? github_token) ''
-              if [ -f ${sopsSecrets.github_token.path} ]; then
-                export GH_TOKEN="$(< ${sopsSecrets.github_token.path})"
-              fi
-            ''}
-
             eval "$(uv generate-shell-completion zsh)"
             eval "$(uvx --generate-shell-completion zsh)"
           '';

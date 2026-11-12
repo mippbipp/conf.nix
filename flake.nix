@@ -150,6 +150,7 @@
                       ;
                     globals = hmGlobals;
                     sopsSecrets = if config ? sops then config.sops.secrets else { };
+                    sopsTemplates = if config ? sops then config.sops.templates else { };
                   };
                   useGlobalPkgs = true;
                   useUserPackages = true;

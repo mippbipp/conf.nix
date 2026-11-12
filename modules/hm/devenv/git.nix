@@ -1,11 +1,19 @@
 {
+  config,
   lib,
   globals,
   host,
   sopsSecrets,
+  sopsTemplates,
   ...
 }:
 {
+  # hosts.yml carries the token, so sops renders it at activation instead of
+  # Home Manager writing it to the store.
+  xdg.configFile."gh/hosts.yml" = lib.mkIf (sopsTemplates ? "gh-hosts.yml") {
+    source = config.lib.file.mkOutOfStoreSymlink sopsTemplates."gh-hosts.yml".path;
+  };
+
   programs = {
     git = {
       enable = true;
@@ -76,7 +84,7 @@
     };
     gh = {
       enable = true;
-      hosts = {
+      hosts = lib.mkIf (!(sopsTemplates ? "gh-hosts.yml")) {
         "github.com" = {
           user = globals.user.name;
         };
