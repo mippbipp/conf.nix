@@ -49,11 +49,4 @@ in
   };
 
   home.file.".config/opencode/plugins/kiro".source = ./kiro/src;
-
-  # Same as `browse set hostname 0.0.0.0`. Remote peers reach only the
-  # extension's WebSocket, which requires pairing, and pewter's firewall
-  # admits port 19988 from tailscale0 only.
-  xdg.configFile."browse/config.json" = lib.mkIf hostRecord.isServer {
-    text = builtins.toJSON { hostname = "0.0.0.0"; };
-  };
 }

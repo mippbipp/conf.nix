@@ -18,6 +18,7 @@
     ./users.nix
     ../../modules/llm/t3code/server.nix
     ../../modules/llm/opencode/server.nix
+    ../../modules/llm/opencode/browse-relay.nix
     ../../modules/system/config/syncthing.nix
     ./attic.nix
     ./karakeep.nix
@@ -29,7 +30,6 @@
     agent.enable = true;
   };
 
-  security.sudo.wheelNeedsPassword = false;
   services.fstrim.enable = false; # managed by Oracle's underlying SAN
 
   # Standard bootloader configuration for UEFI on Oracle ARM

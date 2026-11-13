@@ -46,6 +46,7 @@
 
   # Security / Polkit
   security = {
+    sudo.wheelNeedsPassword = false;
     rtkit.enable = true;
     polkit.enable = true;
     polkit.extraConfig = ''
