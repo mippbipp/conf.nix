@@ -7,6 +7,7 @@
 {
   imports = [
     ./opencode/app.nix
+    ./strobe/hm.nix
   ];
 
   home = {

@@ -3,5 +3,6 @@
   imports = [
     ./opencode/overlay.nix
     ./t3code/overlay.nix
+    ./strobe/overlay.nix
   ];
 }
