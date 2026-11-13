@@ -23,6 +23,7 @@
     ../../modules/de/system
     ../../modules/de/hyprland/system.nix
     ../../modules/de/apps/thunar/system.nix
+    ../../modules/llm/t3code/server.nix
   ];
 
   drivers = {

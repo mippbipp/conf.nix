@@ -4,7 +4,7 @@ Declarative NixOS and home-manager configuration for the fleet in `hosts/`.
 
 ## Hosts
 
-- **gram**: laptop (Secure Boot via lanzaboote).
+- **gram**: laptop (Secure Boot via lanzaboote); also a remote workspace host.
 - **harpe**: WSL guest on the personal laptop.
 - **warpe**: WSL guest on the work laptop; carries the company CA trust.
 - **pewter**: always-on Oracle ARM server; tailnet exit node and remote workspace host.
@@ -101,7 +101,7 @@ A t3 server on a different machine than the client. Projects and sessions live o
 _Avoid_: remote agent
 
 **Pairing**:
-The one-time `t3 pair` token exchange that enrolls a client with the pewter remote workspace.
+The one-time `t3 pair` token exchange that enrolls a client with a remote workspace (pewter or gram).
 _Avoid_: login, auth
 
 **Harness**:

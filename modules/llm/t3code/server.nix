@@ -14,6 +14,32 @@
     backend = null;
   };
 
+  # The desktop app's own server conflicts with this unit and exits on
+  # launch, so disable local environments. The app rewrites this
+  # file at runtime, so merge the one key instead of linking a store copy.
+  home-manager.users.${username} =
+    { lib, pkgs, ... }:
+    let
+      disableLocalEnvironment = pkgs.writeShellScript "t3code-desktop-no-local-environment" ''
+        set -eu
+        settings="$HOME/.t3/userdata/desktop-settings.json"
+        mkdir -p "$(dirname "$settings")"
+        [ -s "$settings" ] || echo '{}' > "$settings"
+        if ! ${pkgs.jq}/bin/jq -e 'type == "object"' "$settings" >/dev/null 2>&1; then
+          echo "t3code: $settings is not a JSON object, leaving it alone" >&2
+          exit 0
+        fi
+        ${pkgs.jq}/bin/jq -e '.localEnvironmentEnabled == false' "$settings" >/dev/null && exit 0
+        ${pkgs.jq}/bin/jq -c '.localEnvironmentEnabled = false' "$settings" > "$settings.tmp"
+        mv "$settings.tmp" "$settings"
+      '';
+    in
+    {
+      home.activation.t3codeDesktopNoLocalEnvironment = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        run ${disableLocalEnvironment}
+      '';
+    };
+
   systemd.services.t3code = {
     description = "t3code remote workspace server";
     wantedBy = [ "multi-user.target" ];
