@@ -5,13 +5,14 @@
   lib,
   pkgs,
   username,
+  globals,
   ...
 }:
 let
   # Personal secrets need the shared age identity. Hosts carrying the work
   # GitLab identity decrypt the work-only file (sops-work.nix) but
   # share the key path below.
-  isPersonalHost = config.fleet.hosts.${host}.isPersonalHost;
+  isPersonalHost = globals.hosts.${host}.isPersonalHost;
 in
 {
   imports = [ inputs.sops-nix.nixosModules.sops ];

@@ -14,7 +14,6 @@
   lib,
   pkgs,
   username,
-  config,
   ...
 }:
 let
@@ -22,7 +21,7 @@ let
   relayPort = 19988;
   tailnetPort = 19989;
   proxyd = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd";
-  isBrowserHost = config.fleet.hosts.${host}.hasDE;
+  isBrowserHost = globals.hosts.${host}.hasDE;
 in
 {
   sops.secrets.browse_relay_token = {

@@ -16,9 +16,7 @@ nixpkgs.lib.genAttrs systems (
   let
     pkgs = nixpkgs.legacyPackages.${system};
     username = globals.user.name;
-    # Evaluated alone, so Role flags stay readable without building a host.
-    records =
-      (nixpkgs.lib.evalModules { modules = [ ./modules/fleet/registry.nix ]; }).config.fleet.hosts;
+    records = globals.hosts;
     hosts = builtins.filter (h: !(records ? ${h}) || !records.${h}.external) (
       builtins.attrNames nixosConfigurations
     );
@@ -62,8 +60,6 @@ nixpkgs.lib.genAttrs systems (
     # declaration) are exempt on the record side only.
     fleet-correspondence =
       let
-        records =
-          (nixpkgs.lib.evalModules { modules = [ ./modules/fleet/registry.nix ]; }).config.fleet.hosts;
         declared = builtins.attrNames nixosConfigurations;
         missing = builtins.filter (h: !(records ? ${h}) || records.${h}.external) declared;
         liveRecords = nixpkgs.lib.filterAttrs (_: r: !r.external) records;
@@ -72,9 +68,9 @@ nixpkgs.lib.genAttrs systems (
       if missing == [ ] && phantom == [ ] then
         pkgs.runCommand "fleet-correspondence" { } "touch $out"
       else
-        throw "fleet registry mismatch: missing records for ${builtins.toString missing}; phantom records for ${builtins.toString phantom}";
+        throw "host records mismatch: missing records for ${builtins.toString missing}; phantom records for ${builtins.toString phantom}";
     # Locks in strictness: a typo'd Role flag and a mistyped flag
-    # must both fail evaluation, so the registry can never silently
+    # must both fail evaluation, so the host records can never silently
     # regress to `or false` semantics.
     fleet-strictness =
       let
@@ -84,17 +80,17 @@ nixpkgs.lib.genAttrs systems (
             builtins.deepSeq
               (nixpkgs.lib.evalModules {
                 modules = [
-                  ./modules/fleet/registry.nix
-                  { fleet.hosts.strictness-probe = extra; }
+                  ./modules/globals.nix
+                  { hosts.strictness-probe = extra; }
                 ];
-              }).config.fleet.hosts
+              }).config.hosts
               false
           );
       in
       if !(evalBad { isExitNod = true; }).success && !(evalBad { isExitNode = "yes"; }).success then
         pkgs.runCommand "fleet-strictness" { } "touch $out"
       else
-        throw "fleet registry is not strict: typo'd Role flag or wrong type evaluated successfully";
+        throw "host records are not strict: typo'd Role flag or wrong type evaluated successfully";
     # The Build gate matrix is control-plane-adjacent YAML outside this
     # flake's references, so pin it by parsing instead: every declared
     # host's system must be covered by exactly one per-arch `build <system>`

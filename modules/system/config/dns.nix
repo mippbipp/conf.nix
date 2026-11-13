@@ -9,14 +9,13 @@
 # still matches on both sides of that seam.
 {
   pkgs,
-  config,
   lib,
   host,
   globals,
   ...
 }:
 let
-  isWorkPc = config.fleet.hosts.${host}.isWorkPc;
+  isWorkPc = globals.hosts.${host}.isWorkPc;
   inherit (globals) nextdns;
 in
 {

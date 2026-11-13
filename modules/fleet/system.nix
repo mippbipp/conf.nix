@@ -5,8 +5,6 @@
 }:
 {
   imports = [
-    ./registry.nix
-
     # Fleet-wide baseline.
     ../system/config/common.nix
     ../system/config/dns.nix

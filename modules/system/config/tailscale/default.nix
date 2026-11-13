@@ -5,10 +5,11 @@
   lib,
   host,
   username,
+  globals,
   ...
 }:
 let
-  self = config.fleet.hosts.${host};
+  self = globals.hosts.${host};
   inherit (self) isExitNode acceptsTailnetSsh;
   hasExposes = config.tailnetExpose != { };
 in

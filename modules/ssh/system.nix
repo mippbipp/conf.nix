@@ -1,12 +1,12 @@
 {
-  config,
   host,
   lib,
+  globals,
   ...
 }:
 let
-  acceptsSsh = config.fleet.hosts.${host}.acceptsSsh;
-  sshPort = config.fleet.hosts.${host}.sshPort;
+  acceptsSsh = globals.hosts.${host}.acceptsSsh;
+  sshPort = globals.hosts.${host}.sshPort;
 in
 {
   services.openssh = lib.mkMerge [

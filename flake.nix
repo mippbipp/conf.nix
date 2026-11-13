@@ -105,16 +105,14 @@
       ...
     }@inputs:
     let
-      globals = import ./modules/globals.nix;
+      # Evaluated once outside any host
+      globals = (nixpkgs.lib.evalModules { modules = [ ./modules/globals.nix ]; }).config;
       mkHostConfig =
         {
           host,
         }:
         nixpkgs.lib.nixosSystem {
           specialArgs = {
-            # Raw globals (user, nextdns, cache) only. Typed fleet records are
-            # read from config.fleet.hosts; Home Manager gets the merged
-            # records via extraSpecialArgs below.
             inherit
               inputs
               host
@@ -136,15 +134,6 @@
                 username,
                 ...
               }:
-              let
-                # Typed fleet records merged under the existing arg name
-                # for Home Manager consumers (devenv, ssh mesh, nrs).
-                # NixOS modules read config.fleet.hosts directly.
-                hmGlobals = {
-                  inherit (globals) user nextdns cache;
-                  hosts = config.fleet.hosts;
-                };
-              in
               {
                 home-manager = {
                   extraSpecialArgs = {
@@ -153,8 +142,8 @@
                       username
                       inputs
                       host
+                      globals
                       ;
-                    globals = hmGlobals;
                     sopsSecrets = if config ? sops then config.sops.secrets else { };
                     sopsTemplates = if config ? sops then config.sops.templates else { };
                   };

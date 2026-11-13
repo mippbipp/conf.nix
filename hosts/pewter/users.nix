@@ -1,7 +1,7 @@
 {
   pkgs,
   username,
-  config,
+  globals,
   ...
 }:
 
@@ -20,7 +20,7 @@
         shell = pkgs.zsh;
         ignoreShellProgramCheck = true;
         openssh.authorizedKeys.keys = [
-          config.fleet.hosts.gram.pubkey
+          globals.hosts.gram.pubkey
         ];
       };
     };

@@ -3,7 +3,7 @@
 Status: accepted. Extends ADR-0010; its static host declaration and typed
 records still hold.
 
-A Role flag in `modules/fleet/registry.nix` is all a host sets to get a
+A Role flag in `modules/globals.nix` is all a host sets to get a
 capability. `modules/fleet/system.nix` (NixOS) and `modules/fleet/hm.nix` (Home
 Manager) select the implementation, both imported by `flake.nix` for every host.
 Host files carry no role imports.

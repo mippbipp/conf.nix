@@ -17,7 +17,7 @@ hostname and finish every applicable item before considering the host added.
    argument of `mkHostConfig`. Import host-only flake modules, such as
    `nixos-wsl` or `lanzaboote`, from the host's own files through `inputs`
    (see `hosts/gram/boot.nix`).
-4. Add `hosts.<host>` to `modules/fleet/registry.nix`. Use an empty record when
+4. Add `hosts.<host>` to `modules/globals.nix`. Use an empty record when
    no other machine needs facts about it; add only cross-host facts and Role
    flags that shared modules consume. A Role flag selects its own
    implementation: `modules/fleet/system.nix` and `modules/fleet/hm.nix` are
@@ -42,8 +42,8 @@ hostname and finish every applicable item before considering the host added.
    editing it, set `SOPS_AGE_KEY_FILE` to the key path declared in
    `modules/system/config/sops.nix`, and inspect only the encrypted diff.
 3. Add an SSH alias or other client binding when the host is reached through a
-   non-default address, port, or jump path. Keep machine facts in the fleet
-   registry (`modules/fleet/registry.nix`) and consume them from the client configuration.
+   non-default address, port, or jump path. Keep machine facts in the host records
+   in Globals (`modules/globals.nix`) and consume them from the client configuration.
 
 ## Conditional infrastructure
 
@@ -78,14 +78,14 @@ main ruleset, and the host's bootstrap or deployment procedure is documented.
 Do not add a host to these just because it exists:
 
 - `modules/hm/devenv/scripts/nrs.nix` derives remote build hosts from the
-  `remoteBuilds` Role flag in the fleet registry, and is installed on every
+  `remoteBuilds` Role flag in the host records, and is installed on every
   NixOS host.
-- `modules/ssh/hm.nix` derives the SSH mesh from the fleet registry: hosts
+- `modules/ssh/hm.nix` derives the SSH mesh from the host records: hosts
   with the `acceptsSsh` Role flag appear in every other host's mesh, and hosts
   with `unlocksPewter` receive the `pewter-luks` entry (which also lands them
   in pewter's initrd `authorizedKeys`).
 - `modules/system/config/syncthing.nix` derives peer devices from the `syncId`
-  presence in the fleet registry.
+  presence in the host records.
 - Shared system and Home Manager modules are imported by the host files; they
   do not maintain a host allowlist.
 - Attic substitution applies to all NixOS hosts through the shared Nix module.

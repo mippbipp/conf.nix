@@ -2,8 +2,8 @@
   inputs,
   modulesPath,
   pkgs,
-  config,
   lib,
+  globals,
   ...
 }:
 {
@@ -59,11 +59,11 @@
         ssh = {
           # Enable root SSH for LUKS unlocking
           enable = true;
-          port = config.fleet.hosts.pewter.sshPort;
+          port = globals.hosts.pewter.sshPort;
           hostKeys = [ "/etc/secrets/initrd/ssh_host_ed25519_key" ];
           # Key holders mirror the mesh's LUKS recipients: one owner, no drift.
-          authorizedKeys = map (name: config.fleet.hosts.${name}.pubkey) (
-            (import ../../modules/ssh/mesh.nix { inherit lib; }).luksUnlockers config.fleet.hosts
+          authorizedKeys = map (name: globals.hosts.${name}.pubkey) (
+            (import ../../modules/ssh/mesh.nix { inherit lib; }).luksUnlockers globals.hosts
           );
         };
       };

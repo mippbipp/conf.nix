@@ -7,12 +7,12 @@
   inputs,
   username,
   host,
-  config,
   lib,
+  globals,
   ...
 }:
 let
-  enabled = config.fleet.hosts.${host}.usesWorkGit;
+  enabled = globals.hosts.${host}.usesWorkGit;
   workFile = ../../../secrets/work.yaml;
   hasWorkFile = builtins.pathExists workFile;
 in
