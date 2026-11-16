@@ -22,6 +22,16 @@ When changing, diagnosing, or operating the flake update pipeline, read
 `docs/adr/0009-flake-update-pipeline.md`. It defines the updater, Build gate,
 watchdog, state directories, and recovery evidence to collect.
 
+## Testing changes on a host
+
+`sudo` is passwordless on every host, so you can run `nrs` (see `GLOSSARY.md`)
+yourself to apply a change to the host you're running on. Check that it builds
+first with
+`nix build ".#nixosConfigurations.<host>.config.system.build.toplevel"`.
+`nrs` switches the live system and always builds from `~/conf.nix`, so changes
+made in another worktree must land there first. Nix ignores untracked files,
+so `git add` new ones. Ask before running `nrs <host>` against any other host.
+
 ## TypeScript workspace
 
 `bun.lock` changes must be committed together with the regenerated `bun.nix`.

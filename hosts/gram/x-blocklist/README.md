@@ -7,12 +7,14 @@ including accounts you blocked by hand.
 
 The official X API only allows blocking on the Enterprise plan, so the job
 drives the logged-in Chrome through the `browse` extension instead. The
-program in `src/` runs inside `browse execute`. It opens X's blocked
-accounts settings page, reuses the headers of that page's own
-`BlockedAccountsAll` request, and calls the endpoints the X website uses
-from inside the tab. x.com's content security policy blocks requests to
-other sites from that tab, so the program reads Clankwall's
-`/api/accounts?flag=ai` pages in a second tab.
+program in `src/` runs under Bun and calls `browse` CLI tools. It opens X's
+blocked accounts settings page in a tab and captures the page's own
+`BlockedAccountsAll` request with `browse network`. Then it calls the
+endpoints the X website uses from inside that tab with `browse eval`.
+browse redacts credentials in captured requests, so the in-page code
+(`src/live/in-page.ts`) reads the CSRF token from the `ct0` cookie and the
+web app's bearer token from its main bundle. Clankwall's
+`/api/accounts?flag=ai` pages are read over plain HTTP.
 
 A run refuses to change anything when Clankwall lists no accounts, since
 syncing to an empty list would unblock everyone. It stops at a 401, 403 or
@@ -22,13 +24,11 @@ out the changes from both lists again.
 ## Dev
 
 ```sh
-bun run --filter x-blocklist build
-sed 's/dryRun: false,/dryRun: true,/' dist/block.js > /tmp/opencode/dry.js
-browse execute --rm --json --timeout-ms 150000 --file /tmp/opencode/dry.js
+bun run --cwd hosts/gram/x-blocklist start --dry-run
 ```
 
 A dry run reads both lists and reports `pending` changes without sending
-any.
+any. It needs `browse` on `PATH` and the extension connected.
 
 ## Operating it
 

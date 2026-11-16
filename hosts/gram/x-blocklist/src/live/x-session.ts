@@ -1,73 +1,38 @@
-import {
-  Array as Arr,
-  Effect,
-  Layer,
-  Option,
-  Record as Rec,
-  Schedule,
-  Schema,
-  String as Str,
-} from "effect";
+import { Array as Arr, Effect, Layer, Option, Schedule, Schema } from "effect";
 
 import type { Account } from "../account.ts";
 import { decodeBlockedPage } from "../blocked.ts";
+import { Browse } from "../browse.ts";
 import { XRequestError, XSession } from "../x-session.ts";
+import { fetchInPage, findBearer } from "./in-page.ts";
+import type { PageRequest } from "./in-page.ts";
 
-export interface BrowserRequest {
-  readonly url: () => string;
-  readonly headers: () => Readonly<Record<string, string>>;
-}
+/** The browse tab group the run's tab opens in. */
+const group = "x-blocklist";
 
-/** The parts of Playwright's `page` that `browse execute` provides. */
-export interface BrowserPage {
-  readonly goto: (
-    url: string,
-    options: { readonly waitUntil: "domcontentloaded" }
-  ) => Promise<null>;
-  readonly on: (
-    event: "request",
-    listener: (request: BrowserRequest) => void
-  ) => BrowserPage;
-  readonly url: () => string;
-  readonly evaluate: <A, R>(fn: (arg: A) => Promise<R>, arg: A) => Promise<R>;
-}
+const blockedSettings = "https://x.com/settings/blocked/all";
 
-interface PageRequest {
-  readonly url: string;
-  readonly method: "GET" | "POST";
-  readonly headers: Readonly<Record<string, string>>;
-  readonly body: string | undefined;
-}
+const Opened = Schema.Struct({ tab: Schema.Finite });
 
-interface PageResponse {
-  readonly status: number;
-  readonly text: string;
-}
+const Capture = Schema.Struct({ entryCount: Schema.Finite });
 
-// Runs inside the X tab, so the request carries the account's cookies.
-// Playwright sends this function to the page as source text, where Effect
-// isn't loaded: it may only use its argument and browser globals.
-// oxlint-disable-next-line effecttsgo/async-function -- see above
-const fetchInPage = async (request: PageRequest): Promise<PageResponse> => {
-  // oxlint-disable-next-line effecttsgo/global-fetch -- see above
-  const response = await fetch(request.url, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body,
-    credentials: "include",
-  });
+const Exchange = Schema.Struct({
+  request: Schema.Struct({ url: Schema.String }),
+});
 
-  return { status: response.status, text: await response.text() };
-};
+const Captured = Schema.Struct({ exchanges: Schema.Array(Exchange) });
 
-// The headers the X web app authenticates its own API calls with.
-const authHeaders = [
-  "authorization",
-  "x-csrf-token",
-  "x-twitter-auth-type",
-  "x-twitter-active-user",
-  "x-twitter-client-language",
-] as const;
+const decodeJson = <
+  S extends Schema.Top & { readonly DecodingServices: never },
+>(
+  schema: S
+) => Schema.decodeEffect(Schema.fromJsonString(schema));
+
+const decodeResponse = decodeJson(
+  Schema.Struct({ status: Schema.Finite, text: Schema.String })
+);
+
+const decodeBearer = decodeJson(Schema.NullOr(Schema.String));
 
 // blocks/create and blocks/destroy both answer with the user they changed.
 const decodeChangeBody = Schema.decodeUnknownOption(
@@ -84,143 +49,148 @@ const encodeVariables = Schema.encodeEffect(
   Schema.fromJsonString(BlockedVariables)
 );
 
-interface Template {
-  readonly url: string;
-  readonly headers: Readonly<Record<string, string>>;
-}
-
-const toTemplate = (request: BrowserRequest): Template => {
-  const headers = request.headers();
-
-  return {
-    url: request.url(),
-    headers: Rec.fromEntries(
-      Arr.flatMap(authHeaders, (name) =>
-        Option.match(Rec.get(headers, name), {
-          onNone: () => [],
-          onSome: (value) => [[name, value] as const],
-        })
-      )
-    ),
-  };
-};
+const failed = (message: string) => () =>
+  XRequestError.make({ message, status: 0 });
 
 /**
- * Opens the blocked accounts settings page and copies the headers of the
- * page's own `BlockedAccountsAll` request, which later calls reuse.
+ * Opens a tab on the blocked accounts settings page, and reads the URL of
+ * the page's own `BlockedAccountsAll` request, which later calls reuse.
  */
-const captureTemplate = Effect.fn("XSessionLive.captureTemplate")(function* (
-  page: BrowserPage
-) {
-  let captured = Option.none<Template>();
+const openSession = Effect.fn("XSessionLive.openSession")(function* () {
+  const browse = yield* Browse;
 
-  page.on("request", (request) => {
-    if (
-      Option.isNone(captured) &&
-      Str.includes("/BlockedAccountsAll?")(request.url())
-    ) {
-      captured = Option.some(toTemplate(request));
-    }
-  });
+  const open = browse
+    .call("tabs", { action: "new", group })
+    .pipe(Effect.flatMap(decodeJson(Opened)));
 
-  yield* Effect.tryPromise({
-    try: () =>
-      page.goto("https://x.com/settings/blocked/all", {
-        waitUntil: "domcontentloaded",
-      }),
-    catch: () =>
-      XRequestError.make({
-        message: "could not open the blocked accounts page",
-        status: 0,
-      }),
-  });
+  // Closing the group also closes any popup X opened from the tab.
+  const close = browse
+    .call("tabs", { action: "close", group })
+    .pipe(Effect.ignore);
 
-  const notSeen = () =>
-    XRequestError.make({
-      message: `no BlockedAccountsAll request seen, is X logged in? (${page.url()})`,
-      status: 0,
-    });
+  const { tab } = yield* Effect.acquireRelease(open, () => close).pipe(
+    Effect.mapError(failed("could not open a tab for X"))
+  );
 
-  return yield* Effect.suspend(() =>
-    Effect.fromOption(captured).pipe(Effect.mapError(notSeen))
-  ).pipe(Effect.retry({ schedule: Schedule.spaced("500 millis"), times: 30 }));
+  const network = (args: Readonly<Record<string, Schema.Json>>) =>
+    browse.call("network", { tab, ...args });
+
+  yield* network({
+    action: "start",
+    urlFilter: "/BlockedAccountsAll?",
+    bodies: false,
+  }).pipe(Effect.mapError(failed("could not watch the X tab's requests")));
+
+  yield* browse
+    .call("navigate", { tab, url: blockedSettings, waitUntil: "load" })
+    .pipe(Effect.mapError(failed("could not open the blocked accounts page")));
+
+  // X sends BlockedAccountsAll after the page loads.
+  yield* network({ action: "status" }).pipe(
+    Effect.flatMap(decodeJson(Capture)),
+    Effect.repeat({
+      schedule: Schedule.spaced("500 millis"),
+      until: (capture) => capture.entryCount > 0,
+      times: 30,
+    }),
+    Effect.ignore
+  );
+
+  const notSeen = failed("no BlockedAccountsAll request seen, is X logged in?");
+
+  const template = yield* network({ action: "stop" }).pipe(
+    Effect.flatMap(decodeJson(Captured)),
+    Effect.mapError(notSeen),
+    Effect.flatMap((captured) =>
+      Effect.fromOption(Arr.head(captured.exchanges)).pipe(
+        Effect.mapError(notSeen)
+      )
+    )
+  );
+
+  const bearer = yield* browse
+    .call("eval", { tab, expression: String(findBearer) })
+    .pipe(
+      Effect.flatMap(decodeBearer),
+      Effect.mapError(failed("could not read X's bearer token")),
+      Effect.flatMap((found) =>
+        Effect.fromOption(Option.fromNullishOr(found)).pipe(
+          Effect.mapError(failed("X's bundle has no bearer token"))
+        )
+      )
+    );
+
+  const call = (request: Omit<PageRequest, "bearer">, what: string) =>
+    browse
+      .call("eval", {
+        tab,
+        expression: String(fetchInPage),
+        arg: { ...request, bearer },
+      })
+      .pipe(
+        Effect.flatMap(decodeResponse),
+        Effect.mapError(failed(`${what} request failed`))
+      );
+
+  return { template: template.request.url, call };
 });
 
-export const layer = (page: BrowserPage) =>
-  Layer.effect(
-    XSession,
-    Effect.gen(function* () {
-      const template = yield* captureTemplate(page);
+export const layer = Layer.effect(
+  XSession,
+  Effect.gen(function* () {
+    const { template, call } = yield* openSession();
 
-      const call = (request: PageRequest, what: string) =>
-        Effect.tryPromise({
-          try: () => page.evaluate(fetchInPage, request),
-          catch: () =>
-            XRequestError.make({
-              message: `${what} request failed`,
-              status: 0,
-            }),
-        });
-
-      const change = (path: string, what: string) => (account: Account) =>
-        Effect.map(
-          call(
-            {
-              url: `https://x.com/i/api/1.1/blocks/${path}.json`,
-              method: "POST",
-              headers: {
-                ...template.headers,
-                "content-type": "application/x-www-form-urlencoded",
-              },
-              body: new URLSearchParams({ user_id: account.id }).toString(),
-            },
-            what
+    const change = (path: string, what: string) => (account: Account) =>
+      Effect.map(
+        call(
+          {
+            url: `https://x.com/i/api/1.1/blocks/${path}.json`,
+            method: "POST",
+            body: `user_id=${encodeURIComponent(account.id)}`,
+            prune: false,
+          },
+          what
+        ),
+        (response) => ({
+          status: response.status,
+          id: Option.map(
+            decodeChangeBody(response.text),
+            (body) => body.id_str
           ),
-          (response) => ({
-            status: response.status,
-            id: Option.map(
-              decodeChangeBody(response.text),
-              (body) => body.id_str
-            ),
-          })
+        })
+      );
+
+    return XSession.of({
+      blockedPage: Effect.fn("XSessionLive.blockedPage")(function* (cursor) {
+        const variables = yield* encodeVariables({
+          count: 100,
+          includePromotedContent: false,
+          ...Option.match(cursor, {
+            onNone: () => ({}),
+            onSome: (value) => ({ cursor: value }),
+          }),
+        }).pipe(Effect.orDie);
+
+        const url = new URL(template);
+
+        url.searchParams.set("variables", variables);
+
+        const response = yield* call(
+          { url: url.toString(), method: "GET", body: null, prune: true },
+          "BlockedAccountsAll"
         );
 
-      return XSession.of({
-        blockedPage: Effect.fn("XSessionLive.blockedPage")(function* (cursor) {
-          const variables = yield* encodeVariables({
-            count: 100,
-            includePromotedContent: false,
-            ...Option.match(cursor, {
-              onNone: () => ({}),
-              onSome: (value) => ({ cursor: value }),
-            }),
-          }).pipe(Effect.orDie);
+        if (response.status !== 200) {
+          return yield* XRequestError.make({
+            message: "BlockedAccountsAll failed",
+            status: response.status,
+          });
+        }
 
-          const url = new URL(template.url);
-
-          url.searchParams.set("variables", variables);
-
-          const response = yield* call(
-            {
-              url: url.toString(),
-              method: "GET",
-              headers: template.headers,
-              body: undefined,
-            },
-            "BlockedAccountsAll"
-          );
-
-          if (response.status !== 200) {
-            return yield* XRequestError.make({
-              message: "BlockedAccountsAll failed",
-              status: response.status,
-            });
-          }
-
-          return yield* decodeBlockedPage(response.text);
-        }),
-        block: change("create", "block"),
-        unblock: change("destroy", "unblock"),
-      });
-    })
-  );
+        return yield* decodeBlockedPage(response.text);
+      }),
+      block: change("create", "block"),
+      unblock: change("destroy", "unblock"),
+    });
+  })
+);

@@ -7,14 +7,14 @@
 }:
 let
   stateDir = "${config.xdg.stateHome}/x-blocklist";
-  # The Effect program in src/, bundled into one `browse execute` script.
+  # The Effect program in src/. It drives Chrome through the browse CLI.
   package = pkgs.callPackage ./package.nix {
     bun2nix = inputs.bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
   };
-  script = "${package}/share/x-blocklist/block.js";
   run = pkgs.writeShellApplication {
-    name = "x-blocklist";
+    name = "x-blocklist-run";
     runtimeInputs = [
+      package
       pkgs.opencode-browse
       pkgs.coreutils
       pkgs.jq
@@ -35,16 +35,14 @@ let
       fi
 
       for _ in $(seq 30); do
-        browse execute --rm --timeout-ms 10000 'return 1' >/dev/null 2>&1 && break
+        browse status --json | jq -e .connected >/dev/null 2>&1 && break
         sleep 3
       done
 
-      # A first sync or a big Clankwall change can mean hundreds of requests
-      # at ~5.5s each; a normal day is a handful.
-      out=$(browse execute --rm --json --timeout-ms 10800000 --file ${script})
-      jq -c '.value.actions[]? + {at: (now | todate)}' <<<"$out" >>${lib.escapeShellArg "${stateDir}/actions.jsonl"}
-      jq '.value | del(.actions)' <<<"$out"
-      jq -e '.ok and .value.stoppedAt == null' <<<"$out" >/dev/null
+      out=$(x-blocklist)
+      jq -c '.actions[] + {at: (now | todate)}' <<<"$out" >>${lib.escapeShellArg "${stateDir}/actions.jsonl"}
+      jq 'del(.actions)' <<<"$out"
+      jq -e '.stoppedAt == null' <<<"$out" >/dev/null
     '';
   };
 in

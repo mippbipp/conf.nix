@@ -27,7 +27,7 @@
         ];
         # Its self-updater runs `npm install -g`, which can't write to the Nix store.
         runtimeEnv.OPENCODE_BROWSER_AUTO_UPDATE = "off";
-        text = ''exec bunx @opencode/browse@0.0.14 "$@"'';
+        text = ''exec bunx @opencode/browse@0.1.0 "$@"'';
       };
     })
   ];

@@ -21,7 +21,6 @@
       "tooling": {
         "@effect/tsgo": "^0.67.4",
         "@oxlint/plugins": "~1.91.0",
-        "esbuild": "^0.28.2",
         "oxfmt": "~0.76.0",
         "oxlint": "~1.91.0",
         "oxlint-tsgolint": "^7.0.2006",
@@ -49,8 +48,5 @@
     "turbo": "catalog:tooling",
     "typescript": "catalog:"
   },
-  "packageManager": "bun@1.4.4",
-  "trustedDependencies": [
-    "esbuild"
-  ]
+  "packageManager": "bun@1.4.4"
 }

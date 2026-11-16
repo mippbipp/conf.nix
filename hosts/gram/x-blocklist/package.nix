@@ -2,6 +2,9 @@
   lib,
   stdenvNoCC,
   bun2nix,
+  bun,
+  makeWrapper,
+  opencode-browse,
 }:
 let
   # The Bun workspace root; this package builds from there.
@@ -29,7 +32,6 @@ stdenvNoCC.mkDerivation {
       ./vitest.config.ts
       ./src
       ./test
-      ./tools
     ];
   };
 
@@ -47,19 +49,26 @@ stdenvNoCC.mkDerivation {
       import ../../../bun.nix (args // { copyPathToStore = _: null; });
   };
 
-  nativeBuildInputs = [ bun2nix.hook ];
+  nativeBuildInputs = [
+    bun2nix.hook
+    makeWrapper
+  ];
 
   # The root `postinstall` would run bun2nix; checkPhase runs `prepare`.
   dontRunLifecycleScripts = true;
 
-  # `bun --bun` runs every `#!/usr/bin/env node` script with Bun, so the
-  # build needs no Node.js.
+  # One file with every dependency inlined, so the output needs no
+  # node_modules.
   buildPhase = ''
     runHook preBuild
-    bun --bun run --cwd hosts/gram/x-blocklist build
+    bun build hosts/gram/x-blocklist/src/main.ts \
+      --target=bun \
+      --outfile=dist/x-blocklist.js
     runHook postBuild
   '';
 
+  # `bun --bun` runs every `#!/usr/bin/env node` script with Bun, so the
+  # checks need no Node.js.
   doCheck = true;
   checkPhase = ''
     runHook preCheck
@@ -73,9 +82,17 @@ stdenvNoCC.mkDerivation {
 
   installPhase = ''
     runHook preInstall
-    install -Dm644 hosts/gram/x-blocklist/dist/block.js $out/share/x-blocklist/block.js
+    install -Dm644 dist/x-blocklist.js $out/lib/x-blocklist/x-blocklist.js
+    # Bun would otherwise read a bunfig.toml and a .env from the working
+    # directory.
+    makeWrapper ${lib.getExe bun} $out/bin/x-blocklist \
+      --add-flags "--config=/dev/null --no-env-file $out/lib/x-blocklist/x-blocklist.js" \
+      --prefix PATH : ${lib.makeBinPath [ opencode-browse ]}
     runHook postInstall
   '';
 
-  meta.description = "The `browse execute` script that blocks an X list's members";
+  meta = {
+    description = "Sync the X account's blocks to Clankwall's AI-flagged accounts";
+    mainProgram = "x-blocklist";
+  };
 }
