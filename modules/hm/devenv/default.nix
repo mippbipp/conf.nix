@@ -20,7 +20,6 @@
       uv
       go
       tokei
-      agent-browser
       opentofu
       attic-client
     ]
