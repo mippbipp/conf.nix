@@ -11,10 +11,10 @@
   ];
 
   home = {
-    # Shared agent skills live in a submodule of this repo, so the
-    # checkout is the single source of truth.
-    file.".agents/skills".source =
-      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/skills";
+    # ~/.agents is a submodule of this repo, so the checkout is the single
+    # source of truth. It holds global skills/ and per-project matt/.
+    file.".agents".source =
+      config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents";
 
     packages = with pkgs; [
       kiro-cli

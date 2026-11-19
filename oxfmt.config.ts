@@ -11,8 +11,8 @@ export default defineConfig({
     "**/dist/**",
     // separate Bun project outside the workspace, with its own format setup
     "modules/llm/opencode/kiro/**",
-    // skills submodule
-    "modules/llm/skills/**",
+    // ~/.agents submodule
+    "modules/llm/.agents/**",
   ],
   printWidth: 80,
   tabWidth: 2,
