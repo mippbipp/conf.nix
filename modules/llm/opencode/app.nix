@@ -1,6 +1,7 @@
 {
   lib,
   pkgs,
+  config,
   host,
   globals,
   ...
@@ -12,6 +13,13 @@ in
   programs.opencode = lib.mkIf (!hostRecord.isWorkPc) {
     enable = true;
     settings = {
+      model = "kiro/claude-opus-5.5#medium";
+      skills = [ "~/.agents/pstack/skills" ];
+      # pstack opens playbook steps as todos and nests subagents (Feature -> arena, interrogate reviewers).
+      experimental = {
+        todo = true;
+        subagent_depth = 2;
+      };
       compaction = {
         buffer = "45%";
         keep.tokens = 20000;
@@ -47,6 +55,15 @@ in
       cli = true;
     };
   };
-
-  home.file.".config/opencode/plugins/kiro".source = ./kiro/src;
+  home = {
+    file = {
+      ".config/opencode/plugins/kiro".source = ./kiro/src;
+      ".config/opencode/commands".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents/pstack/opencode/commands";
+      ".config/opencode/agents".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents/pstack/opencode/agents";
+      ".config/opencode/pstack-models.md".source =
+        config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents/pstack/src/pstack-models.md";
+    };
+  };
 }

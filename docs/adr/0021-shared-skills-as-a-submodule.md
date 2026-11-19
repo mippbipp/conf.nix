@@ -11,7 +11,7 @@ repo like every other dependency, and `modules/llm/hm.nix` links it to
 lands on the next activation without a rebuild, and the commit this repo
 records is the version the host runs.
 
-The submodule holds two skill sets:
+The submodule holds three skill sets:
 
 - `skills/` is global. Agents read `~/.agents/skills` in every directory.
 - `matt/` holds project skills, mostly Matt Pocock's, that depend on a
@@ -20,6 +20,14 @@ The submodule holds two skill sets:
   `"skills": ["~/.agents/matt"]` in its `opencode.jsonc`; this repo does.
   On a machine without the folder, OpenCode skips the entry silently, so
   template repos can carry the line safely.
+- `pstack/` is poteto's pstack, generated for OpenCode from
+  `cursor/plugins` by `pstack/src/make-opencode-tree.mjs`. It is global:
+  `modules/llm/opencode/app.nix` adds `~/.agents/pstack/skills` as a skill
+  source and links its commands, agents and model file into
+  `~/.config/opencode/`. Everything outside `pstack/src/` is generator
+  output. Changes go in `src/opencode.md` (the OpenCode adapter),
+  `src/pstack-models.md` (the model per role) or the generator, never in the
+  generated files.
 
 Pinning makes the skills a reviewed input like the rest of the
 configuration: every host runs the same recorded commit, and a change to a
@@ -49,8 +57,8 @@ skill shows up as a pointer bump in this repo.
 - **Link only `~/.agents/skills` and `~/.agents/matt`, not all of
   `~/.agents`.** Tool files written to `~/.agents` (such as the `npx skills`
   installer's `.skill-lock.json`) would stay out of the repo, but every new
-  top-level folder would need its own link. Rejected; the submodule's
-  `.gitignore` covers the tool files instead.
+  top-level folder would need its own link. Rejected; a tool file shows up
+  as untracked in the submodule, which is the signal to delete it.
 
 ## Consequences
 
@@ -62,6 +70,10 @@ skill shows up as a pointer bump in this repo.
 - Updating the skills means bumping the submodule pointer in this repo.
   Hosts pick the change up with `git submodule sync` and
   `git submodule update --init`.
+- Updating pstack means rerunning the generator against a newer
+  `cursor/plugins` checkout and committing the result. A second run against
+  the same checkout must produce an identical tree (`diff -r`), which shows
+  nothing was edited by hand.
 - The Build gate's `checks` job leaves submodules uninitialized, because
   the paths resolve out of store at activation time and no check reads
   submodule content.
