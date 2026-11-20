@@ -7,7 +7,7 @@ hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(term))
 hl.bind(mod .. " + SHIFT + N", hl.dsp.exec_cmd("caelestia shell drawers toggle sidebar"))
 hl.bind(mod .. " + ALT + L", hl.dsp.exec_cmd("caelestia shell lock lock"))
-hl.bind("CTRL + ALT + P", hl.dsp.exec_cmd("caelestia shell drawers toggle session"))
+hl.bind(mod .. " + X", hl.dsp.exec_cmd("caelestia shell drawers toggle session"))
 hl.bind(mod .. " + SHIFT + C", hl.dsp.exec_cmd("hyprpicker -a"))
 hl.bind("CTRL + ALT + Delete", hl.dsp.exit())
 
@@ -73,7 +73,7 @@ hl.bind(mod .. " + Space", hl.dsp.exec_cmd("vicinae vicinae://toggle"))
 hl.bind(mod .. " + V", hl.dsp.exec_cmd("vicinae vicinae://launch/clipboard/history?toggle=true"))
 
 -- Hex dictation
-hl.bind("End", hl.dsp.global("anomaly.hex:dictation-ALT-space"))
+hl.bind("Next", hl.dsp.global("anomaly.hex:dictation-ALT-space"))
 hl.bind("F9", hl.dsp.global("anomaly.hex:paste-last-CTRL-ALT-v"))
 hl.bind(mod .. " + Escape", hl.dsp.global("anomaly.hex:cancel-dictation"))
 hl.bind("F10", hl.dsp.global("anomaly.hex:capture-F9"))
