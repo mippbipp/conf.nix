@@ -38,6 +38,9 @@ so `git add` new ones. Ask before running `nrs <host>` against any other host.
 `bun install` regenerates it through the root `postinstall` when `bun2nix` is
 on `PATH` (`nix develop` provides it). Otherwise run `bun2nix -o bun.nix`.
 
+Use `agent-browser` for browser automation. Before the first use, run
+`agent-browser skills get core` and follow it.
+
 ## Encrypted secrets
 
 Before editing `secrets/me.yaml`, set `SOPS_AGE_KEY_FILE=<filepath from modules/system/config/sops.nix>` in the command environment. Verify the encrypted diff afterward and keep decrypted values out of command output.

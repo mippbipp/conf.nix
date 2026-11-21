@@ -200,13 +200,26 @@
         system:
         let
           pkgs = nixpkgs.legacyPackages.${system};
+          browsers = pkgs.playwright-driver.browsers;
+          chromiumRevision = pkgs.playwright-driver.browsersJSON.chromium.revision;
+          chromiumDir = "${browsers}/chromium-${chromiumRevision}";
         in
         {
           default = pkgs.mkShell {
             packages = [
               pkgs.bun
               inputs.bun2nix.packages.${system}.default
+              pkgs.agent-browser
             ];
+
+            shellHook = ''
+              export PLAYWRIGHT_BROWSERS_PATH=${browsers}
+              export PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS=true
+              # The folder is chrome-linux or chrome-linux64 depending on the build.
+              for chrome in ${chromiumDir}/chrome-linux*/chrome; do
+                export AGENT_BROWSER_EXECUTABLE_PATH="$chrome"
+              done
+            '';
           };
         }
       );

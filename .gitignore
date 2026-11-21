@@ -1,4 +1,5 @@
 .qmlls.ini
+.direnv
 
 # OpenTofu local state - never commit, secrets adjacent (per-stack, see ADR-0011)
 terraform/**/*.tfstate
