@@ -5,6 +5,7 @@
     "experimentalTaskCommand": true,
   },
   "ui": "stream",
+  "agentGuidance": false,
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

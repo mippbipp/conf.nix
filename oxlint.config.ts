@@ -1,200 +1,33 @@
 import { recommended } from "@effect/tsgo/oxlint-presets";
+import nkzw from "@nkzw/oxlint-config/with-sorting";
 import { defineConfig } from "oxlint";
 
-// Adapted from the sourdough template: same categories and anti-slop rules,
-// minus the React, shadcn and turbo plugins this repo has no use for. It lints
-// the Bun workspace packages listed in package.json.
+const MANUAL_EFFECT_RUNNER_MESSAGE =
+  "Write the test with `it.effect(...)` or `layer(...)(...)` from `@effect/vitest`.";
+
+// Adapted from the sourdough template: same categories and presets, minus the
+// React, shadcn and turbo plugins this repo has no use for. It lints the Bun
+// workspace packages listed in package.json.
 export default defineConfig({
-  extends: [recommended],
-  options: {
-    typeAware: true,
-    typeCheck: true,
-    denyWarnings: true,
-  },
   categories: {
     correctness: "error",
-    suspicious: "warn",
+    nursery: "off",
     pedantic: "warn",
     perf: "error",
-    style: "warn",
     restriction: "warn",
-    nursery: "off",
-  },
-  plugins: [
-    "unicorn",
-    "typescript",
-    "oxc",
-    "eslint",
-    "vitest",
-    "node",
-    "import",
-  ],
-  jsPlugins: [
-    { name: "anti-slop", specifier: "./tools/oxlint/anti-slop/index.ts" },
-    {
-      name: "anti-slop-effect",
-      specifier: "./tools/oxlint/anti-slop/effect/index.ts",
-    },
-  ],
-  rules: {
-    // --- anti-slop js plugin preferences ---
-
-    "oxc/no-accumulating-spread": "error",
-    "anti-slop/no-array-filter-map": "error",
-    "anti-slop/no-reduce-accumulator-copy": "error",
-    "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
-    "anti-slop/no-known-value-widening": "error",
-    "anti-slop/no-module-mocking": "error",
-    "anti-slop/no-object-parameters": "error",
-    "anti-slop/no-reflect-apply": "error",
-    "anti-slop/no-reflect-get": "error",
-    "anti-slop/no-runtime-typeof": "error",
-    "anti-slop/no-shape-in-symbol-names": "error",
-    "anti-slop/no-unknown-parameters": "error",
-    "anti-slop/no-unknown-returns": "error",
-    "anti-slop/no-unknown-type-aliases": "error",
-    "anti-slop/no-unsafe-dictionary-type": "error",
-    "anti-slop/no-widen-then-assert": "error",
-    "anti-slop/require-readable-spacing": "error",
-    "anti-slop/require-safety-comment-for-type-assertion": "error",
-    "anti-slop-effect/no-manual-effect-error-tag": "error",
-    "anti-slop-effect/no-manual-tag-comparison": "error",
-    "anti-slop-effect/no-manual-tagged-construction": "error",
-    "anti-slop-effect/no-service-constructor-imports": "error",
-    "anti-slop-effect/prefer-effect-match": "error",
-    // Maintainers rule aimed at published API stability; this package is private.
-    "effecttsgo/api-stability-leak": "off",
-    // Same reasoning: dual data-first/data-last overloads serve library
-    // consumers piping our functions; nothing outside this package calls them.
-    "effecttsgo/missing-pipeable-signature": "off",
-    // --- not applicable in codebase ---
-    "unicorn/throw-new-error": "off", // Effect errors are values (Schema.TaggedError), never thrown
-    "import/named": "off",
-    "import/default": "off",
-    "import/namespace": "off",
-    "eslint/no-undef": "off",
-    "oxc/no-async-await": "off",
-    "oxc/no-optional-chaining": "off",
-    "oxc/no-rest-spread-properties": "off",
-
-    // --- builtin plugin preferences ---
-
-    // oxfmt will sort imports
-    // https://github.com/oxc-project/oxc/issues/14253
-    // https://github.com/oxc-project/oxc/issues/13610
-    "eslint/sort-imports": "off",
-    "eslint/max-lines-per-function": "off",
-    "eslint/max-lines": "off",
-    "eslint/init-declarations": "off",
-    "eslint/new-cap": "off",
-    "eslint/sort-keys": "off",
-    "eslint/func-names": "off",
-    "eslint/func-style": "off",
-    "eslint/no-magic-numbers": "off",
-    "eslint/no-ternary": "off",
-    "eslint/no-nested-ternary": "off",
-    "eslint/no-bitwise": "off",
-    "eslint/no-void": "off",
-    "eslint/class-methods-use-this": "off",
-    "eslint/capitalized-comments": "off",
-    "eslint/max-statements": "off",
-    "eslint/max-classes-per-file": "off",
-    "eslint/id-length": "off",
-    "eslint/no-undefined": "off",
-    "eslint/no-duplicate-imports": [
-      "error",
-      {
-        allowSeparateTypeImports: true,
-      },
-    ],
-    "eslint/no-plusplus": "off",
-    "eslint/no-await-in-loop": "off",
-    "eslint/no-promise-executor-return": "off",
-    "eslint/no-inline-comments": "off",
-    "eslint/no-warning-comments": ["warn", { terms: ["fixme", "xxx"] }],
-    "eslint/no-use-before-define": "off",
-    "eslint/no-empty-function": "off",
-    // one declaration per statement; comma-joined declarations hurt readability
-    "eslint/one-var": ["error", "never"],
-
-    "import/no-namespace": "off",
-    "import/no-named-export": "off",
-    "import/prefer-default-export": "off",
-    "import/exports-last": "off",
-    "import/group-exports": "off",
-    "import/max-dependencies": "off",
-    "import/no-relative-parent-imports": "off",
-    "import/no-nodejs-modules": "off",
-    "import/no-default-export": "off",
-    "import/consistent-type-specifier-style": "off",
-
-    "jest/require-hook": "off",
-
-    "typescript/no-unsafe-type-assertion": "off",
-    "typescript/explicit-module-boundary-types": "off",
-    "typescript/explicit-function-return-type": "off",
-    "typescript/promise-function-async": "off",
-    "typescript/strict-boolean-expressions": "off",
-    "typescript/no-confusing-void-expression": "off",
-    "typescript/prefer-readonly-parameter-types": "off",
-
-    "unicorn/prefer-ternary": "off",
-    "unicorn/no-array-method-this-argument": "off",
-    "unicorn/no-array-callback-reference": "off",
-    "unicorn/no-null": "off",
-    "unicorn/no-nested-ternary": "off",
-    "unicorn/no-array-for-each": "off",
-    "unicorn/switch-case-braces": "off",
-    "unicorn/no-array-reduce": "off",
-  },
-  overrides: [
-    {
-      files: ["**/*.config.ts"],
-      rules: {
-        "node/no-process-env": "off",
-      },
-    },
-    {
-      // CLI entrypoints and build tools: the top-level runMain launches the process,
-      // it is not test setup code, and it is where layers get provided
-      files: ["**/src/main.ts", "**/tools/*.ts"],
-      rules: {
-        "vitest/require-hook": "off",
-        "effecttsgo/strict-effect-provide": "off",
-      },
-    },
-    {
-      files: ["**/*.test.ts", "**/test/**/*.ts"],
-      rules: {
-        // @effect/vitest layer() owns setup and teardown internally
-        "vitest/no-importing-vitest-globals": "off",
-        // @effect/vitest layer() owns setup and teardown internally
-        "vitest/require-hook": "off",
-        // Effect-integrated assert replaces expect.hasAssertions.
-        "vitest/prefer-expect-assertions": "off",
-        "effecttsgo/strict-effect-provide": "off",
-        // shared test helpers are plain data functions, so a data-last overload
-        // has nothing to dualize
-        "effecttsgo/missing-pipeable-signature": "off",
-      },
-    },
-  ],
-  settings: {
-    vitest: {
-      typecheck: false,
-    },
+    style: "warn",
+    suspicious: "warn",
   },
   env: {
     builtin: true,
   },
+  extends: [recommended, nkzw],
   globals: {},
   ignorePatterns: [
     // The Nix build has no .gitignore, and type-aware linting of
     // node_modules exhausts memory.
     "**/node_modules/**",
-    // agent tooling dirs (installed skills/hooks) and the vendored plugin
-    // itself are not application source
+    // agent tooling dirs (installed skills/hooks) are not application source
     ".agent/**",
     ".agents/**",
     ".claude/**",
@@ -206,7 +39,6 @@ export default defineConfig({
     ".pi/**",
     ".roo/**",
     ".windsurf/**",
-    "tools/oxlint/anti-slop/**",
     // captured CI and API output kept verbatim as test data
     "**/test/fixtures/**",
     // build output
@@ -216,4 +48,179 @@ export default defineConfig({
     // ~/.agents submodule
     "modules/llm/.agents/**",
   ],
+  options: {
+    denyWarnings: true,
+    typeAware: true,
+    typeCheck: true,
+  },
+  overrides: [
+    {
+      files: ["**/*.config.ts"],
+      rules: {
+        "node/no-process-env": "off",
+      },
+    },
+    {
+      // tool config files are plain data; native array methods are fine
+      files: ["*.config.ts"],
+      rules: {
+        "effecttsgo/prefer-effect-array": "off",
+      },
+    },
+    {
+      // CLI entrypoints and build tools: the top-level runMain launches the process,
+      // it is not test setup code, and it is where layers get provided
+      files: ["**/src/main.ts", "**/tools/*.ts"],
+      rules: {
+        "effecttsgo/strict-effect-provide": "off",
+        "vitest/require-hook": "off",
+      },
+    },
+    {
+      // Effect.run* and ManagedRuntime.make skip the test runtime's scope,
+      // TestClock and layer cleanup; tests use it.effect or layer() from
+      // @effect/vitest instead
+      files: ["**/*.{test,spec}.{ts,tsx,mts,cts,js,jsx,mjs,cjs}"],
+      rules: {
+        "eslint/no-restricted-properties": [
+          "error",
+          ...[
+            "runCallback",
+            "runCallbackWith",
+            "runFork",
+            "runForkWith",
+            "runPromise",
+            "runPromiseExit",
+            "runPromiseExitWith",
+            "runPromiseWith",
+            "runSync",
+            "runSyncExit",
+            "runSyncExitWith",
+            "runSyncWith",
+          ].map((property) => ({
+            message: MANUAL_EFFECT_RUNNER_MESSAGE,
+            object: "Effect",
+            property,
+          })),
+          {
+            message: MANUAL_EFFECT_RUNNER_MESSAGE,
+            object: "ManagedRuntime",
+            property: "make",
+          },
+        ],
+      },
+    },
+    {
+      files: ["**/*.test.ts", "**/test/**/*.ts"],
+      rules: {
+        // @effect/vitest layer() owns setup and teardown internally
+        "vitest/no-importing-vitest-globals": "off",
+        // @effect/vitest layer() owns setup and teardown internally
+        "vitest/require-hook": "off",
+        // Effect-integrated assert replaces expect.hasAssertions.
+        "vitest/prefer-expect-assertions": "off",
+        // test harnesses provide their layers at the test's own entry point
+        "effecttsgo/strict-effect-provide": "off",
+      },
+    },
+  ],
+  plugins: [
+    "unicorn",
+    "typescript",
+    "oxc",
+    "eslint",
+    "vitest",
+    "node",
+    "import",
+  ],
+  rules: {
+    // Maintainers rule aimed at published API stability; these packages are private.
+    "effecttsgo/api-stability-leak": "off",
+    // Same reasoning: dual data-first/data-last overloads serve library
+    // consumers piping our functions; nothing outside these packages calls them.
+    "effecttsgo/missing-pipeable-signature": "off",
+    // --- not applicable in codebase ---
+    "import/default": "off",
+    "import/namespace": "off",
+    "oxc/no-async-await": "off",
+    "oxc/no-optional-chaining": "off",
+    "oxc/no-rest-spread-properties": "off",
+    "unicorn/throw-new-error": "off", // Effect errors are values (Schema.TaggedError), never thrown
+
+    // --- builtin plugin preferences ---
+
+    "eslint/capitalized-comments": "off",
+    "eslint/class-methods-use-this": "off",
+    "eslint/func-names": "off",
+    "eslint/func-style": "off",
+    "eslint/id-length": "off",
+    "eslint/max-classes-per-file": "off",
+    "eslint/max-lines": "off",
+    "eslint/max-lines-per-function": "off",
+    "eslint/max-statements": "off",
+    "eslint/new-cap": "off",
+    "eslint/no-await-in-loop": "off",
+    "eslint/no-duplicate-imports": [
+      "error",
+      {
+        allowSeparateTypeImports: true,
+      },
+    ],
+    "eslint/no-empty-function": "off",
+    "eslint/no-inline-comments": "off",
+    "eslint/no-magic-numbers": "off",
+    "eslint/no-nested-ternary": "off",
+    "eslint/no-ternary": "off",
+    "eslint/no-undefined": "off",
+    "eslint/no-use-before-define": "off",
+    "eslint/no-void": "off",
+    "eslint/no-warning-comments": [
+      "error",
+      { terms: ["@nocommit", "fixme", "xxx"] },
+    ],
+    // oxfmt will sort imports
+    // https://github.com/oxc-project/oxc/issues/14253
+    // https://github.com/oxc-project/oxc/issues/13610
+    "eslint/sort-imports": "off",
+    // perfectionist/sort-objects owns key order
+    "eslint/sort-keys": "off",
+    // one declaration per statement; comma-joined declarations hurt readability
+    "eslint/one-var": ["error", "never"],
+
+    "import/consistent-type-specifier-style": "off",
+    "import/exports-last": "off",
+    "import/group-exports": "off",
+    "import/max-dependencies": "off",
+    "import/no-default-export": "off",
+    "import/no-named-export": "off",
+    "import/no-nodejs-modules": "off",
+    "import/no-relative-parent-imports": "off",
+    "import/prefer-default-export": "off",
+
+    "typescript/explicit-function-return-type": "off",
+    "typescript/explicit-module-boundary-types": "off",
+    "typescript/no-confusing-void-expression": "off",
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "typescript/promise-function-async": "off",
+    // effecttsgo/strict-boolean-expressions reports the same thing
+    "typescript/strict-boolean-expressions": "off",
+
+    "unicorn/no-array-callback-reference": "off",
+    "unicorn/no-array-method-this-argument": "off",
+    // both misfire on Effect's data-last Arr.forEach / Arr.reduce in pipe()
+    "unicorn/no-array-for-each": "off",
+    "unicorn/no-array-reduce": "off",
+
+    // effecttsgo/async-function already bans async functions, so the
+    // remaining Promise interop has to chain .then()
+    "promise/prefer-await-to-then": "off",
+    "unicorn/no-nested-ternary": "off",
+    "unicorn/no-null": "off",
+  },
+  settings: {
+    vitest: {
+      typecheck: false,
+    },
+  },
 });

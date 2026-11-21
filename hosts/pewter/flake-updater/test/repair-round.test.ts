@@ -24,7 +24,7 @@ const onBranch = (main: string, head: string) => {
   const world = new World();
   world.main = new Map([["flake.lock", main]]);
   world.head = new Map([["flake.lock", head]]);
-  world.commits = [{ sha: world.next("c"), message: "up" }];
+  world.commits = [{ message: "up", sha: world.next("c") }];
 
   return world;
 };
@@ -36,13 +36,13 @@ const roundIn = Effect.fn("roundIn")(function* (world: World) {
   const main = yield* parseLock(world.main.get("flake.lock") ?? "");
 
   return yield* repairRound({
-    pr: { number: 42, url: "https://github.test/pull/42" },
-    round: 1,
-    main,
     failures: readFailures(failed("build x86_64-linux", gate232).failed)
       .failures,
-    session: Option.none(),
     feedback: Option.none(),
+    main,
+    pr: { number: 42, url: "https://github.test/pull/42" },
+    round: 1,
+    session: Option.none(),
   }).pipe(Effect.provide(fixerLayer(world)));
 });
 
@@ -125,10 +125,10 @@ describe("repair round", () => {
         Option.some({
           subject: "drop removed boot.initrd options",
           trailers: {
+            reverted: [],
+            reviewRequired: true,
             round: "1",
             session: "ses_test",
-            reviewRequired: true,
-            reverted: [],
           },
         })
       );
@@ -222,9 +222,9 @@ describe("repair round", () => {
         edits(
           { "flake.lock": "garbage" },
           {
+            filesChanged: [],
             outcome: "reverted",
             revertedInputs: ["nixpkgs"],
-            filesChanged: [],
             summary: "nixpkgs bbbbbbb breaks every host",
           }
         )
@@ -242,10 +242,10 @@ describe("repair round", () => {
       assert.deepStrictEqual(
         Option.map(lastCommit(world), (commit) => commit.trailers),
         Option.some({
+          reverted: ["nixpkgs"],
+          reviewRequired: false,
           round: "1",
           session: "ses_test",
-          reviewRequired: false,
-          reverted: ["nixpkgs"],
         })
       );
     })
@@ -293,8 +293,8 @@ describe("repair round", () => {
       world.agent.push(() =>
         Effect.fail(
           AgentError.make({
-            reason: "unavailable",
             message: "free usage limit reached",
+            reason: "unavailable",
             session: "ses_limit",
           })
         )

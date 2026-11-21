@@ -6,8 +6,8 @@ export class AgentError extends Schema.TaggedError<
   { readonly brand: unique symbol }
 >()("AgentError", {
   /** `unavailable`: the server, agent or model could not run at all. */
-  reason: Schema.Literals(["unavailable", "failed"]),
   message: Schema.String,
+  reason: Schema.Literals(["unavailable", "failed"]),
   /** The session the failure happened in, when one was opened. */
   session: Schema.optionalKey(Schema.String),
 }) {}
@@ -17,30 +17,30 @@ export class RepairReport extends Schema.Class<
   RepairReport,
   { readonly brand: unique symbol }
 >("RepairReport")({
+  filesChanged: Schema.Array(Schema.String),
   outcome: Schema.Literals(["fixed", "reverted", "gave-up"]),
   revertedInputs: Schema.Array(Schema.String),
-  filesChanged: Schema.Array(Schema.String),
   summary: Schema.String,
 }) {}
 
 export interface RepairRequest {
+  /** `name old→new` lines for every input the update changed. */
+  readonly changes: string;
+  /** Trimmed failing-check output. */
+  readonly failures: string;
+  /** Why the Updater discarded the previous round, if it did. */
+  readonly feedback: Option.Option<string>;
+  readonly mainLock: string;
+  readonly pr: number;
+  readonly round: number;
   /** Continue this session; a new one is created on the first round. */
   readonly session: Option.Option<string>;
   readonly title: string;
-  readonly round: number;
-  readonly pr: number;
-  /** Trimmed failing-check output. */
-  readonly failures: string;
-  /** `name old→new` lines for every input the update changed. */
-  readonly changes: string;
-  readonly mainLock: string;
-  /** Why the Updater discarded the previous round, if it did. */
-  readonly feedback: Option.Option<string>;
 }
 
 export interface RepairResult {
-  readonly session: string;
   readonly report: RepairReport;
+  readonly session: string;
 }
 
 /**
@@ -50,10 +50,10 @@ export interface RepairResult {
 export class Agent extends Context.Service<
   Agent,
   {
-    /** The directory the agent edits; nothing outside it is kept. */
-    readonly workspace: string;
     readonly repair: (
       request: RepairRequest
     ) => Effect.Effect<RepairResult, AgentError>;
+    /** The directory the agent edits; nothing outside it is kept. */
+    readonly workspace: string;
   }
 >()("flake-updater/agent") {}

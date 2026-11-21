@@ -7,7 +7,7 @@ import { gate232 } from "./fixtures/gate-232.ts";
 const line = (job: string, text: string) =>
   `${job}\tbuild\t2026-10-26T09:28:34.0000000Z ${text}`;
 
-const hostSection = (host: string, error: readonly string[]) => [
+const hostSection = (host: string, error: ReadonlyArray<string>) => [
   line("build x86_64-linux", `##[group]build ${host}`),
   ...Arr.map(error, (text) => line("build x86_64-linux", text)),
   line("build x86_64-linux", "##[endgroup]"),

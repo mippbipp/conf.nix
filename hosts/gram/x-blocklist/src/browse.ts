@@ -7,8 +7,8 @@ export class BrowseError extends Schema.TaggedError<
   BrowseError,
   { readonly brand: unique symbol }
 >()("BrowseError", {
-  tool: Schema.String,
   message: Schema.String,
+  tool: Schema.String,
 }) {}
 
 // Tool arguments are plain JSON values, so stringify cannot throw.
@@ -52,11 +52,11 @@ export class Browse extends Context.Service<
             { concurrency: "unbounded" }
           );
 
-          return { stdout, stderr, exitCode: Number(exitCode) };
+          return { exitCode: Number(exitCode), stderr, stdout };
         }).pipe(
           Effect.scoped,
           Effect.mapError((cause) =>
-            BrowseError.make({ tool, message: String(cause) })
+            BrowseError.make({ message: String(cause), tool })
           )
         );
 
@@ -69,8 +69,8 @@ export class Browse extends Context.Service<
         // browse prints a failed call's error on stdout.
         if (output.exitCode !== 0) {
           return yield* BrowseError.make({
-            tool,
             message: Str.trim(`${output.stdout}\n${output.stderr}`),
+            tool,
           });
         }
 

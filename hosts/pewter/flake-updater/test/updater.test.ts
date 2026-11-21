@@ -83,7 +83,7 @@ describe("updater", () => {
     Effect.gen(function* () {
       const world = new World();
       world.pr = Option.some({ number: 7, url: "https://github.test/pull/7" });
-      world.sync = Option.some({ mode: "reset", dropped: ["abc1234"] });
+      world.sync = Option.some({ dropped: ["abc1234"], mode: "reset" });
       world.updatedLock = Option.some(lockAt({ nixpkgs: "bbbbbbb" }));
       world.agentEnabled = false;
 
@@ -99,9 +99,9 @@ describe("updater", () => {
         const world = updated();
         world.issues = [
           {
+            body: "",
             number: 9,
             title: "flake-update: repair failed",
-            body: "",
             url: "https://github.test/issues/9",
           },
         ];
@@ -183,9 +183,9 @@ describe("updater", () => {
               // flake.lock from revertedInputs.
               { "flake.lock": "garbage" },
               {
+                filesChanged: ["flake.lock"],
                 outcome: "reverted",
                 revertedInputs: ["nixpkgs"],
-                filesChanged: ["flake.lock"],
                 summary: "nixpkgs 3ec6363 breaks every host",
               }
             )
@@ -280,9 +280,9 @@ describe("updater", () => {
         const world = updated();
         world.issues = [
           {
+            body: "",
             number: 9,
             title: "flake-update: repair failed",
-            body: "",
             url: "https://github.test/issues/9",
           },
         ];
@@ -313,8 +313,8 @@ describe("updater", () => {
         world.agent.push(() =>
           Effect.fail(
             AgentError.make({
-              reason: "unavailable",
               message: "free usage limit reached",
+              reason: "unavailable",
               session: "ses_limit",
             })
           )
@@ -392,15 +392,15 @@ describe("updater", () => {
 
       world.issues = [
         {
+          body: yield* heldAt("nixpkgs", "0000000"),
           number: 5,
           title: "flake-update: nixpkgs held back",
-          body: yield* heldAt("nixpkgs", "0000000"),
           url: "https://github.test/issues/5",
         },
         {
+          body: yield* heldAt("home-manager", "1111111"),
           number: 6,
           title: "flake-update: home-manager held back",
-          body: yield* heldAt("home-manager", "1111111"),
           url: "https://github.test/issues/6",
         },
       ];

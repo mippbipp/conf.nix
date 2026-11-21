@@ -4,12 +4,12 @@ import type { BranchState } from "./branch-state.ts";
 
 /** This run's repair progress, beside what the branch itself records. */
 export interface RunProgress {
-  readonly rounds: number;
   readonly maxRounds: number;
+  readonly rounds: number;
   readonly session: Option.Option<string>;
 }
 
-const section = (title: string, lines: readonly string[]) =>
+const section = (title: string, lines: ReadonlyArray<string>) =>
   Arr.isReadonlyArrayNonEmpty(lines) ? [`## ${title}`, "", ...lines, ""] : [];
 
 export const renderPrBody = (

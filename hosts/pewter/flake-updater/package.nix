@@ -1,6 +1,8 @@
 {
   lib,
+  stdenv,
   stdenvNoCC,
+  autoPatchelfHook,
   bun2nix,
   bun,
   makeWrapper,
@@ -27,7 +29,6 @@ stdenvNoCC.mkDerivation {
       (root + "/tsconfig.base.json")
       (root + "/oxlint.config.ts")
       (root + "/oxfmt.config.ts")
-      (root + "/tools/oxlint")
       # bun reads every workspace manifest, so the others must be present
       # even though only this one is built.
       (root + "/hosts/gram/x-blocklist/package.json")
@@ -73,7 +74,11 @@ stdenvNoCC.mkDerivation {
   '';
 
   # test/git.test.ts drives the checkout adapter against real git.
-  nativeCheckInputs = [ git ];
+  nativeCheckInputs = [
+    git
+    autoPatchelfHook
+  ];
+  checkInputs = [ stdenv.cc.cc.lib ];
 
   # The Build gate builds pewter's closure, which includes this package, so
   # these checks gate every change to the Updater. `bun --bun` runs every
@@ -82,6 +87,10 @@ stdenvNoCC.mkDerivation {
   checkPhase = ''
     runHook preCheck
     bun --bun run prepare
+    # The patched oxlint runs tsrs for type-aware rules; its npm binary
+    # expects an FHS dynamic loader the sandbox doesn't have.
+    chmod -R u+w node_modules/.bun/@tsrs+*/node_modules/@tsrs
+    autoPatchelf node_modules/.bun/@tsrs+*/node_modules/@tsrs
     bun --bun run --cwd hosts/pewter/flake-updater typecheck
     bun --bun run --cwd hosts/pewter/flake-updater test
     bun --bun x oxfmt --check hosts/pewter/flake-updater

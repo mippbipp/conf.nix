@@ -28,17 +28,17 @@ import type { RepairRequest } from "../agent.ts";
 import { blockedEntries, blockedGlobs } from "../scope.ts";
 
 export interface FixerServerConfig {
-  readonly url: string;
-  readonly password: Redacted.Redacted;
   /** Agent declared in the server's Nix-generated config. */
   readonly agent: string;
-  /** `provider/model`, pinned on every session. */
-  readonly model: string;
-  /** The Flake fixer's workspace, outside the Updater's checkout. */
-  readonly workspace: string;
   /** Read-only material for the agent, outside the workspace. */
   readonly contextDir: string;
+  /** `provider/model`, pinned on every session. */
+  readonly model: string;
+  readonly password: Redacted.Redacted;
   readonly roundTimeout: Duration.Duration;
+  readonly url: string;
+  /** The Flake fixer's workspace, outside the Updater's checkout. */
+  readonly workspace: string;
 }
 
 export class FixerServer extends Context.Service<
@@ -82,8 +82,8 @@ const shellWrites = [
 
 type Rule = Readonly<{
   action: string;
-  resource: string;
   effect: "allow" | "deny" | "ask";
+  resource: string;
 }>;
 
 /**
@@ -91,39 +91,39 @@ type Rule = Readonly<{
  * leave at `ask` is rejected by the Updater; the server's global policies
  * hard-deny the worst cases again.
  */
-const sessionRules = (contextDir: string): readonly Rule[] => [
-  { action: "*", resource: "*", effect: "ask" },
-  { action: "read", resource: "*", effect: "allow" },
-  { action: "read", resource: "secrets/*", effect: "deny" },
-  { action: "glob", resource: "*", effect: "allow" },
-  { action: "grep", resource: "*", effect: "allow" },
-  { action: "edit", resource: "*", effect: "allow" },
-  { action: "external_directory", resource: "*", effect: "deny" },
+const sessionRules = (contextDir: string): ReadonlyArray<Rule> => [
+  { action: "*", effect: "ask", resource: "*" },
+  { action: "read", effect: "allow", resource: "*" },
+  { action: "read", effect: "deny", resource: "secrets/*" },
+  { action: "glob", effect: "allow", resource: "*" },
+  { action: "grep", effect: "allow", resource: "*" },
+  { action: "edit", effect: "allow", resource: "*" },
+  { action: "external_directory", effect: "deny", resource: "*" },
   {
     action: "external_directory",
-    resource: `${contextDir}/*`,
     effect: "allow",
+    resource: `${contextDir}/*`,
   },
-  { action: "external_directory", resource: "/nix/store/*", effect: "allow" },
+  { action: "external_directory", effect: "allow", resource: "/nix/store/*" },
   ...Arr.map(shellAllowed, (resource): Rule => ({
     action: "shell",
-    resource,
     effect: "allow",
+    resource,
   })),
   ...Arr.map(shellWrites, (resource): Rule => ({
     action: "shell",
-    resource,
     effect: "deny",
+    resource,
   })),
   ...Arr.map(blockedGlobs, (resource): Rule => ({
     action: "edit",
-    resource,
     effect: "deny",
+    resource,
   })),
-  { action: "webfetch", resource: "*", effect: "deny" },
-  { action: "websearch", resource: "*", effect: "deny" },
-  { action: "subagent", resource: "*", effect: "deny" },
-  { action: "question", resource: "*", effect: "deny" },
+  { action: "webfetch", effect: "deny", resource: "*" },
+  { action: "websearch", effect: "deny", resource: "*" },
+  { action: "subagent", effect: "deny", resource: "*" },
+  { action: "question", effect: "deny", resource: "*" },
 ];
 
 const firstRound = (
@@ -209,10 +209,10 @@ const unavailableTags = [
 
 const toAgentError = (context: string) => (cause: unknown) =>
   AgentError.make({
+    message: `${context}: ${Predicate.hasProperty(cause, "message") ? String(cause.message) : String(cause)}`,
     reason: Arr.some(unavailableTags, (tag) => Predicate.isTagged(cause, tag))
       ? "unavailable"
       : "failed",
-    message: `${context}: ${Predicate.hasProperty(cause, "message") ? String(cause.message) : String(cause)}`,
   });
 
 const isIdle = (message: SessionMessage.Info): message is SessionMessage.Idle =>
@@ -224,7 +224,7 @@ const isAssistant = (
 
 /** Why a finished round cannot be trusted, if it cannot. */
 const roundProblem = (
-  messages: readonly SessionMessage.Info[],
+  messages: ReadonlyArray<SessionMessage.Info>,
   agent: string
 ): Option.Option<AgentError> => {
   const assistants = Arr.filter(messages, isAssistant);
@@ -232,8 +232,8 @@ const roundProblem = (
   if (Arr.some(assistants, (message) => message.agent !== agent)) {
     return Option.some(
       AgentError.make({
-        reason: "unavailable",
         message: `the server ran a different agent than ${agent}; check its opencode config`,
+        reason: "unavailable",
       })
     );
   }
@@ -252,8 +252,8 @@ const roundProblem = (
 
   return Option.some(
     AgentError.make({
-      reason: providerFault ? "unavailable" : "failed",
       message: error?.message ?? `the round ended ${idle.value.outcome}`,
+      reason: providerFault ? "unavailable" : "failed",
     })
   );
 };
@@ -286,10 +286,10 @@ export const layer = Layer.effect(
           event.data.sessionID === sessionID
             ? client.permission
                 .reply({
-                  sessionID,
-                  requestID: event.data.id,
                   decision: "reject",
                   message: `${event.data.action} ${Arr.join(event.data.resources, " ")} is not allowed for the Flake fixer.`,
+                  requestID: event.data.id,
+                  sessionID,
                 })
                 .pipe(Effect.ignore)
             : Effect.void
@@ -299,27 +299,27 @@ export const layer = Layer.effect(
 
     const openSession = (request: RepairRequest) =>
       Option.match(request.session, {
-        onSome: (id) => Effect.succeed(Session.ID.make(id)),
         onNone: () =>
           client.session
             .create({
-              title: request.title,
               agent: AgentSchema.ID.make(config.agent),
-              model: Model.Ref.parse(config.model),
               location: { directory: AbsolutePath.make(config.workspace) },
+              model: Model.Ref.parse(config.model),
               permissions: [...sessionRules(config.contextDir)],
+              title: request.title,
             })
             .pipe(
               Effect.mapBoth({
-                onSuccess: (session) => session.id,
                 onFailure: toAgentError("creating the session"),
+                onSuccess: (session) => session.id,
               })
             ),
+        onSome: (id) => Effect.succeed(Session.ID.make(id)),
       });
 
     const roundTimedOut = AgentError.make({
-      reason: "failed",
       message: `the round ran past ${Duration.format(config.roundTimeout)}`,
+      reason: "failed",
     });
 
     const runRound = Effect.fn("Agent.runRound")(
@@ -366,7 +366,7 @@ export const layer = Layer.effect(
       yield* checkOutcome(sessionID);
 
       const reply = yield* client.session
-        .generate({ sessionID, prompt: reportPrompt })
+        .generate({ prompt: reportPrompt, sessionID })
         .pipe(Effect.mapError(toAgentError("asking for the round report")));
 
       return yield* decodeReport(jsonObject(reply.text)).pipe(
@@ -398,16 +398,16 @@ export const layer = Layer.effect(
       const report = yield* roundReport(sessionID, text).pipe(
         Effect.mapError((error) =>
           AgentError.make({
-            reason: error.reason,
             message: error.message,
+            reason: error.reason,
             session: sessionID,
           })
         )
       );
 
-      return { session: sessionID, report };
+      return { report, session: sessionID };
     });
 
-    return Agent.of({ workspace: config.workspace, repair });
+    return Agent.of({ repair, workspace: config.workspace });
   })
 );

@@ -15,21 +15,21 @@ import type { ChangeResponse } from "./x-session.ts";
 
 /** One block or unblock request and what X said about it. */
 export interface Action {
-  readonly kind: "block" | "unblock";
-  readonly id: string;
-  readonly handle: string;
-  readonly status: number;
   /** X answered 200 and named this account's ID in the response. */
   readonly confirmed: boolean;
+  readonly handle: string;
+  readonly id: string;
+  readonly kind: "block" | "unblock";
+  readonly status: number;
 }
 
 /** What one run did. */
 export interface Report {
-  /** How many accounts Clankwall flags as AI. */
-  readonly flagged: number;
+  readonly actions: ReadonlyArray<Action>;
   /** How many accounts the X account blocked when the run started. */
   readonly blockedBefore: number;
-  readonly actions: readonly Action[];
+  /** How many accounts Clankwall flags as AI. */
+  readonly flagged: number;
   /** Changes still needed after this run, for a dry or stopped run. */
   readonly pending: { readonly block: number; readonly unblock: number };
   /** The status that ended the run early, when X refused to go on. */
@@ -44,7 +44,7 @@ const stopStatuses: ReadonlySet<number> = new Set([401, 403, 429]);
 const readAll = Effect.fnUntraced(function* <E, R>(
   page: (cursor: Option.Option<string>) => Effect.Effect<AccountsPage, E, R>
 ) {
-  const accounts: Account[] = [];
+  const accounts: Array<Account> = [];
   let cursor = Option.none<string>();
 
   do {
@@ -60,7 +60,7 @@ const readAll = Effect.fnUntraced(function* <E, R>(
   return accounts;
 });
 
-const idsOf = (accounts: readonly Account[]) =>
+const idsOf = (accounts: ReadonlyArray<Account>) =>
   HashSet.fromIterable(Arr.map(accounts, (entry) => entry.id));
 
 /**
@@ -108,7 +108,7 @@ export const run = Effect.fn("Blocklist.run")(function* () {
   const send = (kind: Action["kind"], target: Account) =>
     kind === "block" ? x.block(target) : x.unblock(target);
 
-  const actions: Action[] = [];
+  const actions: Array<Action> = [];
   let stoppedAt = Option.none<number>();
 
   for (const { kind, target } of settings.dryRun ? [] : planned) {
@@ -119,12 +119,12 @@ export const run = Effect.fn("Blocklist.run")(function* () {
     const response: ChangeResponse = yield* send(kind, target);
 
     actions.push({
-      kind,
-      id: target.id,
-      handle: target.handle,
-      status: response.status,
       confirmed:
         response.status === 200 && Option.contains(response.id, target.id),
+      handle: target.handle,
+      id: target.id,
+      kind,
+      status: response.status,
     });
 
     if (stopStatuses.has(response.status)) {
@@ -138,9 +138,9 @@ export const run = Effect.fn("Blocklist.run")(function* () {
       .length;
 
   return {
-    flagged: flagged.length,
-    blockedBefore: blocked.length,
     actions,
+    blockedBefore: blocked.length,
+    flagged: flagged.length,
     pending: {
       block: toBlock.length - done("block"),
       unblock: toUnblock.length - done("unblock"),

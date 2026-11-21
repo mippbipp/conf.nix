@@ -13,24 +13,24 @@ const sha = "c1";
 const pr = { number: 7, url: "https://github.test/pull/7" };
 
 interface FakeCheck {
+  readonly conclusion: string;
   readonly name: string;
   readonly status: string;
-  readonly conclusion: string;
 }
 
 const passed = (name: string): FakeCheck => ({
+  conclusion: "SUCCESS",
   name,
   status: "COMPLETED",
-  conclusion: "SUCCESS",
 });
 
 const failing = (name: string): FakeCheck => ({
+  conclusion: "FAILURE",
   name,
   status: "COMPLETED",
-  conclusion: "FAILURE",
 });
 
-const rollup = (checks: readonly FakeCheck[]) =>
+const rollup = (checks: ReadonlyArray<FakeCheck>) =>
   toJson({
     headRefOid: sha,
     statusCheckRollup: Arr.map(checks, (check, index) => ({
@@ -39,19 +39,19 @@ const rollup = (checks: readonly FakeCheck[]) =>
     })),
   });
 
-const ruleset = (contexts: readonly string[]) =>
+const ruleset = (contexts: ReadonlyArray<string>) =>
   toJson([
-    { type: "deletion", ruleset_id: 1 },
+    { ruleset_id: 1, type: "deletion" },
     {
-      type: "pull_request",
       parameters: { required_approving_review_count: 0 },
+      type: "pull_request",
     },
     {
-      type: "required_status_checks",
       parameters: {
-        strict_required_status_checks_policy: false,
         required_status_checks: Arr.map(contexts, (context) => ({ context })),
+        strict_required_status_checks_policy: false,
       },
+      type: "required_status_checks",
     },
   ]);
 
@@ -64,12 +64,12 @@ const required = [
 /** Canned `gh` output; the last rollup repeats once the list runs out. */
 class FakeGitHub {
   public rulesetJson = ruleset(required);
-  public rollups: string[] = [];
+  public rollups: Array<string> = [];
   public polls = 0;
   public readonly log =
     "build x86_64-linux\tbuild\t2026-10-26T09:28:34Z error: boom";
 
-  public respond(args: readonly string[]): string {
+  public respond(args: ReadonlyArray<string>): string {
     // `gh api` rejects --repo, so match the whole argv.
     if (Arr.join(args, " ") === "api repos/o/r/rules/branches/main") {
       return this.rulesetJson;
@@ -86,24 +86,24 @@ class FakeGitHub {
 }
 
 const gateLayer = (github: FakeGitHub) => {
-  const run = (_command: string, args: readonly string[]) =>
+  const run = (_command: string, args: ReadonlyArray<string>) =>
     Effect.sync(() => github.respond(args));
 
   const shell = Layer.succeed(Shell)({
-    run,
     exec: (command, args) =>
       Effect.map(run(command, args), (stdout) => ({
-        stdout,
-        stderr: "",
         exitCode: 0,
+        stderr: "",
+        stdout,
       })),
+    run,
   });
 
   const host = Layer.succeed(Host)({
-    repoDir: "/var/lib/flake-updater",
-    repo: "o/r",
-    token: Redacted.make("token"),
     dryRun: false,
+    repo: "o/r",
+    repoDir: "/var/lib/flake-updater",
+    token: Redacted.make("token"),
   });
 
   return liveGate.pipe(Layer.provide(Layer.mergeAll(shell, host)));
@@ -146,7 +146,7 @@ describe("live gate", () => {
         rollup(builds),
         rollup([
           ...builds,
-          { name: "flake-update-scope", status: "IN_PROGRESS", conclusion: "" },
+          { conclusion: "", name: "flake-update-scope", status: "IN_PROGRESS" },
         ]),
         rollup([...builds, passed("flake-update-scope")]),
       ];
@@ -158,9 +158,9 @@ describe("live gate", () => {
       assert.strictEqual(github.polls, 3);
       assert.deepStrictEqual(result.failed, [
         {
+          log: github.log,
           name: "build x86_64-linux",
           url: "https://github.com/o/r/actions/runs/1/job/1",
-          log: github.log,
         },
       ]);
     })

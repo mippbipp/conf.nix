@@ -11,28 +11,30 @@ import { Argument, Command, Flag } from "effect/cli";
 import { FetchHttpClient } from "effect/http";
 
 import { Shell } from "./command.ts";
-import * as AgentLive from "./live/agent.ts";
-import * as GateLive from "./live/gate.ts";
-import * as GitLive from "./live/git.ts";
-import * as GitHubLive from "./live/github.ts";
-import * as LocalGate from "./live/local-gate.ts";
-import * as NixLive from "./live/nix.ts";
+import { FixerServer, layer as agentLiveLayer } from "./live/agent.ts";
+import { layer as gateLayer } from "./live/gate.ts";
+import { layer as gitLayer } from "./live/git.ts";
+import { layer as gitHubLayer } from "./live/github.ts";
+import { layer as localGateLayer } from "./live/local-gate.ts";
+import { layer as nixLayer } from "./live/nix.ts";
 import { formatLock, parseLock, revertInputs } from "./lock.ts";
 import { defaultDeadline, Host, Settings } from "./settings.ts";
 import { run } from "./updater.ts";
 
 const flags = {
-  repoDir: Flag.String("repo-dir").pipe(
-    Flag.withDescription("The Updater's checkout"),
-    Flag.withDefault("/var/lib/flake-updater")
+  agent: Flag.Boolean("agent").pipe(
+    Flag.withDescription("Run Flake fixer rounds when the gate is red"),
+    Flag.withDefault(false)
   ),
-  repo: Flag.String("repo").pipe(
-    Flag.withDescription("GitHub repository as owner/name"),
-    Flag.withDefault("mippbipp/conf.nix")
+  agentName: Flag.String("agent-name").pipe(Flag.withDefault("flake-fixer")),
+  agentPasswordFile: Flag.String("agent-password-file").pipe(
+    Flag.withDefault("/var/lib/flake-updater/fixer-password")
   ),
-  tokenFile: Flag.String("token-file").pipe(
-    Flag.withDescription("File holding the GitHub token"),
-    Flag.withDefault("/run/secrets/github_token")
+  agentUrl: Flag.String("agent-url").pipe(
+    Flag.withDefault("http://127.0.0.1:4097")
+  ),
+  contextDir: Flag.String("context-dir").pipe(
+    Flag.withDefault("/var/lib/flake-fixer/context")
   ),
   dryRun: Flag.Boolean("dry-run").pipe(
     Flag.withDescription(
@@ -40,31 +42,29 @@ const flags = {
     ),
     Flag.withDefault(false)
   ),
-  agent: Flag.Boolean("agent").pipe(
-    Flag.withDescription("Run Flake fixer rounds when the gate is red"),
-    Flag.withDefault(false)
-  ),
-  agentUrl: Flag.String("agent-url").pipe(
-    Flag.withDefault("http://127.0.0.1:4097")
-  ),
-  agentPasswordFile: Flag.String("agent-password-file").pipe(
-    Flag.withDefault("/var/lib/flake-updater/fixer-password")
-  ),
-  agentName: Flag.String("agent-name").pipe(Flag.withDefault("flake-fixer")),
+  maxRounds: Flag.Int("max-rounds").pipe(Flag.withDefault(3)),
   model: Flag.String("model").pipe(
     Flag.withDefault("opencode/deepseek-v4.1-flash-free")
   ),
-  workDir: Flag.String("work-dir").pipe(
-    Flag.withDefault("/var/lib/flake-fixer/work")
+  repo: Flag.String("repo").pipe(
+    Flag.withDescription("GitHub repository as owner/name"),
+    Flag.withDefault("mippbipp/conf.nix")
   ),
-  contextDir: Flag.String("context-dir").pipe(
-    Flag.withDefault("/var/lib/flake-fixer/context")
+  repoDir: Flag.String("repo-dir").pipe(
+    Flag.withDescription("The Updater's checkout"),
+    Flag.withDefault("/var/lib/flake-updater")
   ),
   sessionUrl: Flag.String("session-url").pipe(
     Flag.withDescription("Where a person opens Flake fixer sessions"),
     Flag.withDefault("the flake-fixer opencode server")
   ),
-  maxRounds: Flag.Int("max-rounds").pipe(Flag.withDefault(3)),
+  tokenFile: Flag.String("token-file").pipe(
+    Flag.withDescription("File holding the GitHub token"),
+    Flag.withDefault("/run/secrets/github_token")
+  ),
+  workDir: Flag.String("work-dir").pipe(
+    Flag.withDefault("/var/lib/flake-fixer/work")
+  ),
 };
 
 type Flags = Command.Command.Config.Infer<typeof flags>;
@@ -84,17 +84,17 @@ const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
 
   const password = yield* readSecret(options.agentPasswordFile);
 
-  const server = Layer.succeed(AgentLive.FixerServer)({
-    url: options.agentUrl,
-    password,
+  const server = Layer.succeed(FixerServer)({
     agent: options.agentName,
-    model: options.model,
-    workspace: options.workDir,
     contextDir: options.contextDir,
+    model: options.model,
+    password,
     roundTimeout: Duration.hours(1),
+    url: options.agentUrl,
+    workspace: options.workDir,
   });
 
-  return AgentLive.layer.pipe(
+  return agentLiveLayer.pipe(
     Layer.provide(server),
     Layer.provide(FetchHttpClient.layer)
   );
@@ -107,27 +107,25 @@ const update = Command.make(
     const token = yield* readSecret(options.tokenFile);
 
     const host = Layer.succeed(Host)({
-      repoDir: options.repoDir,
-      repo: options.repo,
-      token,
       dryRun: options.dryRun,
+      repo: options.repo,
+      repoDir: options.repoDir,
+      token,
     });
 
     const settings = Layer.succeed(Settings)({
-      maxRounds: options.maxRounds,
       deadline: defaultDeadline,
+      maxRounds: options.maxRounds,
       model: options.model,
       sessionUrl: options.sessionUrl,
     });
 
-    const gate = options.dryRun ? LocalGate.layer : GateLive.layer;
+    const gate = options.dryRun ? localGateLayer : gateLayer;
 
-    const live = Layer.mergeAll(
-      GitLive.layer,
-      GitHubLive.layer,
-      NixLive.layer,
-      gate
-    ).pipe(Layer.provide(Shell.layer), Layer.provide(host));
+    const live = Layer.mergeAll(gitLayer, gitHubLayer, nixLayer, gate).pipe(
+      Layer.provide(Shell.layer),
+      Layer.provide(host)
+    );
 
     const agent = yield* agentLayer(options);
 
@@ -142,11 +140,11 @@ const update = Command.make(
 const revertLock = Command.make(
   "revert-lock",
   {
+    inputs: Argument.String("input").pipe(Argument.variadic({ min: 1 })),
+    lock: Flag.String("lock").pipe(Flag.withDefault("flake.lock")),
     main: Flag.String("main").pipe(
       Flag.withDescription("main's flake.lock to take revisions from")
     ),
-    lock: Flag.String("lock").pipe(Flag.withDefault("flake.lock")),
-    inputs: Argument.String("input").pipe(Argument.variadic({ min: 1 })),
   },
   Effect.fn("revertLock")(function* (options) {
     const fs = yield* FileSystem.FileSystem;

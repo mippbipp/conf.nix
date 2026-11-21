@@ -4,7 +4,7 @@ import { Context, Schema } from "effect";
 export class NixError extends Schema.TaggedError<
   NixError,
   { readonly brand: unique symbol }
->()("NixError", { message: Schema.String, cause: Schema.Defect() }) {}
+>()("NixError", { cause: Schema.Defect(), message: Schema.String }) {}
 
 export class Nix extends Context.Service<
   Nix,

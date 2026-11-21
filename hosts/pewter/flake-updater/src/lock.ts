@@ -46,7 +46,7 @@ export const parseLock = Effect.fn("Lock.parseLock")(function* (text: string) {
   ).pipe(Effect.mapError((cause) => LockParseError.make({ cause })));
 });
 
-const sortEntries = <A>(entries: [string, A][]) =>
+const sortEntries = <A>(entries: Array<[string, A]>) =>
   Arr.sort(
     entries,
     Order.mapInput(Order.String, (entry: [string, A]) => entry[0])
@@ -98,7 +98,7 @@ const rootInputs = (lock: FlakeLock) => lock.nodes[lock.root]?.inputs ?? {};
 const identity = (lock: FlakeLock, name: string): string =>
   describeRef(lock, rootInputs(lock)[name]);
 
-export const inputNames = (lock: FlakeLock): readonly string[] =>
+export const inputNames = (lock: FlakeLock): ReadonlyArray<string> =>
   Arr.sort(Rec.keys(rootInputs(lock)), Order.String);
 
 const lockedAttr = (lock: FlakeLock, name: string, attr: string) => {
@@ -129,8 +129,8 @@ export const shortRev = (lock: FlakeLock, name: string): string => {
 };
 
 export interface InputChange {
-  readonly name: string;
   readonly from: string;
+  readonly name: string;
   readonly to: string;
 }
 
@@ -147,6 +147,7 @@ const fnvPrime = 16_777_619;
 
 // 32-bit FNV-1a, written out so held-back markers already in issue bodies
 // keep matching across dependency upgrades.
+/* oxlint-disable eslint/no-bitwise -- FNV-1a is defined in terms of XOR and unsigned shift */
 const fnv1a = (text: string): number => {
   let hash = fnvOffset;
 
@@ -158,6 +159,7 @@ const fnv1a = (text: string): number => {
 
   return hash >>> 0;
 };
+/* oxlint-enable eslint/no-bitwise */
 
 /**
  * A short digest of a root input's whole lock entry, stable across runs.
@@ -170,8 +172,8 @@ export const entryFingerprint = (lock: FlakeLock, name: string): string =>
 export const changedInputs = (
   base: FlakeLock,
   head: FlakeLock
-): readonly InputChange[] => {
-  const names: string[] = Arr.dedupe([
+): ReadonlyArray<InputChange> => {
+  const names: Array<string> = Arr.dedupe([
     ...inputNames(base),
     ...inputNames(head),
   ]);
@@ -181,7 +183,7 @@ export const changedInputs = (
       return [];
     }
 
-    return [{ name, from: shortRev(base, name), to: shortRev(head, name) }];
+    return [{ from: shortRev(base, name), name, to: shortRev(head, name) }];
   });
 };
 
@@ -189,7 +191,7 @@ export interface LockChange {
   /** Every input is either untouched or back at main's revision. */
   readonly onlyReverts: boolean;
   /** Inputs now at main's revision that were not before. */
-  readonly reverted: readonly string[];
+  readonly reverted: ReadonlyArray<string>;
 }
 
 /**
@@ -298,7 +300,7 @@ const reachable = (nodes: Map<string, LockNode>, root: string) => {
 export const revertInputs = (
   branch: FlakeLock,
   main: FlakeLock,
-  names: readonly string[]
+  names: ReadonlyArray<string>
 ): FlakeLock => {
   const nodes = new Map(Rec.toEntries(branch.nodes));
   const branchRoot = rootInputs(branch);
@@ -313,7 +315,7 @@ export const revertInputs = (
       : undefined;
 
     return Predicate.isString(target) && sourceNode !== undefined
-      ? [{ target, sourceNode }]
+      ? [{ sourceNode, target }]
       : [];
   });
 
@@ -333,11 +335,11 @@ export const revertInputs = (
 
   // Every swap target keeps its key, so reserve them all before copying
   // children into the freed keys.
-  for (const { target, sourceNode } of swaps) {
+  for (const { sourceNode, target } of swaps) {
     nodes.set(target, sourceNode);
   }
 
-  for (const { target, sourceNode } of swaps) {
+  for (const { sourceNode, target } of swaps) {
     nodes.set(target, copyChildren(main, sourceNode, nodes));
   }
 

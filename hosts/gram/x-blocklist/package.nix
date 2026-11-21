@@ -1,6 +1,8 @@
 {
   lib,
+  stdenv,
   stdenvNoCC,
+  autoPatchelfHook,
   bun2nix,
   bun,
   makeWrapper,
@@ -23,7 +25,6 @@ stdenvNoCC.mkDerivation {
       (root + "/tsconfig.base.json")
       (root + "/oxlint.config.ts")
       (root + "/oxfmt.config.ts")
-      (root + "/tools/oxlint")
       # bun reads every workspace manifest, so the others must be present
       # even though only this one is built.
       (root + "/hosts/pewter/flake-updater/package.json")
@@ -67,12 +68,19 @@ stdenvNoCC.mkDerivation {
     runHook postBuild
   '';
 
+  nativeCheckInputs = [ autoPatchelfHook ];
+  checkInputs = [ stdenv.cc.cc.lib ];
+
   # `bun --bun` runs every `#!/usr/bin/env node` script with Bun, so the
   # checks need no Node.js.
   doCheck = true;
   checkPhase = ''
     runHook preCheck
     bun --bun run prepare
+    # The patched oxlint runs tsrs for type-aware rules; its npm binary
+    # expects an FHS dynamic loader the sandbox doesn't have.
+    chmod -R u+w node_modules/.bun/@tsrs+*/node_modules/@tsrs
+    autoPatchelf node_modules/.bun/@tsrs+*/node_modules/@tsrs
     bun --bun run --cwd hosts/gram/x-blocklist typecheck
     bun --bun run --cwd hosts/gram/x-blocklist test
     bun --bun x oxfmt --check hosts/gram/x-blocklist

@@ -5,7 +5,7 @@ import { parseLock } from "./lock.ts";
 export class GitError extends Schema.TaggedError<
   GitError,
   { readonly brand: unique symbol }
->()("GitError", { message: Schema.String, cause: Schema.Defect() }) {}
+>()("GitError", { cause: Schema.Defect(), message: Schema.String }) {}
 
 /**
  * How the local `flake-update` branch was rebuilt for this run:
@@ -14,22 +14,22 @@ export class GitError extends Schema.TaggedError<
  * - `reset`: main conflicted with the PR's code commits, which were dropped.
  */
 export interface SyncOutcome {
+  readonly dropped: ReadonlyArray<string>;
   readonly mode: "fresh" | "continued" | "reset";
-  readonly dropped: readonly string[];
 }
 
 export interface BranchCommit {
-  readonly sha: string;
   readonly message: string;
+  readonly sha: string;
 }
 
 /** A tree object built from the Flake fixer's workspace. */
 export interface ImportedTree {
-  readonly tree: string;
   /** Paths that differ from HEAD. */
-  readonly files: readonly string[];
+  readonly files: ReadonlyArray<string>;
   /** Of `files`, those that are gitlinks added or moved by the workspace. */
-  readonly gitlinks: readonly string[];
+  readonly gitlinks: ReadonlyArray<string>;
+  readonly tree: string;
 }
 
 export const mainRef = "origin/main";
@@ -41,32 +41,35 @@ export const mainRef = "origin/main";
 export class Git extends Context.Service<
   Git,
   {
-    /** Clone if needed, configure auth and identity, fetch origin. */
-    readonly prepare: Effect.Effect<void, GitError>;
-    readonly sync: (
-      continuing: boolean
-    ) => Effect.Effect<SyncOutcome, GitError>;
+    /** Non-merge commits on the branch that main does not have, oldest first. */
+    readonly branchCommits: Effect.Effect<
+      ReadonlyArray<BranchCommit>,
+      GitError
+    >;
+    readonly changedFromMain: Effect.Effect<ReadonlyArray<string>, GitError>;
     /** Commits flake.lock when `nix flake update` changed it. */
     readonly commitLock: (message: string) => Effect.Effect<boolean, GitError>;
-    readonly readLock: (rev: string) => Effect.Effect<string, GitError>;
-    readonly head: Effect.Effect<string, GitError>;
-    /** Non-merge commits on the branch that main does not have, oldest first. */
-    readonly branchCommits: Effect.Effect<readonly BranchCommit[], GitError>;
-    readonly changedFromMain: Effect.Effect<readonly string[], GitError>;
-    /** `replace` rewrites the remote branch (with lease); otherwise fast-forward. */
-    readonly push: (replace: boolean) => Effect.Effect<void, GitError>;
-    /** Replaces `dir` with a plain copy of HEAD's tree. */
-    readonly exportTree: (dir: string) => Effect.Effect<void, GitError>;
-    /** Builds a tree from `dir`, with flake.lock forced to `lock`. */
-    readonly importTree: (
-      dir: string,
-      lock: string
-    ) => Effect.Effect<ImportedTree, GitError>;
     /** Commits `tree` on top of HEAD and moves the branch to it. */
     readonly commitTree: (
       tree: string,
       message: string
     ) => Effect.Effect<string, GitError>;
+    /** Replaces `dir` with a plain copy of HEAD's tree. */
+    readonly exportTree: (dir: string) => Effect.Effect<void, GitError>;
+    readonly head: Effect.Effect<string, GitError>;
+    /** Builds a tree from `dir`, with flake.lock forced to `lock`. */
+    readonly importTree: (
+      dir: string,
+      lock: string
+    ) => Effect.Effect<ImportedTree, GitError>;
+    /** Clone if needed, configure auth and identity, fetch origin. */
+    readonly prepare: Effect.Effect<void, GitError>;
+    /** `replace` rewrites the remote branch (with lease); otherwise fast-forward. */
+    readonly push: (replace: boolean) => Effect.Effect<void, GitError>;
+    readonly readLock: (rev: string) => Effect.Effect<string, GitError>;
+    readonly sync: (
+      continuing: boolean
+    ) => Effect.Effect<SyncOutcome, GitError>;
   }
 >()("flake-updater/git") {}
 

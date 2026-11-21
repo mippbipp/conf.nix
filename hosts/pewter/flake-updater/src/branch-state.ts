@@ -10,10 +10,10 @@ import type { FlakeLock, InputChange } from "./lock.ts";
  * branch alone, which commits need review and which inputs were held back.
  */
 export interface FixerTrailers {
+  readonly reverted: ReadonlyArray<string>;
+  readonly reviewRequired: boolean;
   readonly round: string;
   readonly session: string;
-  readonly reviewRequired: boolean;
-  readonly reverted: readonly string[];
 }
 
 export interface FixerCommitMessage {
@@ -84,10 +84,10 @@ export const parseFixerCommit = (
   return Option.some({
     subject: Str.replace("flake-fixer: ", "")(lines[0] ?? ""),
     trailers: {
+      reverted,
+      reviewRequired: trailers.get("Review") === "required",
       round,
       session: trailers.get("Session") ?? "",
-      reviewRequired: trailers.get("Review") === "required",
-      reverted,
     },
   });
 };
@@ -109,33 +109,33 @@ export const heldBackMarker = (main: FlakeLock, input: string): string =>
 /** What one run reads to derive the branch's state. */
 export interface Branch {
   /** Non-merge commits on the branch that main does not have, oldest first. */
-  readonly commits: readonly BranchCommit[];
+  readonly commits: ReadonlyArray<BranchCommit>;
   readonly head: FlakeLock;
-  readonly main: FlakeLock;
   /** Open issues labelled `automated`. */
-  readonly issues: readonly Issue[];
+  readonly issues: ReadonlyArray<Issue>;
+  readonly main: FlakeLock;
 }
 
 export interface HeldBack {
   readonly input: string;
+  readonly issue: Option.Option<string>;
   /** Subject of the Flake fixer commit that reverted it. */
   readonly reason: string;
-  readonly issue: Option.Option<string>;
 }
 
 /** A held-back issue whose input main has moved past since it was filed. */
 export interface LandedIssue {
-  readonly issue: Issue;
   readonly input: string;
+  readonly issue: Issue;
 }
 
 export interface BranchState {
-  readonly updated: readonly InputChange[];
-  readonly heldBack: readonly HeldBack[];
-  readonly fixerCommits: readonly FixerCommitMessage[];
+  readonly fixerCommits: ReadonlyArray<FixerCommitMessage>;
+  readonly heldBack: ReadonlyArray<HeldBack>;
+  readonly landed: ReadonlyArray<LandedIssue>;
   /** Some Flake fixer commit needs human review, so auto-merge is off. */
   readonly needsReview: boolean;
-  readonly landed: readonly LandedIssue[];
+  readonly updated: ReadonlyArray<InputChange>;
 }
 
 const landedIssue = (main: FlakeLock, issue: Issue) => {
@@ -146,14 +146,14 @@ const landedIssue = (main: FlakeLock, issue: Issue) => {
     entry === undefined ||
     entry === entryFingerprint(main, input)
     ? []
-    : [{ issue, input }];
+    : [{ input, issue }];
 };
 
 /** Held-back issues whose input main has moved past since they were filed. */
 export const landedIssues = (
   main: FlakeLock,
-  issues: readonly Issue[]
-): readonly LandedIssue[] =>
+  issues: ReadonlyArray<Issue>
+): ReadonlyArray<LandedIssue> =>
   Arr.flatMap(issues, (issue) => landedIssue(main, issue));
 
 // An input reverted in an earlier round stays held back only while the
@@ -161,7 +161,7 @@ export const landedIssues = (
 // retries it every run.
 const heldBackInputs = (
   branch: Branch,
-  fixerCommits: readonly FixerCommitMessage[]
+  fixerCommits: ReadonlyArray<FixerCommitMessage>
 ) => {
   const heldBack = new Map<string, HeldBack>();
 
@@ -179,8 +179,8 @@ const heldBackInputs = (
       if (sameRevision(branch.head, branch.main, input)) {
         heldBack.set(input, {
           input,
-          reason: commit.subject,
           issue: issueUrl(input),
+          reason: commit.subject,
         });
       }
     }
@@ -195,13 +195,13 @@ export const deriveBranchState = (branch: Branch): BranchState => {
   );
 
   return {
-    updated: changedInputs(branch.main, branch.head),
-    heldBack: heldBackInputs(branch, fixerCommits),
     fixerCommits,
+    heldBack: heldBackInputs(branch, fixerCommits),
+    landed: landedIssues(branch.main, branch.issues),
     needsReview: Arr.some(
       fixerCommits,
       (commit) => commit.trailers.reviewRequired
     ),
-    landed: landedIssues(branch.main, branch.issues),
+    updated: changedInputs(branch.main, branch.head),
   };
 };

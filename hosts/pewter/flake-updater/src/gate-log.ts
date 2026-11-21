@@ -20,16 +20,16 @@ const hostGroup = /^##\[group\]build (?<host>\S+)$/u;
 const storeHash = /\/nix\/store\/[0-9a-z]{32}-/gu;
 
 export interface FailureExcerpt {
+  /** Hosts whose `build <host>` section contained an error. */
+  readonly hosts: ReadonlyArray<string>;
   /** Error blocks grouped by job, deduplicated across hosts. */
   readonly text: string;
-  /** Hosts whose `build <host>` section contained an error. */
-  readonly hosts: readonly string[];
 }
 
 interface Block {
-  readonly job: string;
   readonly host: Option.Option<string>;
-  readonly lines: string[];
+  readonly job: string;
+  readonly lines: Array<string>;
 }
 
 interface LogLine {
@@ -53,8 +53,8 @@ const continues = (block: Block, line: LogLine) =>
   block.lines.length < maxBlockLines &&
   (line.text === "" || /^\s/u.test(line.text));
 
-const collectBlocks = (log: string): readonly Block[] => {
-  const blocks: Block[] = [];
+const collectBlocks = (log: string): ReadonlyArray<Block> => {
+  const blocks: Array<Block> = [];
   const groups = new Map<string, Option.Option<string>>();
   let open = Option.none<Block>();
 
@@ -73,8 +73,8 @@ const collectBlocks = (log: string): readonly Block[] => {
         groups.set(line.job, Option.none());
       } else if (Str.startsWith("error:")(line.text)) {
         const block: Block = {
-          job: line.job,
           host: groups.get(line.job) ?? Option.none(),
+          job: line.job,
           lines: [line.text],
         };
 
@@ -88,9 +88,9 @@ const collectBlocks = (log: string): readonly Block[] => {
 };
 
 interface Distinct {
-  readonly job: string;
   readonly error: string;
   readonly hosts: Set<string>;
+  readonly job: string;
 }
 
 export const trimGateLog = (log: string): FailureExcerpt => {
@@ -105,9 +105,9 @@ export const trimGateLog = (log: string): FailureExcerpt => {
     const key = `${block.job}\n${error}`;
 
     const entry = distinct.get(key) ?? {
-      job: block.job,
       error,
       hosts: new Set(),
+      job: block.job,
     };
 
     if (Option.isSome(block.host)) {
@@ -135,8 +135,8 @@ export const trimGateLog = (log: string): FailureExcerpt => {
   }
 
   return {
-    text: Str.trimEnd(text),
     hosts: Arr.sort([...hosts], Order.String),
+    text: Str.trimEnd(text),
   };
 };
 
@@ -146,7 +146,7 @@ export interface CheckFailure {
 }
 
 /** Failing checks as the agent and issues see them. */
-export const renderFailures = (failures: readonly CheckFailure[]): string =>
+export const renderFailures = (failures: ReadonlyArray<CheckFailure>): string =>
   Arr.join(
     Arr.map(failures, ({ check, excerpt }) => {
       const text =
@@ -163,13 +163,15 @@ export const renderFailures = (failures: readonly CheckFailure[]): string =>
 const repairableCheck = /^(?:build|checks) /u;
 
 export interface GateFailures {
-  readonly failures: readonly CheckFailure[];
+  readonly failures: ReadonlyArray<CheckFailure>;
   /** Names of failing checks outside the Build gate. */
-  readonly outsideGate: readonly string[];
+  readonly outsideGate: ReadonlyArray<string>;
 }
 
 /** A red verdict as a repair round sees it: trimmed to the Nix errors. */
-export const readFailures = (checks: readonly FailedCheck[]): GateFailures => ({
+export const readFailures = (
+  checks: ReadonlyArray<FailedCheck>
+): GateFailures => ({
   failures: Arr.map(checks, (check) => ({
     check,
     excerpt: trimGateLog(check.log),

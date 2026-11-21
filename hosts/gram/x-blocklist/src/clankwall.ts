@@ -27,10 +27,10 @@ export class Clankwall extends Context.Service<
 export const firstPage = "/api/accounts?flag=ai&limit=500";
 
 const Response = Schema.Struct({
-  next: Schema.NullOr(Schema.String),
   accounts: Schema.Array(
     Schema.Struct({ id: Schema.String, username: Schema.String })
   ),
+  next: Schema.NullOr(Schema.String),
 });
 
 const decodeResponse = Schema.decodeEffect(Schema.fromJsonString(Response));
@@ -42,16 +42,16 @@ export const decodeFlaggedPage = Effect.fn("decodeFlaggedPage")(function* (
   const response = yield* decodeResponse(body).pipe(
     Effect.mapError((cause) =>
       DecodeError.make({
-        message: "unexpected Clankwall response",
         cause,
+        message: "unexpected Clankwall response",
       })
     )
   );
 
   return {
     accounts: Arr.map(response.accounts, (entry) => ({
-      id: entry.id,
       handle: entry.username,
+      id: entry.id,
     })),
     next: Option.fromNullishOr(response.next),
   } satisfies AccountsPage;

@@ -16,7 +16,7 @@ const HostSystems = Schema.Record(Schema.String, Schema.String);
 const decodeSystems = Schema.decodeEffect(Schema.fromJsonString(HostSystems));
 
 const fail = (message: string) => (cause: unknown) =>
-  GateError.make({ message, cause });
+  GateError.make({ cause, message });
 
 // Same shape as `gh run view --log-failed`, so the trimmer attributes errors
 // to hosts the way it does for the real gate.
@@ -53,7 +53,7 @@ export const layer = Layer.effect(
         Effect.mapError(fail("listing hosts"))
       );
 
-      const sections: string[] = [];
+      const sections: Array<string> = [];
 
       for (const name of Arr.sort(Rec.keys(systems), Str.Order)) {
         yield* Effect.log(`evaluating ${name}`);
@@ -83,17 +83,17 @@ export const layer = Layer.effect(
 
       if (Arr.isReadonlyArrayNonEmpty(sections)) {
         failed.push({
+          log: asJobLog("build local", Arr.join(sections, "\n")),
           name: "build local",
           url: "(local evaluation)",
-          log: asJobLog("build local", Arr.join(sections, "\n")),
         });
       }
 
       if (checks.exitCode !== 0) {
         failed.push({
+          log: asJobLog("checks local", checks.stderr),
           name: "checks local",
           url: "(local evaluation)",
-          log: asJobLog("checks local", checks.stderr),
         });
       }
 

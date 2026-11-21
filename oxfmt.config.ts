@@ -4,8 +4,6 @@ export default defineConfig({
   ignorePatterns: [
     "*.md",
     "*.nix",
-    // vendored oxlint plugin: don't reformat third-party-owned source
-    "tools/oxlint/anti-slop/**",
     // captured CI and API output kept verbatim as test data
     "**/test/fixtures/**",
     "**/dist/**",

@@ -6,18 +6,18 @@ import type { PullRequest } from "./github.ts";
 export class GateError extends Schema.TaggedError<
   GateError,
   { readonly brand: unique symbol }
->()("GateError", { message: Schema.String, cause: Schema.Defect() }) {}
+>()("GateError", { cause: Schema.Defect(), message: Schema.String }) {}
 
 export interface FailedCheck {
-  readonly name: string;
-  readonly url: string;
   /** Raw failed-step log in `gh run view --log-failed` format. */
   readonly log: string;
+  readonly name: string;
+  readonly url: string;
 }
 
 /** The gate passed when no check failed. */
 export interface GateVerdict {
-  readonly failed: readonly FailedCheck[];
+  readonly failed: ReadonlyArray<FailedCheck>;
 }
 
 /** Waits for the Build gate's verdict on a pushed commit. */

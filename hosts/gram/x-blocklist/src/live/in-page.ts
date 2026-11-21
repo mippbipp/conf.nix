@@ -2,7 +2,7 @@
 // their source text. Effect isn't loaded there, so they may only use their
 // arguments and browser globals. browse calls each as (element, arg), and
 // element is unset for these calls.
-/* oxlint-disable effecttsgo/async-function, effecttsgo/global-fetch, effecttsgo/global-json, effecttsgo/prefer-effect-array, effecttsgo/prefer-effect-record, anti-slop/no-unknown-parameters, anti-slop/no-unknown-returns, anti-slop/no-runtime-typeof -- see above */
+/* oxlint-disable effecttsgo/async-function, effecttsgo/global-fetch, effecttsgo/global-json, effecttsgo/prefer-effect-array, effecttsgo/prefer-effect-record, quality/no-unknown-returns -- see above */
 
 declare const document: {
   readonly cookie: string;
@@ -10,12 +10,12 @@ declare const document: {
 };
 
 export interface PageRequest {
-  readonly url: string;
-  readonly method: "GET" | "POST";
   readonly bearer: string;
   readonly body: string | null;
+  readonly method: "GET" | "POST";
   /** Shrink a GraphQL response to the fields decodeBlockedPage reads. */
   readonly prune: boolean;
+  readonly url: string;
 }
 
 export interface PageResponse {
@@ -36,19 +36,19 @@ export const fetchInPage = async (
     /(?:^|; )ct0=(?<token>[^;]*)/u.exec(document.cookie)?.groups?.token ?? "";
 
   const response = await fetch(request.url, {
-    method: request.method,
+    body: request.body,
+    credentials: "include",
     headers: {
       authorization: `Bearer ${request.bearer}`,
-      "x-csrf-token": csrf,
-      "x-twitter-auth-type": "OAuth2Session",
-      "x-twitter-active-user": "yes",
       "content-type":
         request.method === "POST"
           ? "application/x-www-form-urlencoded"
           : "application/json",
+      "x-csrf-token": csrf,
+      "x-twitter-active-user": "yes",
+      "x-twitter-auth-type": "OAuth2Session",
     },
-    body: request.body,
-    credentials: "include",
+    method: request.method,
   });
 
   const text = await response.text();

@@ -9,7 +9,7 @@ Each package stays in the host or module directory whose Nix code runs it,
 rather than in the `apps/` and `packages/` layout of the sourdough template,
 and the `workspaces` field of the root `package.json` lists the packages by
 path. The packages share one `bun.lock`, one set of version catalogs (Effect
-is pinned once), and one oxlint, oxfmt and anti-slop setup at the root.
+is pinned once), and one oxlint and oxfmt setup at the root.
 Programs run on Bun, with `@effect/platform-bun` as the Effect platform.
 
 Nix never runs turbo. Each package's `package.nix` takes the workspace root

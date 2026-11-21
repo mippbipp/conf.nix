@@ -18,25 +18,25 @@ const branch = "flake-update";
 const remoteBranch = `origin/${branch}`;
 
 const fixerAuthor = {
-  GIT_AUTHOR_NAME: "flake-fixer",
   GIT_AUTHOR_EMAIL: "mippbipp+flake-fixer@users.noreply.github.com",
+  GIT_AUTHOR_NAME: "flake-fixer",
 };
 
 const lines = (text: string) =>
   Arr.filter(Str.split(Str.trim(text), "\n"), Str.isNonEmpty);
 
 const fail = (message: string) => (cause: unknown) =>
-  GitError.make({ message, cause });
+  GitError.make({ cause, message });
 
 // Hooks never run: the Updater's checkout does exactly what this file says
 // and nothing a commit could smuggle in.
-const withoutHooks = (rest: readonly string[]) => [
+const withoutHooks = (rest: ReadonlyArray<string>) => [
   "-c",
   "core.hooksPath=/dev/null",
   ...rest,
 ];
 
-const describe = (rest: readonly string[]) => `git ${Arr.join(rest, " ")}`;
+const describe = (rest: ReadonlyArray<string>) => `git ${Arr.join(rest, " ")}`;
 
 export const layer = Layer.effect(
   Git,
@@ -51,13 +51,13 @@ export const layer = Layer.effect(
     // user's Home Manager git config stays untouched. It sits inside .git,
     // where no commit can replace it.
     const env = {
-      GIT_CONFIG_GLOBAL: path.join(gitDir, "updater.gitconfig"),
       GH_TOKEN: Redacted.value(host.token),
+      GIT_CONFIG_GLOBAL: path.join(gitDir, "updater.gitconfig"),
       GIT_TERMINAL_PROMPT: "0",
     };
 
     const git = (
-      rest: readonly string[],
+      rest: ReadonlyArray<string>,
       extra: Readonly<Record<string, string>> = {}
     ) => {
       const options = { cwd: host.repoDir, env: { ...env, ...extra } };
@@ -68,14 +68,14 @@ export const layer = Layer.effect(
       );
     };
 
-    const gitStatus = (rest: readonly string[]) => {
+    const gitStatus = (rest: ReadonlyArray<string>) => {
       const options = { cwd: host.repoDir, env };
       const toError = fail(describe(rest));
 
       return exec("git", withoutHooks(rest), options).pipe(
         Effect.mapBoth({
-          onSuccess: (output) => output.exitCode,
           onFailure: toError,
+          onSuccess: (output) => output.exitCode,
         })
       );
     };
@@ -133,7 +133,7 @@ export const layer = Layer.effect(
       if (!continuing || !remoteExists) {
         yield* startFromMain;
 
-        return { mode: "fresh", dropped: [] } satisfies SyncOutcome;
+        return { dropped: [], mode: "fresh" } satisfies SyncOutcome;
       }
 
       yield* git(["checkout", "--force", "-B", branch, remoteBranch]);
@@ -148,7 +148,7 @@ export const layer = Layer.effect(
       ]);
 
       if (merged === 0) {
-        return { mode: "continued", dropped: [] } satisfies SyncOutcome;
+        return { dropped: [], mode: "continued" } satisfies SyncOutcome;
       }
 
       const unmerged = yield* git(["diff", "--name-only", "--diff-filter=U"]);
@@ -160,7 +160,7 @@ export const layer = Layer.effect(
         yield* git(["add", "flake.lock"]);
         yield* git(["commit", "--no-edit"]);
 
-        return { mode: "continued", dropped: [] } satisfies SyncOutcome;
+        return { dropped: [], mode: "continued" } satisfies SyncOutcome;
       }
 
       const revList = yield* git([
@@ -175,7 +175,7 @@ export const layer = Layer.effect(
       yield* git(["merge", "--abort"]);
       yield* startFromMain;
 
-      return { mode: "reset", dropped } satisfies SyncOutcome;
+      return { dropped, mode: "reset" } satisfies SyncOutcome;
     });
 
     const commitLock = Effect.fn("Git.commitLock")(function* (message: string) {
@@ -197,13 +197,16 @@ export const layer = Layer.effect(
       `${mainRef}..HEAD`,
     ]).pipe(
       Effect.map((output) =>
-        Arr.flatMap(Str.split(output, "\u001E"), (record): BranchCommit[] => {
-          const [sha, message] = Str.split(Str.trim(record), "\u001F");
+        Arr.flatMap(
+          Str.split(output, "\u001E"),
+          (record): Array<BranchCommit> => {
+            const [sha, message] = Str.split(Str.trim(record), "\u001F");
 
-          return sha === undefined || sha === "" || message === undefined
-            ? []
-            : [{ sha, message: Str.trim(message) }];
-        })
+            return sha === undefined || sha === "" || message === undefined
+              ? []
+              : [{ message: Str.trim(message), sha }];
+          }
+        )
       )
     );
 
@@ -310,7 +313,7 @@ export const layer = Layer.effect(
           : []
       );
 
-      return { tree, files, gitlinks: changedGitlinks };
+      return { files, gitlinks: changedGitlinks, tree };
     });
 
     const commitTree = Effect.fn("Git.commitTree")(function* (
@@ -330,19 +333,19 @@ export const layer = Layer.effect(
     });
 
     return Git.of({
-      prepare,
-      sync,
-      commitLock,
-      readLock: (rev) => git(["show", `${rev}:flake.lock`]),
-      head: git(["rev-parse", "HEAD"]).pipe(Effect.map(Str.trim)),
       branchCommits,
       changedFromMain: git(["diff", "--name-only", mainRef, "HEAD"]).pipe(
         Effect.map(lines)
       ),
-      push,
-      exportTree,
-      importTree,
+      commitLock,
       commitTree,
+      exportTree,
+      head: git(["rev-parse", "HEAD"]).pipe(Effect.map(Str.trim)),
+      importTree,
+      prepare,
+      push,
+      readLock: (rev) => git(["show", `${rev}:flake.lock`]),
+      sync,
     });
   })
 );

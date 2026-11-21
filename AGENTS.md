@@ -34,12 +34,32 @@ so `git add` new ones. Ask before running `nrs <host>` against any other host.
 
 ## TypeScript workspace
 
+This repo uses bun (`packageManager` in `package.json`). When a skill or doc
+says `npm`, `npx`, `pnpm` or `yarn`, use `bun` or `bunx` instead.
+
+Lint, format and typecheck with `bun run ox`; fix with `bun run ox:fix`.
+
 `bun.lock` changes must be committed together with the regenerated `bun.nix`.
 `bun install` regenerates it through the root `postinstall` when `bun2nix` is
 on `PATH` (`nix develop` provides it). Otherwise run `bun2nix -o bun.nix`.
 
+This repo uses Effect 4. Before writing any Effect code, read
+`node_modules/effect/AGENTS.md` **completely**, and follow the links in the
+file when required. For APIs the guide doesn't cover, search the source in
+`node_modules/effect/src`.
+
+Before changing `turbo.jsonc` or turbo commands, read `docs/README.md` in the
+installed `turbo` package (find it with
+`bun -p "require.resolve('turbo/package.json')"`), then the pages it points to.
+
 Use `agent-browser` for browser automation. Before the first use, run
 `agent-browser skills get core` and follow it.
+
+## GitHub Actions
+
+`.github/workflows/actions.lock` pins every action to a commit SHA, and the
+`actions-lock` Build gate job verifies it. After changing any `uses:` line, run
+`gh actions-lock` and commit the updated lockfile.
 
 ## Encrypted secrets
 

@@ -5,8 +5,8 @@ import { DecodeError } from "./decode-error.ts";
 
 const User = Schema.Struct({
   __typename: Schema.Literal("User"),
-  rest_id: Schema.String,
   core: Schema.Struct({ screen_name: Schema.String }),
+  rest_id: Schema.String,
 });
 
 // Suspended or deleted accounts can come back without a User result; they
@@ -53,8 +53,8 @@ const isItem = Schema.is(Item);
 const isCursor = Schema.is(Cursor);
 
 const toAccount = (user: typeof User.Type): Account => ({
-  id: user.rest_id,
   handle: user.core.screen_name,
+  id: user.rest_id,
 });
 
 const accountOf = (content: typeof Entry.Type.content) =>
@@ -69,8 +69,8 @@ export const decodeBlockedPage = Effect.fn("decodeBlockedPage")(function* (
   const response = yield* decodeResponse(body).pipe(
     Effect.mapError((cause) =>
       DecodeError.make({
-        message: "unexpected BlockedAccountsAll response",
         cause,
+        message: "unexpected BlockedAccountsAll response",
       })
     )
   );

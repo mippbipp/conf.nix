@@ -41,8 +41,8 @@ const decodeChangeBody = Schema.decodeUnknownOption(
 
 const BlockedVariables = Schema.Struct({
   count: Schema.Finite,
-  includePromotedContent: Schema.Boolean,
   cursor: Schema.optionalKey(Schema.String),
+  includePromotedContent: Schema.Boolean,
 });
 
 const encodeVariables = Schema.encodeEffect(
@@ -77,8 +77,8 @@ const openSession = Effect.fn("XSessionLive.openSession")(function* () {
 
   yield* network({
     action: "start",
-    urlFilter: "/BlockedAccountsAll?",
     bodies: false,
+    urlFilter: "/BlockedAccountsAll?",
   }).pipe(Effect.mapError(failed("could not watch the X tab's requests")));
 
   yield* browse
@@ -90,8 +90,8 @@ const openSession = Effect.fn("XSessionLive.openSession")(function* () {
     Effect.flatMap(decodeJson(Capture)),
     Effect.repeat({
       schedule: Schedule.spaced("500 millis"),
-      until: (capture) => capture.entryCount > 0,
       times: 30,
+      until: (capture) => capture.entryCount > 0,
     }),
     Effect.ignore
   );
@@ -109,7 +109,7 @@ const openSession = Effect.fn("XSessionLive.openSession")(function* () {
   );
 
   const bearer = yield* browse
-    .call("eval", { tab, expression: String(findBearer) })
+    .call("eval", { expression: String(findBearer), tab })
     .pipe(
       Effect.flatMap(decodeBearer),
       Effect.mapError(failed("could not read X's bearer token")),
@@ -123,44 +123,45 @@ const openSession = Effect.fn("XSessionLive.openSession")(function* () {
   const call = (request: Omit<PageRequest, "bearer">, what: string) =>
     browse
       .call("eval", {
-        tab,
-        expression: String(fetchInPage),
         arg: { ...request, bearer },
+        expression: String(fetchInPage),
+        tab,
       })
       .pipe(
         Effect.flatMap(decodeResponse),
         Effect.mapError(failed(`${what} request failed`))
       );
 
-  return { template: template.request.url, call };
+  return { call, template: template.request.url };
 });
 
 export const layer = Layer.effect(
   XSession,
   Effect.gen(function* () {
-    const { template, call } = yield* openSession();
+    const { call, template } = yield* openSession();
 
     const change = (path: string, what: string) => (account: Account) =>
       Effect.map(
         call(
           {
-            url: `https://x.com/i/api/1.1/blocks/${path}.json`,
-            method: "POST",
             body: `user_id=${encodeURIComponent(account.id)}`,
+            method: "POST",
             prune: false,
+            url: `https://x.com/i/api/1.1/blocks/${path}.json`,
           },
           what
         ),
         (response) => ({
-          status: response.status,
           id: Option.map(
             decodeChangeBody(response.text),
             (body) => body.id_str
           ),
+          status: response.status,
         })
       );
 
     return XSession.of({
+      block: change("create", "block"),
       blockedPage: Effect.fn("XSessionLive.blockedPage")(function* (cursor) {
         const variables = yield* encodeVariables({
           count: 100,
@@ -176,7 +177,7 @@ export const layer = Layer.effect(
         url.searchParams.set("variables", variables);
 
         const response = yield* call(
-          { url: url.toString(), method: "GET", body: null, prune: true },
+          { body: null, method: "GET", prune: true, url: url.toString() },
           "BlockedAccountsAll"
         );
 
@@ -189,7 +190,6 @@ export const layer = Layer.effect(
 
         return yield* decodeBlockedPage(response.text);
       }),
-      block: change("create", "block"),
       unblock: change("destroy", "unblock"),
     });
   })

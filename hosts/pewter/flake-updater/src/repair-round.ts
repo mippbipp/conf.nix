@@ -19,40 +19,40 @@ import type { FlakeLock } from "./lock.ts";
 import { isBlocked } from "./scope.ts";
 
 export interface RoundRequest {
-  readonly pr: PullRequest;
-  readonly round: number;
-  readonly main: FlakeLock;
-  readonly failures: readonly CheckFailure[];
-  /** Continue this Flake fixer session; the first round opens one. */
-  readonly session: Option.Option<string>;
+  readonly failures: ReadonlyArray<CheckFailure>;
   /** Why the previous round was discarded, if it was. */
   readonly feedback: Option.Option<string>;
+  readonly main: FlakeLock;
+  readonly pr: PullRequest;
+  readonly round: number;
+  /** Continue this Flake fixer session; the first round opens one. */
+  readonly session: Option.Option<string>;
 }
 
 export type RoundOutcome = Data.TaggedEnum<{
+  AgentFailed: { readonly error: AgentError };
   /** Committed on top of the branch and pushed. */
   Committed: {
-    readonly sha: string;
-    readonly session: string;
-    readonly summary: string;
-    readonly reviewRequired: boolean;
     /** Inputs now held back at main's revision. */
-    readonly reverted: readonly string[];
+    readonly reverted: ReadonlyArray<string>;
+    readonly reviewRequired: boolean;
+    readonly session: string;
+    readonly sha: string;
+    readonly summary: string;
   };
   /** Nothing committed; the reason goes into the next round's prompt. */
   Discarded: { readonly reason: string; readonly session: string };
-  GaveUp: { readonly summary: string; readonly session: string };
-  AgentFailed: { readonly error: AgentError };
+  GaveUp: { readonly session: string; readonly summary: string };
 }>;
 
 export const roundOutcome = Data.taggedEnum<RoundOutcome>();
 
 export type CommittedRound = Data.TaggedEnum.Value<RoundOutcome, "Committed">;
 
-const sorted = (paths: readonly string[]) =>
+const sorted = (paths: ReadonlyArray<string>) =>
   Arr.join(Arr.sort(paths, Order.String), ", ");
 
-const withoutLock = (paths: readonly string[]) =>
+const withoutLock = (paths: ReadonlyArray<string>) =>
   Arr.filter(paths, (path) => path !== "flake.lock");
 
 /**
@@ -140,10 +140,10 @@ const commitRound = Effect.fn("RepairRound.commitRound")(function* (
   const sha = yield* git.commitTree(
     imported.tree,
     formatFixerCommit(report.summary, {
+      reverted: change.reverted,
+      reviewRequired,
       round: `${request.round}`,
       session,
-      reviewRequired,
-      reverted: change.reverted,
     })
   );
 
@@ -154,11 +154,11 @@ const commitRound = Effect.fn("RepairRound.commitRound")(function* (
   yield* git.push(false);
 
   return roundOutcome.Committed({
-    sha,
-    session,
-    summary: report.summary,
-    reviewRequired,
     reverted: change.reverted,
+    reviewRequired,
+    session,
+    sha,
+    summary: report.summary,
   });
 });
 
@@ -177,14 +177,14 @@ export const repairRound = Effect.fn("RepairRound.run")(function* (
 
   const attempt = yield* Effect.result(
     agent.repair({
+      changes: describeChanges(request.main, before),
+      failures: renderFailures(request.failures),
+      feedback: request.feedback,
+      mainLock: formatLock(request.main),
+      pr: request.pr.number,
+      round: request.round,
       session: request.session,
       title: `flake-update #${request.pr.number}`,
-      round: request.round,
-      pr: request.pr.number,
-      failures: renderFailures(request.failures),
-      changes: describeChanges(request.main, before),
-      mainLock: formatLock(request.main),
-      feedback: request.feedback,
     })
   );
 
@@ -196,8 +196,8 @@ export const repairRound = Effect.fn("RepairRound.run")(function* (
 
   if (repaired.report.outcome === "gave-up") {
     return roundOutcome.GaveUp({
-      summary: repaired.report.summary,
       session: repaired.session,
+      summary: repaired.report.summary,
     });
   }
 

@@ -7,7 +7,7 @@ import blockedPaths from "../blocked-paths.json" with { type: "json" };
  * `flake-update-scope` workflow and the policies in opencode-config.nix read
  * the same file.
  */
-const { prefixes, files, substrings } = blockedPaths;
+const { files, prefixes, substrings } = blockedPaths;
 
 export const isBlocked = (path: string): boolean =>
   Arr.contains(files, path) ||
@@ -15,14 +15,14 @@ export const isBlocked = (path: string): boolean =>
   Arr.some(substrings, (substring) => Str.includes(substring)(path));
 
 /** Every entry, for telling the agent what it may not change. */
-export const blockedEntries: readonly string[] = [
+export const blockedEntries: ReadonlyArray<string> = [
   ...prefixes,
   ...files,
   ...substrings,
 ];
 
 /** The same list as opencode permission globs. */
-export const blockedGlobs: readonly string[] = [
+export const blockedGlobs: ReadonlyArray<string> = [
   ...Arr.map(prefixes, (prefix) => `${prefix}*`),
   ...files,
   ...Arr.map(substrings, (substring) => `*${substring}*`),

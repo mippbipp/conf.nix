@@ -21,8 +21,8 @@ describe("blockedAccountsAll decoding", () => {
       const page = yield* decodeBlockedPage(body);
 
       assert.deepStrictEqual(page.accounts, [
-        { id: "2117395986658025472", handle: "getradaria" },
-        { id: "2116792142949421056", handle: "packleaderseo" },
+        { handle: "getradaria", id: "2117395986658025472" },
+        { handle: "packleaderseo", id: "2116792142949421056" },
       ]);
       assert.isTrue(Option.isSome(page.next));
     })
@@ -80,8 +80,8 @@ describe("clankwall decoding", () => {
       const page = yield* decodeFlaggedPage(body);
 
       assert.deepStrictEqual(page.accounts, [
-        { id: "1992461", handle: "fishjar" },
-        { id: "18010811", handle: "neiljesani" },
+        { handle: "fishjar", id: "1992461" },
+        { handle: "neiljesani", id: "18010811" },
       ]);
       assert.deepStrictEqual(
         page.next,
@@ -95,7 +95,7 @@ describe("clankwall decoding", () => {
   it.effect("ends at a page with no next link", () =>
     Effect.gen(function* () {
       const page = yield* decodeFlaggedPage(
-        toJson({ next: null, accounts: [] })
+        toJson({ accounts: [], next: null })
       );
 
       assert.deepStrictEqual(page.next, Option.none());

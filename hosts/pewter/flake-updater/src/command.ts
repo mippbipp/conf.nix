@@ -30,16 +30,16 @@ export interface CommandOptions {
 }
 
 export interface CommandOutput {
-  readonly stdout: string;
-  readonly stderr: string;
   readonly exitCode: number;
+  readonly stderr: string;
+  readonly stdout: string;
 }
 
 const collect = (
   stream: Stream.Stream<Uint8Array, PlatformError.PlatformError>
 ) => Stream.mkString(Stream.decodeText(stream));
 
-const describe = (command: string, args: readonly string[]) =>
+const describe = (command: string, args: ReadonlyArray<string>) =>
   Arr.join([command, ...args], " ");
 
 /** Child processes for the live layers. */
@@ -49,13 +49,13 @@ export class Shell extends Context.Service<
     /** Runs a command to completion, whatever its exit code. */
     readonly exec: (
       command: string,
-      args: readonly string[],
+      args: ReadonlyArray<string>,
       options?: CommandOptions
     ) => Effect.Effect<CommandOutput, CommandError>;
     /** Runs a command and fails unless it exits 0; returns stdout. */
     readonly run: (
       command: string,
-      args: readonly string[],
+      args: ReadonlyArray<string>,
       options?: CommandOptions
     ) => Effect.Effect<string, CommandError>;
   }
@@ -68,7 +68,7 @@ export class Shell extends Context.Service<
       const exec = Effect.fn("Shell.exec")(
         function* (
           command: string,
-          args: readonly string[],
+          args: ReadonlyArray<string>,
           options: CommandOptions = {}
         ) {
           const handle = yield* spawner.spawn(
@@ -85,7 +85,7 @@ export class Shell extends Context.Service<
             { concurrency: "unbounded" }
           );
 
-          return { stdout, stderr, exitCode: Number(exitCode) };
+          return { exitCode: Number(exitCode), stderr, stdout };
         },
         Effect.scoped,
         Effect.mapError((cause) =>
@@ -99,7 +99,7 @@ export class Shell extends Context.Service<
 
       const run = Effect.fn("Shell.run")(function* (
         command: string,
-        args: readonly string[],
+        args: ReadonlyArray<string>,
         options: CommandOptions = {}
       ) {
         const output = yield* exec(command, args, options);

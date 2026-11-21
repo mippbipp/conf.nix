@@ -6,8 +6,8 @@ import { FetchHttpClient } from "effect/http";
 import { run } from "./blocklist.ts";
 import type { Report } from "./blocklist.ts";
 import { Browse } from "./browse.ts";
-import * as ClankwallLive from "./live/clankwall.ts";
-import * as XSessionLive from "./live/x-session.ts";
+import { layer as clankwallLayer } from "./live/clankwall.ts";
+import { layer as xSessionLayer } from "./live/x-session.ts";
 import { Settings } from "./settings.ts";
 
 const flags = {
@@ -36,13 +36,13 @@ const sync = Command.make(
       Settings,
       Settings.of({
         dryRun: options.dryRun,
-        pause: { min: 4000, max: 7000 },
+        pause: { max: 7000, min: 4000 },
       })
     );
 
     const live = Layer.mergeAll(
-      XSessionLive.layer.pipe(Layer.provide(Browse.layer)),
-      ClankwallLive.layer.pipe(Layer.provide(FetchHttpClient.layer))
+      xSessionLayer.pipe(Layer.provide(Browse.layer)),
+      clankwallLayer.pipe(Layer.provide(FetchHttpClient.layer))
     );
 
     const report = yield* run().pipe(

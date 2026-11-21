@@ -22,12 +22,12 @@ jobs:
             runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           persist-credentials: false
 
       - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@main
+        uses: DeterminateSystems/determinate-nix-action@v3.24.2
 
       - name: Install Attic client
         run: nix profile install nixpkgs#attic-client
@@ -79,6 +79,26 @@ jobs:
           done
           exit $status
 
+  # Fails when .github/workflows/actions.lock is out of sync with the
+  # workflows or a locked pin no longer verifies upstream. Run
+  # `gh actions-lock` after changing any `uses:` line.
+  actions-lock:
+    name: actions-lock
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Verify the actions lockfile
+        run: |
+          gh extension install github/gh-actions-lock --pin v0.4.1
+          gh actions-lock --verify
+
   checks:
     name: checks ${{ matrix.system }}
     runs-on: ${{ matrix.runs-on }}
@@ -96,14 +116,14 @@ jobs:
         run: git config --global url."https://github.com/".insteadOf "git@github.com:"
 
       - name: Checkout repo
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7.0.1
         with:
           # No check reads submodule content, so submodules stay uninitialized here.
           submodules: false
           persist-credentials: false
 
       - name: Install Nix
-        uses: DeterminateSystems/determinate-nix-action@main
+        uses: DeterminateSystems/determinate-nix-action@v3.24.2
 
       - name: Build flake checks
         env:

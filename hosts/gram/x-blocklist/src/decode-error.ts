@@ -4,4 +4,4 @@ import { Schema } from "effect";
 export class DecodeError extends Schema.TaggedError<
   DecodeError,
   { readonly brand: unique symbol }
->()("DecodeError", { message: Schema.String, cause: Schema.Defect() }) {}
+>()("DecodeError", { cause: Schema.Defect(), message: Schema.String }) {}

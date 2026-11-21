@@ -19,18 +19,20 @@
         "effect": "4.1.0"
       },
       "tooling": {
-        "@effect/tsgo": "^0.67.4",
-        "@oxlint/plugins": "~1.91.0",
-        "oxfmt": "~0.76.0",
-        "oxlint": "~1.91.0",
-        "oxlint-tsgolint": "^7.0.2006",
-        "turbo": "^2.11.10"
+        "@effect/tsgo": "^0.70.0",
+        "@nkzw/oxlint-config": "3.0.0",
+        "@oxlint/plugins": "~1.94.0",
+        "oxfmt": "~0.78.0",
+        "oxlint": "~1.94.0",
+        "oxlint-tsgolint": "7.0.2007",
+        "tsrs": "0.25.0-ts7.1.0-beta",
+        "turbo": "^2.11.11"
       }
     }
   },
   "type": "module",
   "scripts": {
-    "prepare": "effect-tsgo patch --oxlint",
+    "prepare": "effect-tsgo patch --oxlint --tsrs",
     "postinstall": "command -v bun2nix >/dev/null || exit 0; bun2nix -o bun.nix",
     "build": "turbo run build",
     "test": "turbo run test",
@@ -39,12 +41,14 @@
   },
   "devDependencies": {
     "@effect/tsgo": "catalog:tooling",
+    "@nkzw/oxlint-config": "catalog:tooling",
     "@oxlint/plugins": "catalog:tooling",
     "@types/bun": "catalog:",
     "effect": "catalog:effect",
     "oxfmt": "catalog:tooling",
     "oxlint": "catalog:tooling",
     "oxlint-tsgolint": "catalog:tooling",
+    "tsrs": "catalog:tooling",
     "turbo": "catalog:tooling",
     "typescript": "catalog:"
   },

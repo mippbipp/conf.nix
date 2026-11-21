@@ -64,8 +64,8 @@ export type AgentStep = (
 
 export interface IssueEvent {
   readonly action: "create" | "comment" | "close";
-  readonly title: string;
   readonly body: string;
+  readonly title: string;
 }
 
 /** Everything the fake services read and record, inspected by tests. */
@@ -75,24 +75,24 @@ export class World {
   public working: Tree = new Map(this.main);
   public workspace: Tree = new Map();
   public readonly trees = new Map<string, Tree>();
-  public commits: BranchCommit[] = [];
+  public commits: Array<BranchCommit> = [];
   public sync: Option.Option<SyncOutcome> = Option.none();
   /** flake.lock as `nix flake update` would write it. */
   public updatedLock: Option.Option<string> = Option.none();
-  public readonly pushes: { replace: boolean; sha: string }[] = [];
+  public readonly pushes: Array<{ replace: boolean; sha: string }> = [];
   public pr: Option.Option<PullRequest> = Option.none();
-  public readonly createdPrs: { title: string; body: string }[] = [];
-  public readonly prUpdates: PullRequestUpdate[] = [];
-  public issues: Issue[] = [];
-  public readonly issueEvents: IssueEvent[] = [];
-  public readonly gate: GateVerdict[] = [];
-  public readonly verdicts: string[] = [];
-  public readonly agent: AgentStep[] = [];
-  public readonly repairRequests: RepairRequest[] = [];
+  public readonly createdPrs: Array<{ body: string; title: string }> = [];
+  public readonly prUpdates: Array<PullRequestUpdate> = [];
+  public issues: Array<Issue> = [];
+  public readonly issueEvents: Array<IssueEvent> = [];
+  public readonly gate: Array<GateVerdict> = [];
+  public readonly verdicts: Array<string> = [];
+  public readonly agent: Array<AgentStep> = [];
+  public readonly repairRequests: Array<RepairRequest> = [];
   /** Directories exportTree and importTree were given, in order. */
-  public readonly workspaceDirs: string[] = [];
+  public readonly workspaceDirs: Array<string> = [];
   /** Ordered pushes and review holds, to check which came first. */
-  public readonly timeline: string[] = [];
+  public readonly timeline: Array<string> = [];
   public holdFails = false;
   public agentEnabled = true;
   public gateHangs = false;
@@ -149,12 +149,58 @@ const gitlinkPaths = (a: Tree, b: Tree) =>
 
 const gitLayer = (world: World) =>
   Layer.succeed(Git)({
+    branchCommits: Effect.sync(() => [...world.commits]),
+    changedFromMain: Effect.sync(() => diffPaths(world.main, world.head)),
+    commitLock: (message) =>
+      Effect.sync(() => {
+        if (world.working.get("flake.lock") === world.head.get("flake.lock")) {
+          return false;
+        }
+
+        world.head = new Map(world.working);
+        world.commits.push({ message, sha: world.next("c") });
+
+        return true;
+      }),
+    commitTree: (tree, message) =>
+      Effect.sync(() => {
+        world.head = new Map(world.trees.get(tree));
+        const sha = world.next("c");
+        world.commits.push({ message, sha });
+
+        return sha;
+      }),
+    exportTree: (dir) =>
+      Effect.sync(() => {
+        world.workspaceDirs.push(dir);
+        world.workspace = new Map(world.head);
+      }),
+    head: Effect.sync(() => world.sha()),
+    importTree: (dir, lock) =>
+      Effect.sync(() => {
+        world.workspaceDirs.push(dir);
+        const tree = new Map([...world.workspace, ["flake.lock", lock]]);
+        const id = world.next("t");
+        world.trees.set(id, tree);
+
+        return {
+          files: diffPaths(world.head, tree),
+          gitlinks: gitlinkPaths(world.head, tree),
+          tree: id,
+        };
+      }),
     prepare: Effect.void,
+    push: (replace) =>
+      Effect.sync(() => {
+        world.pushes.push({ replace, sha: world.sha() });
+        world.timeline.push(`push ${world.sha()}`);
+      }),
+    readLock: (rev) => readLock(world, rev),
     sync: (continuing) =>
       Effect.sync(() => {
         const outcome = Option.getOrElse(world.sync, (): SyncOutcome => ({
-          mode: continuing ? "continued" : "fresh",
           dropped: [],
+          mode: continuing ? "continued" : "fresh",
         }));
 
         if (outcome.mode !== "continued") {
@@ -166,106 +212,60 @@ const gitLayer = (world: World) =>
 
         return outcome;
       }),
-    commitLock: (message) =>
-      Effect.sync(() => {
-        if (world.working.get("flake.lock") === world.head.get("flake.lock")) {
-          return false;
-        }
-
-        world.head = new Map(world.working);
-        world.commits.push({ sha: world.next("c"), message });
-
-        return true;
-      }),
-    readLock: (rev) => readLock(world, rev),
-    head: Effect.sync(() => world.sha()),
-    branchCommits: Effect.sync(() => [...world.commits]),
-    changedFromMain: Effect.sync(() => diffPaths(world.main, world.head)),
-    push: (replace) =>
-      Effect.sync(() => {
-        world.pushes.push({ replace, sha: world.sha() });
-        world.timeline.push(`push ${world.sha()}`);
-      }),
-    exportTree: (dir) =>
-      Effect.sync(() => {
-        world.workspaceDirs.push(dir);
-        world.workspace = new Map(world.head);
-      }),
-    importTree: (dir, lock) =>
-      Effect.sync(() => {
-        world.workspaceDirs.push(dir);
-        const tree = new Map([...world.workspace, ["flake.lock", lock]]);
-        const id = world.next("t");
-        world.trees.set(id, tree);
-
-        return {
-          tree: id,
-          files: diffPaths(world.head, tree),
-          gitlinks: gitlinkPaths(world.head, tree),
-        };
-      }),
-    commitTree: (tree, message) =>
-      Effect.sync(() => {
-        world.head = new Map(world.trees.get(tree));
-        const sha = world.next("c");
-        world.commits.push({ sha, message });
-
-        return sha;
-      }),
   });
 
 const githubLayer = (world: World) =>
   Layer.succeed(GitHub)({
-    openPr: Effect.sync(() => world.pr),
-    createPr: (title, body) =>
-      Effect.sync(() => {
-        const pr = { number: 42, url: "https://github.test/pull/42" };
-        world.pr = Option.some(pr);
-        world.createdPrs.push({ title, body });
-
-        return pr;
-      }),
-    updatePr: (_pr, update) =>
-      Effect.sync(() => {
-        world.prUpdates.push(update);
-      }),
-    holdForReview: (pr) =>
-      world.holdFails
-        ? Effect.fail(
-            GitHubError.make({ message: "auto-merge stayed on", cause: null })
-          )
-        : Effect.sync(() => {
-            world.timeline.push(`hold #${pr.number}`);
-          }),
-    openIssues: Effect.sync(() => [...world.issues]),
-    createIssue: (title, body) =>
-      Effect.sync(() => {
-        const number = 100 + world.issueEvents.length;
-
-        const issue = {
-          number,
-          title,
-          body,
-          url: `https://github.test/issues/${number}`,
-        };
-
-        world.issues.push(issue);
-        world.issueEvents.push({ action: "create", title, body });
-
-        return issue;
-      }),
-    commentIssue: (issue, body) =>
-      Effect.sync(() => {
-        world.issueEvents.push({ action: "comment", title: issue.title, body });
-      }),
     closeIssue: (issue, comment) =>
       Effect.sync(() => {
         world.issues = Arr.filter(world.issues, (open) => open !== issue);
         world.issueEvents.push({
           action: "close",
-          title: issue.title,
           body: comment,
+          title: issue.title,
         });
+      }),
+    commentIssue: (issue, body) =>
+      Effect.sync(() => {
+        world.issueEvents.push({ action: "comment", body, title: issue.title });
+      }),
+    createIssue: (title, body) =>
+      Effect.sync(() => {
+        const number = 100 + world.issueEvents.length;
+
+        const issue = {
+          body,
+          number,
+          title,
+          url: `https://github.test/issues/${number}`,
+        };
+
+        world.issues.push(issue);
+        world.issueEvents.push({ action: "create", body, title });
+
+        return issue;
+      }),
+    createPr: (title, body) =>
+      Effect.sync(() => {
+        const pr = { number: 42, url: "https://github.test/pull/42" };
+        world.pr = Option.some(pr);
+        world.createdPrs.push({ body, title });
+
+        return pr;
+      }),
+    holdForReview: (pr) =>
+      world.holdFails
+        ? Effect.fail(
+            GitHubError.make({ cause: null, message: "auto-merge stayed on" })
+          )
+        : Effect.sync(() => {
+            world.timeline.push(`hold #${pr.number}`);
+          }),
+    openIssues: Effect.sync(() => [...world.issues]),
+    openPr: Effect.sync(() => world.pr),
+    updatePr: (_pr, update) =>
+      Effect.sync(() => {
+        world.prUpdates.push(update);
       }),
   });
 
@@ -294,7 +294,6 @@ export const fixerWorkspace = "/var/lib/flake-fixer/work";
 
 const agentLayer = (world: World) =>
   Layer.succeed(Agent)({
-    workspace: fixerWorkspace,
     repair: (request) =>
       Effect.suspend(() => {
         world.repairRequests.push(request);
@@ -303,19 +302,20 @@ const agentLayer = (world: World) =>
         if (step === undefined) {
           return Effect.fail(
             AgentError.make({
-              reason: "failed",
               message: "test agent has no step left",
+              reason: "failed",
             })
           );
         }
 
         return step(request, world.workspace);
       }),
+    workspace: fixerWorkspace,
   });
 
 export const settings = {
-  maxRounds: 3,
   deadline: Duration.hours(11),
+  maxRounds: 3,
   model: "opencode/deepseek-v4.1-flash-free",
   sessionUrl: "https://pewter.test:8444",
 };
@@ -342,9 +342,9 @@ export const edits =
   (
     files: Readonly<Record<string, string>>,
     report: Partial<{
+      filesChanged: ReadonlyArray<string>;
       outcome: "fixed" | "reverted" | "gave-up";
-      revertedInputs: readonly string[];
-      filesChanged: readonly string[];
+      revertedInputs: ReadonlyArray<string>;
       summary: string;
     }> = {}
   ): AgentStep =>
@@ -355,16 +355,16 @@ export const edits =
       }
 
       return {
-        session: Option.getOrElse(request.session, () => "ses_test"),
         report: RepairReport.make({
+          filesChanged: report.filesChanged ?? Rec.keys(files),
           outcome: report.outcome ?? "fixed",
           revertedInputs: report.revertedInputs ?? [],
-          filesChanged: report.filesChanged ?? Rec.keys(files),
           summary: report.summary ?? "fix the build",
         }),
+        session: Option.getOrElse(request.session, () => "ses_test"),
       };
     });
 
 export const failed = (name: string, log: string): GateVerdict => ({
-  failed: [{ name, url: `https://github.test/job/${name}`, log }],
+  failed: [{ log, name, url: `https://github.test/job/${name}` }],
 });

@@ -53,34 +53,34 @@ const nestedLock = (rev: string, nestedRev: string) =>
 const bareLock = (rev: string) =>
   FlakeLock.make({
     nodes: {
+      root: { inputs: { tool: "tool" } },
       tool: {
         locked: { owner: "upstream", repo: "tool", rev, type: "github" },
         original: { owner: "upstream", repo: "tool", type: "github" },
       },
-      root: { inputs: { tool: "tool" } },
     },
     root: "root",
     version: 7,
   });
 
 const heldBackIssue = (main: FlakeLock, input: string): Issue => ({
+  body: `${heldBackMarker(main, input)}\nThe Flake fixer reverted it.`,
   number: 5,
   title: heldBackTitle(input),
-  body: `${heldBackMarker(main, input)}\nThe Flake fixer reverted it.`,
   url: "https://github.test/issues/5",
 });
 
 const fixerCommit = (
   sha: string,
   summary: string,
-  trailers: { reviewRequired: boolean; reverted: readonly string[] }
+  trailers: { reverted: ReadonlyArray<string>; reviewRequired: boolean }
 ): BranchCommit => ({
-  sha,
   message: formatFixerCommit(summary, {
     round: "1",
     session: "ses_old",
     ...trailers,
   }),
+  sha,
 });
 
 const landedTitles = (state: ReturnType<typeof deriveBranchState>) =>
@@ -90,10 +90,10 @@ describe("branch state", () => {
   it.effect("parses the trailers it formats", () =>
     Effect.sync(() => {
       const trailers = {
+        reverted: ["home-manager", "nixpkgs"],
+        reviewRequired: true,
         round: "2",
         session: "ses_abc",
-        reviewRequired: true,
-        reverted: ["home-manager", "nixpkgs"],
       };
 
       const message = formatFixerCommit(
@@ -114,14 +114,14 @@ describe("branch state", () => {
 
       const commits = [
         fixerCommit("c2", "nixos-hardware breaks gram", {
-          reviewRequired: false,
           reverted: ["nixos-hardware"],
+          reviewRequired: false,
         }),
       ];
 
       const issues = [heldBackIssue(main, "nixos-hardware")];
 
-      const held = deriveBranchState({ commits, head: main, main, issues });
+      const held = deriveBranchState({ commits, head: main, issues, main });
 
       assert.deepStrictEqual(
         Arr.map(held.heldBack, (input) => input.input),
@@ -134,8 +134,8 @@ describe("branch state", () => {
       const landed = deriveBranchState({
         commits,
         head: main,
-        main: moved,
         issues,
+        main: moved,
       });
 
       assert.deepStrictEqual(landed.heldBack, []);
@@ -165,8 +165,8 @@ describe("branch state", () => {
           deriveBranchState({
             commits: [],
             head: bareLock("aaaaaaa"),
-            main,
             issues,
+            main,
           })
         );
 
@@ -184,17 +184,17 @@ describe("branch state", () => {
       const state = deriveBranchState({
         commits: [
           fixerCommit("c1", "nixpkgs breaks gram", {
-            reviewRequired: false,
             reverted: ["nixpkgs"],
+            reviewRequired: false,
           }),
           fixerCommit("c2", "nixpkgs breaks every host", {
-            reviewRequired: false,
             reverted: ["nixpkgs"],
+            reviewRequired: false,
           }),
         ],
         head: main,
-        main,
         issues: [],
+        main,
       });
 
       assert.deepStrictEqual(
@@ -214,27 +214,27 @@ describe("branch state", () => {
 
         const state = deriveBranchState({
           commits: [
-            { sha: "c1", message: "up" },
+            { message: "up", sha: "c1" },
             fixerCommit("c2", "drop removed boot.initrd options", {
-              reviewRequired: true,
               reverted: [],
+              reviewRequired: true,
             }),
             fixerCommit("c3", "nixpkgs breaks every host", {
-              reviewRequired: false,
               reverted: ["nixpkgs"],
+              reviewRequired: false,
             }),
           ],
           head,
-          main,
           issues: [issue],
+          main,
         });
 
         assert.isTrue(state.needsReview);
         assert.deepStrictEqual(state.heldBack, [
           {
             input: "nixpkgs",
-            reason: "nixpkgs breaks every host",
             issue: Option.some(issue.url),
+            reason: "nixpkgs breaks every host",
           },
         ]);
         assert.deepStrictEqual(

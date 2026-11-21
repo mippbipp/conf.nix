@@ -13,15 +13,15 @@ export const toJson = (value: Schema.Json): string =>
   JSON.stringify(value);
 
 export const account = (handle: string): Account => ({
-  id: `id-${handle}`,
   handle,
+  id: `id-${handle}`,
 });
 
 const pageSize = 100;
 
 // Cursors are `cursor-<offset>`, as paged builds them.
 const paged = (
-  accounts: readonly Account[],
+  accounts: ReadonlyArray<Account>,
   cursor: Option.Option<string>
 ): AccountsPage => {
   const start = Option.match(cursor, {
@@ -38,26 +38,26 @@ const paged = (
 };
 
 export interface FakeRequest {
-  readonly kind: "block" | "unblock";
   readonly handle: string;
+  readonly kind: "block" | "unblock";
 }
 
 /** The fake X: the account's blocked list, and every change it was asked for. */
 export class FakeX {
-  public readonly blocked: Account[];
+  public readonly blocked: Array<Account>;
   /** Status X answers a block or unblock with, per handle; 200 when absent. */
   public readonly status = new Map<string, number>();
   /** Account X names in a successful response, per requested handle. */
   public readonly answeredAs = new Map<string, Account>();
-  public readonly requests: FakeRequest[] = [];
+  public readonly requests: Array<FakeRequest> = [];
   public blockedStatus = 200;
   public pageReads = 0;
 
-  public constructor(blocked: readonly Account[]) {
+  public constructor(blocked: ReadonlyArray<Account>) {
     this.blocked = [...blocked];
   }
 
-  public blockedHandles(): readonly string[] {
+  public blockedHandles(): ReadonlyArray<string> {
     return Arr.sort(
       Arr.map(this.blocked, (entry) => entry.handle),
       Str.Order
@@ -67,18 +67,18 @@ export class FakeX {
 
 /** The fake Clankwall: the AI-flagged accounts it lists. */
 export class FakeClankwall {
-  public readonly flagged: readonly Account[];
+  public readonly flagged: ReadonlyArray<Account>;
   public status = 200;
   public pageReads = 0;
 
-  public constructor(flagged: readonly Account[]) {
+  public constructor(flagged: ReadonlyArray<Account>) {
     this.flagged = flagged;
   }
 }
 
 const change = (x: FakeX, kind: FakeRequest["kind"], target: Account) =>
   Effect.sync(() => {
-    x.requests.push({ kind, handle: target.handle });
+    x.requests.push({ handle: target.handle, kind });
 
     const status = x.status.get(target.handle) ?? 200;
 
@@ -98,11 +98,11 @@ const change = (x: FakeX, kind: FakeRequest["kind"], target: Account) =>
     }
 
     return {
-      status,
       id:
         status === 200
           ? Option.some((x.answeredAs.get(target.handle) ?? target).id)
           : Option.none(),
+      status,
     };
   });
 
@@ -111,6 +111,7 @@ export const layers = (x: FakeX, clankwall: FakeClankwall) =>
     Layer.succeed(
       XSession,
       XSession.of({
+        block: (target) => change(x, "block", target),
         blockedPage: (cursor) =>
           Effect.suspend(() => {
             x.pageReads += 1;
@@ -124,7 +125,6 @@ export const layers = (x: FakeX, clankwall: FakeClankwall) =>
                   })
                 );
           }),
-        block: (target) => change(x, "block", target),
         unblock: (target) => change(x, "unblock", target),
       })
     ),
@@ -149,7 +149,7 @@ export const layers = (x: FakeX, clankwall: FakeClankwall) =>
 
 export const defaults: BlocklistSettings = {
   dryRun: false,
-  pause: { min: 4000, max: 7000 },
+  pause: { max: 7000, min: 4000 },
 };
 
 export const settingsLayer = (overrides: Partial<BlocklistSettings> = {}) =>

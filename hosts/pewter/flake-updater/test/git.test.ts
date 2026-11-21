@@ -13,7 +13,7 @@ import {
 
 import { Shell } from "../src/command.ts";
 import { Git, GitError, mainRef } from "../src/git.ts";
-import * as GitLive from "../src/live/git.ts";
+import { layer as gitLiveLayer } from "../src/live/git.ts";
 import { Host } from "../src/settings.ts";
 
 /** The real Shell, except `gh`: these tests never reach GitHub. */
@@ -21,7 +21,7 @@ const offlineShell = Layer.effect(
   Shell,
   Effect.gen(function* () {
     const shell = yield* Shell;
-    const skipped = { stdout: "", stderr: "", exitCode: 0 };
+    const skipped = { exitCode: 0, stderr: "", stdout: "" };
 
     return Shell.of({
       exec: (command, args, options) =>
@@ -46,8 +46,8 @@ const gitlinkSha = Str.repeat(40)("1");
 
 const initialFiles = {
   "flake.lock": "main lock\n",
-  "README.md": "readme\n",
   "old.nix": "old\n",
+  "README.md": "readme\n",
 };
 
 /**
@@ -64,39 +64,42 @@ const makeRemote = Effect.gen(function* () {
   });
 
   const dirs: Record<Where, string> = {
+    checkout: path.join(root, "checkout"),
     origin: path.join(root, "origin.git"),
     upstream: path.join(root, "upstream"),
-    checkout: path.join(root, "checkout"),
     workspace: path.join(root, "workspace"),
   };
 
   const env = {
+    GIT_AUTHOR_EMAIL: "upstream@example.test",
+    GIT_AUTHOR_NAME: "upstream",
+    GIT_COMMITTER_EMAIL: "upstream@example.test",
+    GIT_COMMITTER_NAME: "upstream",
     GIT_CONFIG_GLOBAL: path.join(root, "gitconfig"),
     GIT_CONFIG_NOSYSTEM: "1",
-    GIT_AUTHOR_NAME: "upstream",
-    GIT_AUTHOR_EMAIL: "upstream@example.test",
-    GIT_COMMITTER_NAME: "upstream",
-    GIT_COMMITTER_EMAIL: "upstream@example.test",
   };
 
-  const git = (where: Where, args: readonly string[]) =>
+  const git = (where: Where, args: ReadonlyArray<string>) =>
     shell
       .run("git", args, { cwd: dirs[where], env })
       .pipe(Effect.map(Str.trim));
 
-  const succeeds = (where: Where, args: readonly string[]) =>
+  const succeeds = (where: Where, args: ReadonlyArray<string>) =>
     shell
       .exec("git", args, { cwd: dirs[where], env })
       .pipe(Effect.map((output) => output.exitCode === 0));
 
   const write = (where: Where, files: Readonly<Record<string, string>>) =>
-    Effect.forEach(Rec.toEntries(files), ([file, content]) => {
-      const target = path.join(dirs[where], file);
-
-      return fs
-        .makeDirectory(path.dirname(target), { recursive: true })
-        .pipe(Effect.andThen(fs.writeFileString(target, content)));
-    });
+    Effect.forEach(
+      Rec.toEntries(files),
+      ([file, content]) => {
+        const target = path.join(dirs[where], file);
+        return fs
+          .makeDirectory(path.dirname(target), { recursive: true })
+          .pipe(Effect.andThen(fs.writeFileString(target, content)));
+      },
+      { concurrency: 1 }
+    );
 
   /** Commits `files` on `branch` in upstream and pushes it to origin. */
   const publish = Effect.fn("publish")(function* (
@@ -126,13 +129,13 @@ const makeRemote = Effect.gen(function* () {
   /** The Updater's Git, prepared the way a run starts. */
   const connect = (dryRun: boolean) => {
     const host = Layer.succeed(Host)({
-      repoDir: dirs.checkout,
-      repo: "mippbipp/conf.nix",
-      token: Redacted.make("x"),
       dryRun,
+      repo: "mippbipp/conf.nix",
+      repoDir: dirs.checkout,
+      token: Redacted.make("x"),
     });
 
-    const gitLayer = GitLive.layer.pipe(Layer.provide(host));
+    const gitLayer = gitLiveLayer.pipe(Layer.provide(host));
 
     return Effect.gen(function* () {
       const live = yield* Git;
@@ -168,18 +171,18 @@ const makeRemote = Effect.gen(function* () {
   ]);
 
   return {
-    dirs,
-    git,
-    succeeds,
-    write,
-    publish,
     connect,
+    dirs,
     exists,
-    remove: (where: Where, file: string) =>
-      fs.remove(path.join(dirs[where], file), { recursive: true }),
+    git,
+    list: (where: Where) => fs.readDirectory(dirs[where], { recursive: true }),
+    publish,
     read: (where: Where, file: string) =>
       fs.readFileString(path.join(dirs[where], file)),
-    list: (where: Where) => fs.readDirectory(dirs[where], { recursive: true }),
+    remove: (where: Where, file: string) =>
+      fs.remove(path.join(dirs[where], file), { recursive: true }),
+    succeeds,
+    write,
   };
 });
 
@@ -199,7 +202,7 @@ const replaced = (dryRun: boolean) =>
     yield* remote.write("checkout", { "flake.lock": "updated lock\n" });
     yield* git.commitLock("up");
 
-    return { remote, git, remoteSha };
+    return { git, remote, remoteSha };
   });
 
 const originBranch = (remote: Effect.Success<typeof makeRemote>) =>
@@ -215,7 +218,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         const outcome = yield* git.sync(false);
 
-        assert.deepStrictEqual(outcome, { mode: "fresh", dropped: [] });
+        assert.deepStrictEqual(outcome, { dropped: [], mode: "fresh" });
         const head = yield* git.head;
         const mainSha = yield* remote.git("checkout", ["rev-parse", mainRef]);
         assert.strictEqual(head, mainSha);
@@ -236,7 +239,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         const outcome = yield* git.sync(true);
 
-        assert.deepStrictEqual(outcome, { mode: "fresh", dropped: [] });
+        assert.deepStrictEqual(outcome, { dropped: [], mode: "fresh" });
         const head = yield* git.head;
         const mainSha = yield* remote.git("checkout", ["rev-parse", mainRef]);
         assert.strictEqual(head, mainSha);
@@ -263,7 +266,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         const outcome = yield* git.sync(true);
 
-        assert.deepStrictEqual(outcome, { mode: "continued", dropped: [] });
+        assert.deepStrictEqual(outcome, { dropped: [], mode: "continued" });
 
         const parents = yield* remote.git("checkout", [
           "rev-parse",
@@ -282,7 +285,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const remote = yield* makeRemote;
         yield* remote.publish(
           "flake-update",
-          { "flake.lock": "branch lock\n", "fix.nix": "fix\n" },
+          { "fix.nix": "fix\n", "flake.lock": "branch lock\n" },
           "up"
         );
         yield* remote.publish("main", { "flake.lock": "newer lock\n" }, "bump");
@@ -290,7 +293,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
         const outcome = yield* git.sync(true);
 
-        assert.deepStrictEqual(outcome, { mode: "continued", dropped: [] });
+        assert.deepStrictEqual(outcome, { dropped: [], mode: "continued" });
         const lock = yield* git.readLock("HEAD");
         assert.strictEqual(lock, "newer lock\n");
         const changed = yield* git.changedFromMain;
@@ -463,7 +466,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
     it.effect("refuses a push that is not a fast-forward", () =>
       Effect.gen(function* () {
-        const { remote, git, remoteSha } = yield* replaced(false);
+        const { git, remote, remoteSha } = yield* replaced(false);
 
         const error = yield* Effect.flip(git.push(false));
 
@@ -477,7 +480,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
       "replaces the branch when origin is where the fetch left it",
       () =>
         Effect.gen(function* () {
-          const { remote, git } = yield* replaced(false);
+          const { git, remote } = yield* replaced(false);
 
           yield* git.push(true);
 
@@ -489,7 +492,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
     it.effect("will not replace a branch that moved since the fetch", () =>
       Effect.gen(function* () {
-        const { remote, git } = yield* replaced(false);
+        const { git, remote } = yield* replaced(false);
 
         const moved = yield* remote.publish(
           "flake-update",
@@ -507,7 +510,7 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
 
     it.effect("pushes nothing in a dry run", () =>
       Effect.gen(function* () {
-        const { remote, git, remoteSha } = yield* replaced(true);
+        const { git, remote, remoteSha } = yield* replaced(true);
 
         yield* git.push(true);
         yield* git.push(false);
@@ -549,8 +552,8 @@ layer(services, { excludeTestServices: true })("live git", (it) => {
         const before = yield* git.head;
         yield* git.exportTree(remote.dirs.workspace);
         yield* remote.write("workspace", {
-          "README.md": "edited\n",
           "new/file.nix": "new\n",
+          "README.md": "edited\n",
         });
         yield* remote.remove("workspace", "old.nix");
 

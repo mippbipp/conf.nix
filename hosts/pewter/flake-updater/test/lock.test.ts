@@ -22,20 +22,20 @@ describe("lock", () => {
     Effect.sync(() => {
       const main = FlakeLock.make({
         nodes: {
-          root: { inputs: { herdr: "herdr", nixpkgs: "nixpkgs" } },
-          nixpkgs: {
-            locked: locked("nixpkgs", "aaaaaaa"),
-            original: original("nixpkgs"),
-          },
           herdr: {
             inputs: { nixpkgs: "nixpkgs_2" },
             locked: locked("herdr", "1111111"),
             original: original("herdr"),
           },
+          nixpkgs: {
+            locked: locked("nixpkgs", "aaaaaaa"),
+            original: original("nixpkgs"),
+          },
           nixpkgs_2: {
             locked: locked("nixpkgs", "ccccccc"),
             original: original("nixpkgs"),
           },
+          root: { inputs: { herdr: "herdr", nixpkgs: "nixpkgs" } },
         },
         root: "root",
         version: 7,
@@ -44,11 +44,6 @@ describe("lock", () => {
       // The update swapped which key holds the root nixpkgs.
       const branch = FlakeLock.make({
         nodes: {
-          root: { inputs: { herdr: "herdr", nixpkgs: "nixpkgs_2" } },
-          nixpkgs_2: {
-            locked: locked("nixpkgs", "bbbbbbb"),
-            original: original("nixpkgs"),
-          },
           herdr: {
             inputs: { nixpkgs: "nixpkgs" },
             locked: locked("herdr", "2222222"),
@@ -58,6 +53,11 @@ describe("lock", () => {
             locked: locked("nixpkgs", "ddddddd"),
             original: original("nixpkgs"),
           },
+          nixpkgs_2: {
+            locked: locked("nixpkgs", "bbbbbbb"),
+            original: original("nixpkgs"),
+          },
+          root: { inputs: { herdr: "herdr", nixpkgs: "nixpkgs_2" } },
         },
         root: "root",
         version: 7,

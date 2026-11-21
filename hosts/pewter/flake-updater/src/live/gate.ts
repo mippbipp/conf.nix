@@ -16,10 +16,10 @@ import { Host } from "../settings.ts";
 
 // The rollup tags entries with __typename; the fields alone tell them apart.
 const CheckRun = Schema.Struct({
-  name: Schema.String,
-  status: Schema.String,
   conclusion: Schema.String,
   detailsUrl: Schema.String,
+  name: Schema.String,
+  status: Schema.String,
 });
 
 const StatusContext = Schema.Struct({
@@ -46,8 +46,8 @@ const RuleParameters = Schema.Struct({
 // Only required_status_checks rules carry the list; the other rule types are
 // decoded so the filter below can drop them.
 const BranchRule = Schema.Struct({
-  type: Schema.String,
   parameters: Schema.optionalKey(RuleParameters),
+  type: Schema.String,
 });
 
 type Rule = typeof BranchRule.Type;
@@ -66,31 +66,31 @@ const jobUrl = /\/actions\/runs\/(?<run>\d+)\/job\/(?<job>\d+)/u;
 const pollInterval = Duration.minutes(1);
 
 interface CheckState {
-  readonly name: string;
-  readonly url: string;
   readonly done: boolean;
   readonly failed: boolean;
+  readonly name: string;
+  readonly url: string;
 }
 
 const describeCheck = (check: Check): CheckState =>
   "detailsUrl" in check
     ? {
-        name: check.name,
-        url: check.detailsUrl,
         done: check.status === "COMPLETED",
         failed: failedConclusions.has(check.conclusion),
+        name: check.name,
+        url: check.detailsUrl,
       }
     : {
-        name: check.context,
-        url: check.targetUrl,
         done: check.state !== "PENDING" && check.state !== "EXPECTED",
         failed: check.state === "FAILURE" || check.state === "ERROR",
+        name: check.context,
+        url: check.targetUrl,
       };
 
 const fail = (message: string) => (cause: unknown) =>
-  GateError.make({ message, cause });
+  GateError.make({ cause, message });
 
-const describe = (args: readonly string[]) =>
+const describe = (args: ReadonlyArray<string>) =>
   `gh ${Arr.join(Arr.take(args, 2), " ")}`;
 
 const retryPolicy = {
@@ -110,7 +110,7 @@ const contextsOf = (rule: Rule) =>
     (check) => check.context
   );
 
-const requiredContexts = (rules: readonly Rule[]) => {
+const requiredContexts = (rules: ReadonlyArray<Rule>) => {
   const statusRules = Arr.filter(
     rules,
     (rule) => rule.type === "required_status_checks"
@@ -128,7 +128,7 @@ export const layer = Layer.effect(
     const env = { GH_TOKEN: Redacted.value(host.token) };
 
     // GitHub's API has bad minutes; a poll should not fail the whole run.
-    const request = (args: readonly string[]) => {
+    const request = (args: ReadonlyArray<string>) => {
       const toError = fail(describe(args));
 
       return run("gh", args, { env }).pipe(
@@ -137,7 +137,7 @@ export const layer = Layer.effect(
       );
     };
 
-    const gh = (args: readonly string[]) =>
+    const gh = (args: ReadonlyArray<string>) =>
       request([...args, "--repo", host.repo]);
 
     // Read per verdict so a ruleset edit applies on the next round.
@@ -156,8 +156,8 @@ export const layer = Layer.effect(
 
       if (Arr.isReadonlyArrayEmpty(contexts)) {
         return yield* GateError.make({
-          message: "main's ruleset requires no status checks",
           cause: undefined,
+          message: "main's ruleset requires no status checks",
         });
       }
 
@@ -209,13 +209,13 @@ export const layer = Layer.effect(
           Arr.every(checks, (check) => check.done);
 
         if (decided) {
-          const failed: FailedCheck[] = [];
+          const failed: Array<FailedCheck> = [];
 
           for (const check of Arr.filter(checks, (entry) => entry.failed)) {
             failed.push({
+              log: yield* failedLog(check),
               name: check.name,
               url: check.url,
-              log: yield* failedLog(check),
             });
           }
 

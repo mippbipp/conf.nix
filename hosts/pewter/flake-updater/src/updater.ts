@@ -30,15 +30,15 @@ import type { UpdaterSettings } from "./settings.ts";
 
 /** Repair progress within one run, shown in the PR body and issues. */
 interface Progress {
+  readonly failures: ReadonlyArray<CheckFailure>;
   readonly rounds: number;
   readonly session: Option.Option<string>;
-  readonly failures: readonly CheckFailure[];
 }
 
 const noProgress: Progress = {
+  failures: [],
   rounds: 0,
   session: Option.none(),
-  failures: [],
 };
 
 const sessionLink = (settings: UpdaterSettings, session: string) =>
@@ -52,15 +52,15 @@ const readBranch = Effect.fn("Updater.readBranch")(function* (main: FlakeLock) {
   return deriveBranchState({
     commits: yield* git.branchCommits,
     head: yield* readFlakeLock("HEAD"),
-    main,
     issues: yield* github.openIssues,
+    main,
   });
 });
 
 /** The PR under repair and main's lock, fixed for the whole run. */
 interface Target {
-  readonly pr: PullRequest;
   readonly main: FlakeLock;
+  readonly pr: PullRequest;
 }
 
 /**
@@ -76,8 +76,8 @@ const syncPr = Effect.fn("Updater.syncPr")(function* (
   const state = yield* readBranch(target.main);
 
   const body = renderPrBody(state, {
-    rounds: progress.rounds,
     maxRounds: settings.maxRounds,
+    rounds: progress.rounds,
     session: Option.map(progress.session, (id) => sessionLink(settings, id)),
   });
 
@@ -117,7 +117,7 @@ const closeLandedIssues = Effect.fn("Updater.closeLandedIssues")(function* (
   const issues = yield* github.openIssues;
   const landed = landedIssues(main, issues);
 
-  for (const { issue, input } of landed) {
+  for (const { input, issue } of landed) {
     yield* github.closeIssue(
       issue,
       `main now has \`${input}\` at ${shortRev(main, input)}, so the update landed.`
@@ -137,10 +137,10 @@ const reportRepairFailure = Effect.fn("Updater.reportRepairFailure")(function* (
   yield* reportIssue(
     repairFailedTitle,
     renderRepairFailedIssue({
+      failures: progress.failures,
+      model: settings.model,
       pr: target.pr.number,
       reason,
-      model: settings.model,
-      failures: progress.failures,
       session: Option.map(progress.session, (id) => sessionLink(settings, id)),
     })
   );
@@ -174,18 +174,21 @@ const reportHeldBack = Effect.fn("Updater.reportHeldBack")(function* (
     onSome: (id) => sessionLink(settings, id),
   });
 
-  yield* Effect.forEach(committed.reverted, (input) =>
-    reportIssue(
-      heldBackTitle(input),
-      renderHeldBackIssue({
-        input,
-        pr: target.pr.number,
-        reason: committed.summary,
-        marker: heldBackMarker(target.main, input),
-        failures: progress.failures,
-        session,
-      })
-    )
+  yield* Effect.forEach(
+    committed.reverted,
+    (input) =>
+      reportIssue(
+        heldBackTitle(input),
+        renderHeldBackIssue({
+          failures: progress.failures,
+          input,
+          marker: heldBackMarker(target.main, input),
+          pr: target.pr.number,
+          reason: committed.summary,
+          session,
+        })
+      ),
+    { concurrency: 1 }
   );
 });
 
@@ -198,22 +201,22 @@ const agentFailure = (error: AgentError) =>
 interface Step {
   /** The gate is green. */
   readonly done: boolean;
-  /** Stop and report this reason. */
-  readonly stop: Option.Option<string>;
   /** Why the Updater discarded the round, for the next prompt. */
   readonly feedback: Option.Option<string>;
+  /** Stop and report this reason. */
+  readonly stop: Option.Option<string>;
 }
 
 const stopWith = (reason: string): Step => ({
   done: false,
-  stop: Option.some(reason),
   feedback: Option.none(),
+  stop: Option.some(reason),
 });
 
 const carryOn = (feedback: Option.Option<string>): Step => ({
   done: false,
-  stop: Option.none(),
   feedback,
+  stop: Option.none(),
 });
 
 /** Records a round's outcome and decides what the loop does next. */
@@ -235,10 +238,6 @@ const settle = Effect.fn("Updater.settle")(function* (
   return yield* roundOutcome.$match(outcome, {
     AgentFailed: (failed) =>
       Effect.succeed(failed.error.pipe(agentFailure, stopWith)),
-    GaveUp: (gaveUp) =>
-      Effect.succeed(stopWith(`the Flake fixer gave up: ${gaveUp.summary}`)),
-    Discarded: (discarded) =>
-      Effect.succeed(carryOn(Option.some(discarded.reason))),
     Committed: (committed) =>
       Effect.gen(function* () {
         yield* reportHeldBack(target, progress, committed);
@@ -246,6 +245,10 @@ const settle = Effect.fn("Updater.settle")(function* (
 
         return carryOn(Option.none());
       }),
+    Discarded: (discarded) =>
+      Effect.succeed(carryOn(Option.some(discarded.reason))),
+    GaveUp: (gaveUp) =>
+      Effect.succeed(stopWith(`the Flake fixer gave up: ${gaveUp.summary}`)),
   });
 });
 
@@ -264,7 +267,7 @@ const step = Effect.fn("Updater.step")(function* (
   if (Arr.isReadonlyArrayEmpty(verdict.failed)) {
     yield* closeRepairIssue(target.pr);
 
-    return { done: true, stop: Option.none(), feedback: Option.none() };
+    return { done: true, feedback: Option.none(), stop: Option.none() };
   }
 
   const { failures, outsideGate } = readFailures(verdict.failed);
@@ -291,12 +294,12 @@ const step = Effect.fn("Updater.step")(function* (
   yield* Ref.update(state, (progress) => ({ ...progress, rounds: round }));
 
   const outcome = yield* repairRound({
+    failures,
+    feedback,
+    main: target.main,
     pr: target.pr,
     round,
-    main: target.main,
-    failures,
     session: current.session,
-    feedback,
   });
 
   return yield* settle(target, state, outcome);
@@ -368,7 +371,7 @@ export const run = Effect.fn("Updater.run")(function* () {
     onSome: Effect.succeed,
   });
 
-  const target = { pr, main };
+  const target = { main, pr };
 
   yield* syncPr(target, noProgress);
 

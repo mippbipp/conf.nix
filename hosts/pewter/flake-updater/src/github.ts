@@ -4,7 +4,7 @@ import { Context, Schema } from "effect";
 export class GitHubError extends Schema.TaggedError<
   GitHubError,
   { readonly brand: unique symbol }
->()("GitHubError", { message: Schema.String, cause: Schema.Defect() }) {}
+>()("GitHubError", { cause: Schema.Defect(), message: Schema.String }) {}
 
 export interface PullRequest {
   readonly number: number;
@@ -12,9 +12,9 @@ export interface PullRequest {
 }
 
 export interface Issue {
+  readonly body: string;
   readonly number: number;
   readonly title: string;
-  readonly body: string;
   readonly url: string;
 }
 
@@ -30,15 +30,22 @@ export interface PullRequestUpdate {
 export class GitHub extends Context.Service<
   GitHub,
   {
-    readonly openPr: Effect.Effect<Option.Option<PullRequest>, GitHubError>;
+    readonly closeIssue: (
+      issue: Issue,
+      comment: string
+    ) => Effect.Effect<void, GitHubError>;
+    readonly commentIssue: (
+      issue: Issue,
+      body: string
+    ) => Effect.Effect<void, GitHubError>;
+    readonly createIssue: (
+      title: string,
+      body: string
+    ) => Effect.Effect<Issue, GitHubError>;
     readonly createPr: (
       title: string,
       body: string
     ) => Effect.Effect<PullRequest, GitHubError>;
-    readonly updatePr: (
-      pr: PullRequest,
-      update: PullRequestUpdate
-    ) => Effect.Effect<void, GitHubError>;
     /**
      * Turns auto-merge off and confirms it is off, so a commit that needs
      * review can be pushed without the Build gate merging it.
@@ -47,18 +54,11 @@ export class GitHub extends Context.Service<
       pr: PullRequest
     ) => Effect.Effect<void, GitHubError>;
     /** Open issues labelled `automated`. */
-    readonly openIssues: Effect.Effect<readonly Issue[], GitHubError>;
-    readonly createIssue: (
-      title: string,
-      body: string
-    ) => Effect.Effect<Issue, GitHubError>;
-    readonly commentIssue: (
-      issue: Issue,
-      body: string
-    ) => Effect.Effect<void, GitHubError>;
-    readonly closeIssue: (
-      issue: Issue,
-      comment: string
+    readonly openIssues: Effect.Effect<ReadonlyArray<Issue>, GitHubError>;
+    readonly openPr: Effect.Effect<Option.Option<PullRequest>, GitHubError>;
+    readonly updatePr: (
+      pr: PullRequest,
+      update: PullRequestUpdate
     ) => Effect.Effect<void, GitHubError>;
   }
 >()("flake-updater/github") {}

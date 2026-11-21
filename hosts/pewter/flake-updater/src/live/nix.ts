@@ -14,7 +14,7 @@ export const layer = Layer.effect(
       update: run("nix", ["flake", "update"], { cwd: host.repoDir }).pipe(
         Effect.asVoid,
         Effect.mapError((cause) =>
-          NixError.make({ message: "nix flake update failed", cause })
+          NixError.make({ cause, message: "nix flake update failed" })
         )
       ),
     });

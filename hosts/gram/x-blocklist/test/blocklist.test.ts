@@ -98,7 +98,7 @@ describe("a blocklist run", () => {
       const fiber = yield* run().pipe(
         Effect.provide([
           ...layers(x, clankwall),
-          settingsLayer({ pause: { min: 4000, max: 4000 } }),
+          settingsLayer({ pause: { max: 4000, min: 4000 } }),
         ]),
         Effect.forkChild
       );
@@ -149,7 +149,7 @@ describe("a blocklist run", () => {
       const x = new FakeX([]);
       const clankwall = new FakeClankwall([account("a"), account("b")]);
 
-      x.answeredAs.set("b", { id: "id-someone_else", handle: "b" });
+      x.answeredAs.set("b", { handle: "b", id: "id-someone_else" });
 
       const report = yield* runIn(x, clankwall);
 
@@ -170,7 +170,7 @@ describe("a blocklist run", () => {
       // Clankwall lowercases usernames and can hold an old one.
       const clankwall = new FakeClankwall([account("someone")]);
 
-      x.answeredAs.set("someone", { id: "id-someone", handle: "SomeOne_2" });
+      x.answeredAs.set("someone", { handle: "SomeOne_2", id: "id-someone" });
 
       const report = yield* runIn(x, clankwall);
 

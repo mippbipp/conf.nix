@@ -23,9 +23,9 @@ const AutoMergeJson = Schema.Struct({
 });
 
 const IssueJson = Schema.Struct({
+  body: Schema.String,
   number: Schema.Finite,
   title: Schema.String,
-  body: Schema.String,
   url: Schema.String,
 });
 
@@ -35,9 +35,9 @@ const decodeJson = <S extends Schema.Top>(schema: S) =>
 const issueNumber = /\/issues\/(?<number>\d+)$/u;
 
 const fail = (message: string) => (cause: unknown) =>
-  GitHubError.make({ message, cause });
+  GitHubError.make({ cause, message });
 
-const describe = (args: readonly string[]) =>
+const describe = (args: ReadonlyArray<string>) =>
   `gh ${Arr.join(Arr.take(args, 2), " ")}`;
 
 export const layer = Layer.effect(
@@ -47,7 +47,7 @@ export const layer = Layer.effect(
     const { run } = yield* Shell;
     const env = { GH_TOKEN: Redacted.value(host.token) };
 
-    const gh = (args: readonly string[]) => {
+    const gh = (args: ReadonlyArray<string>) => {
       const toError = fail(describe(args));
 
       return run("gh", [...args, "--repo", host.repo], { env }).pipe(
@@ -146,8 +146,8 @@ export const layer = Layer.effect(
       yield* Effect.when(
         Effect.fail(
           GitHubError.make({
-            message: `auto-merge is still on for #${number}`,
             cause: null,
+            message: `auto-merge is still on for #${number}`,
           })
         ),
         Effect.succeed(state.autoMergeRequest !== null)
@@ -170,26 +170,18 @@ export const layer = Layer.effect(
 
       yield* gh(["pr", "edit", number, "--body", update.body]);
 
-      if (update.needsReview) {
-        yield* gh(["pr", "edit", number, "--add-label", "ready-for-human"]);
-      } else {
-        // Fails when the label is absent, which is the state we want.
-        yield* gh([
-          "pr",
-          "edit",
-          number,
-          "--remove-label",
-          "ready-for-human",
-        ]).pipe(Effect.catchTag("GitHubError", () => Effect.void));
-      }
+      // Removing the label fails when it is absent, which is the state we want.
+      yield* update.needsReview
+        ? gh(["pr", "edit", number, "--add-label", "ready-for-human"])
+        : gh(["pr", "edit", number, "--remove-label", "ready-for-human"]).pipe(
+            Effect.catchTag("GitHubError", () => Effect.void)
+          );
 
       // Auto-merge still waits for every required gate check; squash keeps
       // main to one commit per update.
-      if (update.needsReview) {
-        yield* holdForReview(pr);
-      } else {
-        yield* gh(["pr", "merge", number, "--auto", "--squash"]);
-      }
+      yield* update.needsReview
+        ? holdForReview(pr)
+        : gh(["pr", "merge", number, "--auto", "--squash"]);
     });
 
     const openIssues = gh([
@@ -218,7 +210,7 @@ export const layer = Layer.effect(
       if (host.dryRun) {
         yield* Effect.log(`dry-run: would open issue "${title}":\n${body}`);
 
-        return { number: 0, title, body, url: "(dry run)" };
+        return { body, number: 0, title, url: "(dry run)" };
       }
 
       const created = yield* gh([
@@ -238,7 +230,7 @@ export const layer = Layer.effect(
 
       const number = Number(issueNumber.exec(url)?.groups?.number ?? "0");
 
-      return { number, title, body, url } satisfies Issue;
+      return { body, number, title, url } satisfies Issue;
     });
 
     const commentIssue = (issue: Issue, body: string) =>
@@ -258,14 +250,14 @@ export const layer = Layer.effect(
       );
 
     return GitHub.of({
-      openPr,
+      closeIssue,
+      commentIssue,
+      createIssue,
       createPr,
-      updatePr,
       holdForReview,
       openIssues,
-      createIssue,
-      commentIssue,
-      closeIssue,
+      openPr,
+      updatePr,
     });
   })
 );

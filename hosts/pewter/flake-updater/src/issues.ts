@@ -5,10 +5,10 @@ import type { CheckFailure } from "./gate-log.ts";
 
 export const repairFailedTitle = "flake-update: repair failed";
 
-const failingHosts = (failures: readonly CheckFailure[]) =>
+const failingHosts = (failures: ReadonlyArray<CheckFailure>) =>
   Arr.dedupe(Arr.flatMap(failures, ({ excerpt }) => excerpt.hosts));
 
-const checkLinks = (failures: readonly CheckFailure[]) =>
+const checkLinks = (failures: ReadonlyArray<CheckFailure>) =>
   Arr.map(failures, ({ check }) => `- [${check.name}](${check.url})`);
 
 const details = (summary: string, text: string) => [
@@ -22,12 +22,12 @@ const details = (summary: string, text: string) => [
 ];
 
 export interface HeldBackReport {
+  readonly failures: ReadonlyArray<CheckFailure>;
   readonly input: string;
-  readonly pr: number;
-  readonly reason: string;
   /** From `heldBackMarker`, so a later run can tell when the update landed. */
   readonly marker: string;
-  readonly failures: readonly CheckFailure[];
+  readonly pr: number;
+  readonly reason: string;
   readonly session: string;
 }
 
@@ -57,10 +57,10 @@ export const renderHeldBackIssue = (report: HeldBackReport): string => {
 };
 
 export interface RepairFailure {
+  readonly failures: ReadonlyArray<CheckFailure>;
+  readonly model: string;
   readonly pr: number;
   readonly reason: string;
-  readonly model: string;
-  readonly failures: readonly CheckFailure[];
   readonly session: Option.Option<string>;
 }
 
