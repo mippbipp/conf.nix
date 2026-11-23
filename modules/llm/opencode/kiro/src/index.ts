@@ -43,15 +43,20 @@ import {
 } from "effect/http";
 
 import { type Auth, authHeaders, KiroAccount } from "./account.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Conversation.open
-import * as Conversation from "./conversation.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
-import * as Failure from "./failure.ts";
+import { type MessagesRequest, type Turn, open } from "./conversation.ts";
+import {
+  type Failure,
+  KiroApiError,
+  RefreshError,
+  SignInError,
+  fromCause,
+  fromReply,
+  toResponse,
+} from "./failure.ts";
 import { Images } from "./images.ts";
 import { HEADERS_SECONDS, ID, IDLE_SECONDS, isOk, send } from "./kiro.ts";
 import { decodeSaved, FALLBACK, modelInfo, sameModels } from "./models.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Usage.make
-import * as Usage from "./usage.ts";
+import { type Host as UsageHost, make as makeUsage } from "./usage.ts";
 
 const PACKAGE = "@opencode/ai/providers/anthropic";
 // where the Anthropic route posts; http.request sends it on to the account's region
@@ -110,12 +115,10 @@ const standIn = () =>
 // what http.response needs to turn a call's answer back, by the call: the
 // turn, and the sign-in it was sent with, so a token Kiro turns down is
 // refreshed once; or why it couldn't be sent
-type Sent =
-  | { auth: Auth; error?: never; turn: Conversation.Turn }
-  | { error: Failure.Failure };
+type Sent = { auth: Auth; error?: never; turn: Turn } | { error: Failure };
 
 // Host is the part of OpenCode's plugin context this plugin uses.
-type Host = Usage.Host & {
+type Host = UsageHost & {
   readonly provider: Pick<Plugin.Context["provider"], "transform" | "reload">;
   readonly session: Pick<Plugin.Context["session"], "hook">;
 };
@@ -132,7 +135,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
     Option.getOrElse(decodeSaved(saved), () => FALLBACK)
   );
   // what each reply cost, for the sidebar
-  const usage = yield* Usage.make(ctx);
+  const usage = yield* makeUsage(ctx);
 
   // the account's own models once Kiro lists them. A listing that fails on
   // the network or on Kiro's side is tried again 5, 20 and 80 seconds later.
@@ -144,8 +147,8 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   // each failed listing leads to one more try at most.
   const listAgain = yield* Ref.make(false);
   const mayPass = (error: Effect.Error<typeof account.models>) =>
-    Schema.is(Failure.RefreshError)(error) ||
-    (Schema.is(Failure.KiroApiError)(error) &&
+    Schema.is(RefreshError)(error) ||
+    (Schema.is(KiroApiError)(error) &&
       (error.status === 429 || error.status >= 500));
   const listModels = Effect.gen(function* () {
     const found = yield* account.models;
@@ -163,7 +166,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
       while: mayPass,
     }),
     Effect.tapError((failed) =>
-      Schema.is(Failure.SignInError)(failed) || mayPass(failed)
+      Schema.is(SignInError)(failed) || mayPass(failed)
         ? Ref.set(listAgain, true)
         : Effect.void
     ),
@@ -179,7 +182,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   });
 
   // the call that sends a turn to Kiro, its images fitted
-  const callFor = (turn: Conversation.Turn, auth: Auth) =>
+  const callFor = (turn: Turn, auth: Auth) =>
     images.fit(turn.request(auth.profile)).pipe(
       Effect.map((request) =>
         // oxlint-disable-next-line effecttsgo/global-json -- the Kiro request is built from plain JSON values, so stringify cannot throw
@@ -211,9 +214,9 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
               "An error occurred in Effect.tryPromise"
             ),
           try: () => event.request.clone().json(),
-        })) as Conversation.MessagesRequest;
+        })) as MessagesRequest;
         const known = yield* Ref.get(models);
-        const turn = Conversation.open(req, known);
+        const turn = open(req, known);
         const auth = yield* account.credentials();
         yield* listIfAsked;
         const request = yield* callFor(turn, auth);
@@ -227,7 +230,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         Effect.catchCause(effect, (cause) =>
           Effect.sync(() => {
             const call = standIn();
-            sent.set(call, { error: Failure.fromCause(cause) });
+            sent.set(call, { error: fromCause(cause) });
             event.request = call;
           })
         )
@@ -245,7 +248,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         }
         sent.delete(event.request);
         if (call.error !== undefined) {
-          event.response = Failure.toResponse(call.error);
+          event.response = toResponse(call.error);
           return;
         }
         let res = HttpClientResponse.fromWeb(
@@ -266,12 +269,8 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         }
         if (!isOk(res.status)) {
           const body = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-          event.response = Failure.toResponse(
-            Failure.fromReply(
-              res.status,
-              Str.slice(0, 2 ** 20)(body),
-              res.headers
-            )
+          event.response = toResponse(
+            fromReply(res.status, Str.slice(0, 2 ** 20)(body), res.headers)
           );
           return;
         }
@@ -284,10 +283,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           Effect.provideService(HttpClient.HttpClient, http),
           Effect.catchCause((cause) =>
             Effect.sync(() => {
-              event.response = cause.pipe(
-                Failure.fromCause,
-                Failure.toResponse
-              );
+              event.response = cause.pipe(fromCause, toResponse);
             })
           )
         )

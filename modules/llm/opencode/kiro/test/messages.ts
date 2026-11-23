@@ -1,7 +1,7 @@
 // Messages requests for a test: Codex's view_image turn (yetone/magpie#1861),
 // and PNGs built at the sizes a report gave (magpie-community/plugins#428).
 
-import { deflateSync } from "node:zlib";
+import { crc32, deflateSync } from "node:zlib";
 
 import { Array as Arr } from "effect";
 
@@ -31,16 +31,16 @@ export const viewImage = (
 } => ({
   messages: [
     {
-      content: [{ type: "text", text: "take a screenshot and look at it" }],
+      content: [{ text: "take a screenshot and look at it", type: "text" }],
       role: "user",
     },
     {
       content: [
         {
-          type: "tool_use",
           id: "call_view1",
-          name: "view_image",
           input: { path: "/tmp/a.png" },
+          name: "view_image",
+          type: "tool_use",
         },
       ],
       role: "assistant",
@@ -48,10 +48,10 @@ export const viewImage = (
     {
       content: [
         {
-          type: "tool_result",
-          tool_use_id: "call_view1",
-          content,
           cache_control: { type: "ephemeral" },
+          content,
+          tool_use_id: "call_view1",
+          type: "tool_result",
         },
       ],
       role: "user",
@@ -78,10 +78,10 @@ export function codex(data: string, follow = false) {
   if (follow) {
     req.messages.push(
       {
-        content: [{ type: "text", text: "It is a contact sheet." }],
+        content: [{ text: "It is a contact sheet.", type: "text" }],
         role: "assistant",
       },
-      { content: [{ type: "text", text: "now make it smaller" }], role: "user" }
+      { content: [{ text: "now make it smaller", type: "text" }], role: "user" }
     );
   }
   return req;
@@ -90,7 +90,7 @@ export function codex(data: string, follow = false) {
 export const usersOf = (conversation: Conversation) =>
   Arr.append(
     Arr.flatMap(conversation.history ?? [], (entry) =>
-      entry.userInputMessage ? [entry.userInputMessage] : []
+      entry.userInputMessage === undefined ? [] : [entry.userInputMessage]
     ),
     conversation.currentMessage.userInputMessage
   );
@@ -106,20 +106,6 @@ export const LIMIT = 5 * 1024 * 1024;
 export const REPORTED_RAW = 4_171_428;
 export const REPORTED_B64 = 5_561_904;
 
-const CRC = new Uint32Array(256).map((_, index) => {
-  let crc = index;
-  for (let i = 0; i < 8; i++) {
-    crc = crc & 1 ? 0xed_b8_83_20 ^ (crc >>> 1) : crc >>> 1;
-  }
-  return crc >>> 0;
-});
-const crc32 = (buf: Uint8Array) => {
-  let crc = 0xff_ff_ff_ff;
-  for (const byte of buf) {
-    crc = CRC[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
-  }
-  return (crc ^ 0xff_ff_ff_ff) >>> 0;
-};
 function pngChunk(type: string, data: Buffer) {
   const out = Buffer.alloc(12 + data.length);
   out.writeUInt32BE(data.length, 0);
@@ -128,7 +114,7 @@ function pngChunk(type: string, data: Buffer) {
   out.writeUInt32BE(crc32(out.subarray(4, 8 + data.length)), 8 + data.length);
   return out;
 }
-const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+const PNG_SIG = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const ihdr = (width: number, height: number) => {
   const data = Buffer.alloc(13);
   data.writeUInt32BE(width, 0);
@@ -147,24 +133,23 @@ export function png(
   { noise = true, size }: { noise?: boolean; size?: number } = {}
 ) {
   const row = 1 + width * 3;
-  const rows = Buffer.alloc(height * row, 0x80);
+  const rows = Buffer.alloc(height * row, 128);
   if (noise) {
-    let seed = 0x9e_37_79_b9;
-    for (let i = 0; i < rows.length; i++) {
+    let seed = 2_654_435_769 % 2_147_483_647;
+    for (let i = 0; i < rows.length; i += 1) {
       if (i % row === 0) {
         rows[i] = 0;
-        continue;
+      } else {
+        seed = (seed * 48_271) % 2_147_483_647;
+        rows[i] = seed % 256;
       }
-      seed ^= seed << 13;
-      seed ^= seed >>> 17;
-      seed ^= seed << 5;
-      rows[i] = seed & 0xff;
     }
   } else {
-    for (let line = 0; line < height; line++) {
+    for (let line = 0; line < height; line += 1) {
       rows[line * row] = 0;
     }
   }
+  // oxlint-disable-next-line node/no-sync -- the PNGs are fixtures built once, as the module loads
   const idat = pngChunk("IDAT", deflateSync(rows, { level: noise ? 0 : 9 }));
   const end = pngChunk("IEND", Buffer.alloc(0));
   const file = Buffer.concat([PNG_SIG, ihdr(width, height), idat, end]);
@@ -180,7 +165,7 @@ export function png(
   return Buffer.concat([
     PNG_SIG,
     ihdr(width, height),
-    pngChunk("pdNg", Buffer.alloc(pad, 0x2a)),
+    pngChunk("pdNg", Buffer.alloc(pad, 42)),
     idat,
     end,
   ]);
@@ -188,13 +173,14 @@ export function png(
 
 // bomb is a header saying 20000×20000 (400M pixels) with almost nothing behind it
 export function bomb(size: number) {
+  // oxlint-disable-next-line node/no-sync -- see png
   const idat = pngChunk("IDAT", deflateSync(Buffer.alloc(1000)));
   const end = pngChunk("IEND", Buffer.alloc(0));
   const head = Buffer.concat([PNG_SIG, ihdr(20_000, 20_000)]);
   const pad = size - head.length - idat.length - end.length - 12;
   return Buffer.concat([
     head,
-    pngChunk("pdNg", Buffer.alloc(pad, 0x2a)),
+    pngChunk("pdNg", Buffer.alloc(pad, 42)),
     idat,
     end,
   ]);

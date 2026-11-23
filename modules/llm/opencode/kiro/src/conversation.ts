@@ -23,8 +23,15 @@ import {
   String as Str,
 } from "effect";
 
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
-import * as Failure from "./failure.ts";
+import {
+  type Failure,
+  brokeOff,
+  emptyReply,
+  fromBody,
+  fromException,
+  toError,
+  toResponse,
+} from "./failure.ts";
 import { field, IDLE_SECONDS, isSet } from "./kiro.ts";
 import { BUDGETS, type KiroModel, thinks } from "./models.ts";
 
@@ -947,7 +954,7 @@ type KiroEvent =
   | Said
   | { kind: "sig" | "toolArgs"; text: string }
   | { id: string; kind: "toolStart"; name: string }
-  | ({ kind: "error" } & Failure.Failure)
+  | ({ kind: "error" } & Failure)
   | { kind: "stop"; reason: string; usage: Usage };
 
 // what the payload of each event Kiro sends may hold
@@ -1010,7 +1017,7 @@ class ReplyDecoder {
   private pct = 0;
   private said = 0;
   private heard = false; // a message of the stream arrived
-  private failed: Failure.Failure | undefined = undefined;
+  private failed: Failure | undefined = undefined;
   private ended = false;
   private readonly window: number; // the model's context, to reckon the input from
   private readonly budget: number | undefined; // the thinking budget the prompt set
@@ -1061,11 +1068,11 @@ class ReplyDecoder {
 
   // broke is the body failing before its end
   public broke(message: string) {
-    this.fail(Failure.brokeOff(message));
+    this.fail(brokeOff(message));
   }
 
   // fail is the reply failing: the first failure is the one said
-  public fail(failure: Failure.Failure) {
+  public fail(failure: Failure) {
     this.failed ??= failure;
   }
 
@@ -1081,7 +1088,7 @@ class ReplyDecoder {
     if (this.buf.length > 0) {
       this.broke("the connection closed partway through an event");
     } else if (!this.heard) {
-      this.fail(Failure.emptyReply);
+      this.fail(emptyReply);
     }
     const out: Array<KiroEvent> = this.think.end();
     if (this.failed !== undefined) {
@@ -1116,7 +1123,7 @@ class ReplyDecoder {
     const type = headers[":message-type"];
     if (type === "exception" || type === "error") {
       const exception = headers[":exception-type"];
-      this.failed = Failure.fromException(
+      this.failed = fromException(
         exception === undefined || exception === ""
           ? headers[":error-code"]
           : exception,
@@ -1126,10 +1133,7 @@ class ReplyDecoder {
     }
     const kind = headers[":event-type"];
     if (kind !== undefined && kind !== "" && FAILURE_EVENTS.has(kind)) {
-      this.failed = Failure.fromException(
-        kind,
-        new TextDecoder().decode(payload)
-      );
+      this.failed = fromException(kind, new TextDecoder().decode(payload));
       return;
     }
     const event = Option.getOrUndefined(
@@ -1260,7 +1264,7 @@ const events = (
       Stream.takeUntil(() => reader.done),
       Stream.flattenIterable,
       Stream.catchCause((cause) => {
-        reader.fail(Failure.fromBody(cause, idleSeconds));
+        reader.fail(fromBody(cause, idleSeconds));
         return Stream.empty;
       }),
       Stream.concat(Stream.suspend(() => Stream.fromIterable(reader.end())))
@@ -1388,7 +1392,7 @@ class MessagesEncoder {
       }
       case "error": {
         close();
-        sse("error", { error: Failure.toError(event) });
+        sse("error", { error: toError(event) });
         break;
       }
       case "stop": {
@@ -1441,7 +1445,7 @@ const reply = Effect.fnUntraced(function* (
   const first = Option.getOrUndefined(head);
   if (first === undefined || first.kind === "error") {
     yield* Scope.close(scope, Exit.void);
-    return Failure.toResponse(first ?? Failure.emptyReply);
+    return toResponse(first ?? emptyReply);
   }
   const body = Stream.concat(Stream.make(first), rest).pipe(
     Stream.takeUntil(isLast),

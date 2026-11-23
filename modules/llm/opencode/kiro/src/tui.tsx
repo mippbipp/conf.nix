@@ -19,8 +19,14 @@ import {
 } from "solid-js";
 
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Sidebar.lines
-import * as Sidebar from "./sidebar.ts";
+import {
+  type Line,
+  answerOf,
+  lines,
+  sessionsCounted,
+  shown as isShown,
+  unanswered,
+} from "./sidebar.ts";
 
 function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   const data = props.context.data.session;
@@ -28,7 +34,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   const session = () => data.get(props.sessionID);
   const sessionIDs = createMemo(
     () =>
-      Sidebar.sessionsCounted(
+      sessionsCounted(
         props.sessionID,
         session(),
         data.family(data.root(props.sessionID))
@@ -49,8 +55,8 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
         .rpc(KiroRpc)
         .usage({ sessionIDs: [...sessionIDs()] }, { location: location() })
     )
-      .then(Sidebar.answerOf)
-      .catch(Sidebar.unanswered);
+      .then(answerOf)
+      .catch(unanswered);
   const [usage, { refetch }] = createResource(
     () =>
       Arr.join(
@@ -82,11 +88,11 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
 
   const answer = () => {
     const { latest } = usage;
-    return Sidebar.shown(session()?.model?.providerID, latest, sessionIDs())
+    return isShown(session()?.model?.providerID, latest, sessionIDs())
       ? latest
       : undefined;
   };
-  const colour = (tone: Sidebar.Line["tone"]) =>
+  const colour = (tone: Line["tone"]) =>
     ({
       error: theme().text.feedback.error.base,
       muted: theme().text.muted,
@@ -98,7 +104,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
       {(shown: Accessor<UsageAnswer>) => (
         <box>
           {/* oxlint-disable-next-line effecttsgo/global-date -- Solid view code, outside any Effect, so there is no Clock */}
-          <For each={Sidebar.lines(shown(), sessionIDs(), Date.now())}>
+          <For each={lines(shown(), sessionIDs(), Date.now())}>
             {(line) => (
               <text fg={colour(line.tone)}>
                 {line.tone === "title" ? <b>{line.text}</b> : line.text}

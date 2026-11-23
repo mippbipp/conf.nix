@@ -33,8 +33,7 @@ import {
 } from "effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
-import * as Failure from "./failure.ts";
+import { KiroApiError, RefreshError, SignInError } from "./failure.ts";
 import { deadline, field, isOk, isSet, send } from "./kiro.ts";
 import { decodeListedModel, type KiroModel, modelOf } from "./models.ts";
 import type { AccountUsage, Allowance } from "./rpc.ts";
@@ -467,7 +466,7 @@ const TokenAnswer = Schema.Struct({
 });
 
 const refreshFailed = (error: { message: string }) =>
-  Failure.RefreshError.make({
+  RefreshError.make({
     message: `Couldn't refresh Kiro's sign-in: ${error.message}`,
   });
 
@@ -479,7 +478,7 @@ const tokenPost = Effect.fnUntraced(
       Effect.mapError(refreshFailed)
     );
     if ([400, 401, 403].includes(res.status)) {
-      return yield* Failure.SignInError.make({ message: EXPIRED });
+      return yield* SignInError.make({ message: EXPIRED });
     }
     if (!isOk(res.status)) {
       return yield* refreshFailed({
@@ -526,7 +525,7 @@ const askToken = Effect.fnUntraced(function* (
   refreshToken: string
 ): Effect.fn.Return<
   TokenOut | undefined,
-  Failure.SignInError | Failure.RefreshError,
+  SignInError | RefreshError,
   HttpClient.HttpClient
 > {
   if (cred.method === "social") {
@@ -587,7 +586,7 @@ const refresh = Effect.fnUntraced(function* (
   cred: Cred
 ): Effect.fn.Return<
   { byKiroCli: boolean; cred: Cred },
-  Failure.SignInError | Failure.RefreshError,
+  SignInError | RefreshError,
   HttpClient.HttpClient
 > {
   if (filled(cred.dbKey) !== undefined) {
@@ -607,12 +606,12 @@ const refresh = Effect.fnUntraced(function* (
     }
   }
   if (cred.refresh === "") {
-    return yield* Failure.SignInError.make({ message: EXPIRED });
+    return yield* SignInError.make({ message: EXPIRED });
   }
   const out = yield* askToken(cred, cred.refresh);
   const token = filled(out?.access);
   if (out === undefined || token === undefined) {
-    return yield* Failure.SignInError.make({ message: EXPIRED });
+    return yield* SignInError.make({ message: EXPIRED });
   }
   const expiresIn =
     out.expiresIn !== undefined && out.expiresIn !== null && out.expiresIn > 0
@@ -682,7 +681,7 @@ const managementCall = Effect.fnUntraced(
   function* <A>(
     auth: Pick<Auth, "token" | "tokenType" | "region">,
     { decode, input, method }: ManagementCall<A>
-  ): Effect.fn.Return<A, Failure.KiroApiError, HttpClient.HttpClient> {
+  ): Effect.fn.Return<A, KiroApiError, HttpClient.HttpClient> {
     const url = `${management(auth.region)}/${method}`;
     const request = (
       "body" in input
@@ -701,12 +700,12 @@ const managementCall = Effect.fnUntraced(
     const res = yield* send(request).pipe(Effect.mapError(unreachable(method)));
     if (!isOk(res.status)) {
       const body = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-      return yield* Failure.KiroApiError.fromReply(res.status, body);
+      return yield* KiroApiError.fromReply(res.status, body);
     }
     return yield* res.json.pipe(
       Effect.flatMap(decode),
       Effect.mapError((error) =>
-        Failure.KiroApiError.make({
+        KiroApiError.make({
           body: "",
           message: `Kiro's ${method} answer didn't read as expected: ${error.message}`,
           status: 502,
@@ -724,7 +723,7 @@ const managementCall = Effect.fnUntraced(
 );
 
 const unreachable = (method: string) => (error: { message: string }) =>
-  Failure.KiroApiError.make({
+  KiroApiError.make({
     body: "",
     message: `Couldn't reach Kiro for ${method}: ${error.message}`,
     status: 502,
@@ -740,11 +739,11 @@ const decodeProfiles = Schema.decodeUnknownEffect(
 // or the first Kiro lists in either of its regions.
 const profileOf = Effect.fnUntraced(function* (
   cred: Cred
-): Effect.fn.Return<string, Failure.KiroApiError, HttpClient.HttpClient> {
+): Effect.fn.Return<string, KiroApiError, HttpClient.HttpClient> {
   if (cred.builderID === true) {
     return BUILDER_ID_PROFILE;
   }
-  let last = Option.none<Failure.KiroApiError>();
+  let last = Option.none<KiroApiError>();
   for (const region of ["us-east-1", "eu-central-1"]) {
     const out = yield* managementCall(
       { region, token: cred.access, tokenType: tokenType(cred) },
@@ -773,7 +772,7 @@ const profileOf = Effect.fnUntraced(function* (
     }
   }
   return yield* Option.getOrElse(last, () =>
-    Failure.KiroApiError.make({
+    KiroApiError.make({
       body: "",
       message: "Kiro has no profile for this sign-in",
       status: 502,
@@ -989,7 +988,7 @@ const listModels = Effect.fnUntraced(function* (auth: Auth) {
     }
   }
   if (list.length === 0) {
-    return yield* Failure.KiroApiError.make({
+    return yield* KiroApiError.make({
       body: "",
       message: "Kiro listed no models",
       status: 502,
@@ -1009,10 +1008,7 @@ const listModels = Effect.fnUntraced(function* (auth: Auth) {
 
 // ---- the account ---------------------------------------------------------------
 
-type AccountError =
-  | Failure.SignInError
-  | Failure.RefreshError
-  | Failure.KiroApiError;
+type AccountError = SignInError | RefreshError | KiroApiError;
 
 // KiroAccount hands out the credentials to call Kiro with, read fresh from
 // kiro-cli (or the IDE) each time and refreshed when near their end or
@@ -1057,7 +1053,7 @@ export class KiroAccount extends Context.Service<
         function* (rejected?: string) {
           let cred = (yield* readCLI()) ?? (yield* readIDE());
           if (cred === null) {
-            return yield* Failure.SignInError.make({ message: NOT_SIGNED_IN });
+            return yield* SignInError.make({ message: NOT_SIGNED_IN });
           }
           for (let i = 0; i < 16; i += 1) {
             const newer = refreshedFrom.get(cred.access);

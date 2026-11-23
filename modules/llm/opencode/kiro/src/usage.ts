@@ -10,10 +10,8 @@ import type { Plugin } from "@opencode/plugin/effect";
 import { Effect, Exit, Option, Schema, Semaphore, String as Str } from "effect";
 
 import { KiroAccount } from "./account.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Conversation.Usage
-import type * as Conversation from "./conversation.ts";
-// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
-import * as Failure from "./failure.ts";
+import type { Usage } from "./conversation.ts";
+import { fromCause } from "./failure.ts";
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
 
 // Host is the part of OpenCode's plugin context the tracker uses.
@@ -36,7 +34,7 @@ const decodeCredits = Schema.decodeUnknownOption(Schema.Finite);
 export interface Tracker {
   readonly record: (
     sessionID: string | undefined,
-    usage: Pick<Conversation.Usage, "credits">
+    usage: Pick<Usage, "credits">
   ) => Effect.Effect<void>;
 }
 
@@ -59,7 +57,7 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
     Effect.catchCause((cause) =>
       Effect.succeed({
         account: null,
-        error: Str.slice(0, 200)(Failure.fromCause(cause).message),
+        error: Str.slice(0, 200)(fromCause(cause).message),
       })
     )
   );
