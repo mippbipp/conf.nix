@@ -2,6 +2,23 @@
 {
   stylix = {
     enable = true;
+    # Targets are opt-in so an upstream target for an app we don't use can't
+    # break evaluation (wayprompt in #245).
+    autoEnable = false;
+    overlays.enable = true;
+    targets = {
+      console.enable = true;
+      font-packages = {
+        enable = true;
+        fonts.enable = true;
+      };
+      fontconfig = {
+        enable = true;
+        fonts.enable = true;
+      };
+      gtksourceview.enable = true;
+      nixos-icons.enable = true;
+    };
     base16Scheme = "${pkgs.base16-schemes}/share/themes/tokyo-night-dark.yaml";
     polarity = "dark";
     cursor = {
