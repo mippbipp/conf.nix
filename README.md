@@ -22,8 +22,9 @@ The repo root is a Bun workspace with turbo. Its packages sit next to the Nix mo
 
 * [`hosts/pewter/flake-updater/`](./hosts/pewter/flake-updater/): the Updater (ADR 0009)
 * [`hosts/gram/x-blocklist/`](./hosts/gram/x-blocklist/): the X blocklist job on gram
+* [`modules/llm/opencode/kiro/`](./modules/llm/opencode/kiro/): the OpenCode plugin for Kiro
 
-`modules/llm/opencode/kiro/` is a separate Bun project with its own setup and stays outside the workspace. Versions shared across packages, Effect included, are pinned in the catalogs in the root `package.json`.
+Versions shared across packages, Effect included, are pinned in the catalogs in the root `package.json`.
 
 Run `nix develop` first for Bun and bun2nix.
 

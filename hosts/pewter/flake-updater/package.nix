@@ -32,6 +32,7 @@ stdenvNoCC.mkDerivation {
       # bun reads every workspace manifest, so the others must be present
       # even though only this one is built.
       (root + "/hosts/gram/x-blocklist/package.json")
+      (root + "/modules/llm/opencode/kiro/package.json")
       ./package.json
       ./blocked-paths.json
       ./tsconfig.json

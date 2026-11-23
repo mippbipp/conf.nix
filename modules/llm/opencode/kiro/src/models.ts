@@ -19,7 +19,7 @@ export const BUDGETS = new Map([
   ["max", 50_000],
 ]);
 const PROMPT_EFFORTS = ["low", "medium", "high", "max"];
-export const thinks = (id: string) => /claude/i.test(id) || id === "auto";
+export const thinks = (id: string) => /claude/iu.test(id) || id === "auto";
 
 // KiroModel is a model as Kiro lists it, kept in the plugin's storage
 // between runs. fields is the request fields it takes for thinking:
@@ -59,50 +59,39 @@ export const FALLBACK: ReadonlyArray<KiroModel> = [
 ];
 
 // a JSON schema's enum, as a model's request fields give one
-const Enum = field(
-  Schema.Struct({ enum: field(Schema.Array(Schema.Unknown)) })
-);
+const Values = Schema.Array(Schema.Unknown);
+const Enum = field(Schema.Struct({ enum: field(Values) }));
+// a JSON schema object's properties, as a model's request fields give them
+const withProperties = <F extends Schema.Struct.Fields>(fields: F) => {
+  const properties = field(Schema.Struct(fields));
+  return field(Schema.Struct({ properties }));
+};
+
+const MaxTokens = Schema.Struct({
+  maximum: field(Schema.Finite),
+  minimum: field(Schema.Finite),
+});
+const RequestFields = Schema.Struct({
+  max_tokens: field(MaxTokens),
+  output_config: withProperties({ effort: Enum }),
+  reasoning: withProperties({ effort: Enum }),
+  thinking: withProperties({ display: Enum, type: Enum }),
+});
+const TokenLimits = Schema.Struct({
+  maxInputTokens: field(Schema.Finite),
+  maxOutputTokens: field(Schema.Finite),
+});
+
+// the JSON schema of the request fields a model takes
+const RequestFieldsSchema = Schema.Struct({ properties: field(RequestFields) });
 
 // a model as List-Available-Models gives it
 const ListedModel = Schema.Struct({
-  additionalModelRequestFieldsSchema: field(
-    Schema.Struct({
-      properties: field(
-        Schema.Struct({
-          max_tokens: field(
-            Schema.Struct({
-              minimum: field(Schema.Finite),
-              maximum: field(Schema.Finite),
-            })
-          ),
-          output_config: field(
-            Schema.Struct({
-              properties: field(Schema.Struct({ effort: Enum })),
-            })
-          ),
-          reasoning: field(
-            Schema.Struct({
-              properties: field(Schema.Struct({ effort: Enum })),
-            })
-          ),
-          thinking: field(
-            Schema.Struct({
-              properties: field(Schema.Struct({ type: Enum, display: Enum })),
-            })
-          ),
-        })
-      ),
-    })
-  ),
+  additionalModelRequestFieldsSchema: field(RequestFieldsSchema),
   modelId: Schema.String,
   modelName: field(Schema.String),
   supportedInputTypes: field(Schema.Array(Schema.Unknown)),
-  tokenLimits: field(
-    Schema.Struct({
-      maxInputTokens: field(Schema.Finite),
-      maxOutputTokens: field(Schema.Finite),
-    })
-  ),
+  tokenLimits: field(TokenLimits),
 });
 type ListedModel = typeof ListedModel.Type;
 export const decodeListedModel = Schema.decodeUnknownOption(ListedModel);
@@ -118,9 +107,9 @@ function thinkingOf(
   fields: Fields
 ): Pick<KiroModel, "fields" | "efforts" | "off" | "summarized"> {
   const thinking = fields.thinking?.properties ?? {};
-  const style = fields.output_config
+  const style = Predicate.isNotNullish(fields.output_config)
     ? "claude"
-    : fields.reasoning
+    : Predicate.isNotNullish(fields.reasoning)
       ? "openai"
       : "";
   const efforts =
@@ -138,11 +127,11 @@ function thinkingOf(
 export function modelOf(listed: ListedModel): KiroModel {
   const fields = listed.additionalModelRequestFieldsSchema?.properties ?? {};
   const maxTokens = fields.max_tokens;
-  let name = listed.modelName;
-  if (!name || name === listed.modelId) {
+  let name = listed.modelName ?? "";
+  if (name === "" || name === listed.modelId) {
     name = listed.modelId === "auto" ? "Auto" : listed.modelId;
   }
-  return {
+  const model: KiroModel = {
     context: listed.tokenLimits?.maxInputTokens ?? 0,
     id: listed.modelId,
     images: Arr.some(
@@ -152,16 +141,17 @@ export function modelOf(listed: ListedModel): KiroModel {
     name,
     output: listed.tokenLimits?.maxOutputTokens ?? 0,
     ...thinkingOf(fields),
-    ...(maxTokens?.maximum && maxTokens.maximum > 0
-      ? { maxTokens: [maxTokens.minimum ?? 1, maxTokens.maximum] as const }
-      : {}),
   };
+  const maximum = maxTokens?.maximum ?? 0;
+  return maximum > 0
+    ? { ...model, maxTokens: [maxTokens?.minimum ?? 1, maximum] }
+    : model;
 }
 
 function variantsOf(model: KiroModel): Array<Model.Variant> {
   let levels: ReadonlyArray<string> = [];
   if (model.fields === "claude") {
-    levels = [...(model.off ? ["none"] : []), ...model.efforts];
+    levels = [...(model.off === true ? ["none"] : []), ...model.efforts];
   } else if (model.fields === "openai") {
     levels = model.efforts;
   } else if (thinks(model.id)) {

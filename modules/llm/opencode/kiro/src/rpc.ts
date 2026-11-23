@@ -6,6 +6,13 @@
 import { Rpc } from "@opencode/plugin/rpc";
 import { Schema } from "effect";
 
+// a free trial still running, with its own limit
+const Trial = Schema.Struct({
+  expiresAt: Schema.optional(Schema.Finite),
+  limit: Schema.Finite,
+  used: Schema.Finite,
+});
+
 // an allowance is one kind of usage the account has a limit for, credits today
 const Allowance = Schema.Struct({
   limit: Schema.Finite,
@@ -22,14 +29,7 @@ const Allowance = Schema.Struct({
       rate: Schema.Finite,
     })
   ),
-  // a free trial still running, with its own limit
-  trial: Schema.optional(
-    Schema.Struct({
-      expiresAt: Schema.optional(Schema.Finite),
-      limit: Schema.Finite,
-      used: Schema.Finite,
-    })
-  ),
+  trial: Schema.optional(Trial),
 });
 export const AccountUsage = Schema.Struct({
   allowances: Schema.Array(Allowance),
@@ -46,6 +46,10 @@ export type AccountUsage = typeof AccountUsage.Type;
 export type Allowance = typeof Allowance.Type;
 export type UsageAnswer = typeof UsageAnswer.Type;
 
+const UsageQuestion = Schema.Struct({
+  sessionIDs: Schema.Array(Schema.String),
+});
+
 export const KiroRpc = Rpc.define({
   events: {
     // the account or a session's credits changed: ask for usage again
@@ -56,9 +60,7 @@ export const KiroRpc = Rpc.define({
     // usage is the account's usage this month, and the credits each session
     // asked for has spent. error says why the account couldn't be read.
     usage: {
-      input: Schema.toStandardSchemaV1(
-        Schema.Struct({ sessionIDs: Schema.Array(Schema.String) })
-      ),
+      input: Schema.toStandardSchemaV1(UsageQuestion),
       output: Schema.toStandardSchemaV1(UsageAnswer),
     },
   },

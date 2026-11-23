@@ -3,7 +3,10 @@
 // answers over the RPC in rpc.ts, and says when to ask again; sidebar.ts
 // says what the answer shows as.
 
+/* oxlint-disable typescript/no-unsafe-return -- Solid's JSX.Element includes DOM's Node, which this package's lib leaves out, so the type-aware lint reads JSX as an error type */
+
 import { Plugin } from "@opencode/plugin/tui";
+import { Array as Arr } from "effect";
 import {
   type Accessor,
   createEffect,
@@ -16,6 +19,7 @@ import {
 } from "solid-js";
 
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
+// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Sidebar.lines
 import * as Sidebar from "./sidebar.ts";
 
 function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
@@ -30,7 +34,9 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
         data.family(data.root(props.sessionID))
       ),
     undefined,
-    { equals: (before, now) => before.join(",") === now.join(",") }
+    {
+      equals: (before, now) => Arr.join(before, ",") === Arr.join(now, ","),
+    }
   );
   const location = createMemo(() => session()?.location, undefined, {
     equals: (before, now) => before?.directory === now?.directory,
@@ -42,9 +48,15 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
       props.context.client
         .rpc(KiroRpc)
         .usage({ sessionIDs: [...sessionIDs()] }, { location: location() })
-    ).then(Sidebar.answerOf, Sidebar.unanswered);
+    )
+      .then(Sidebar.answerOf)
+      .catch(Sidebar.unanswered);
   const [usage, { refetch }] = createResource(
-    () => [sessionIDs().join(","), location()?.directory ?? ""].join("\n"),
+    () =>
+      Arr.join(
+        [Arr.join(sessionIDs(), ","), location()?.directory ?? ""],
+        "\n"
+      ),
     ask
   );
 
@@ -85,6 +97,7 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
     <Show when={answer()}>
       {(shown: Accessor<UsageAnswer>) => (
         <box>
+          {/* oxlint-disable-next-line effecttsgo/global-date -- Solid view code, outside any Effect, so there is no Clock */}
           <For each={Sidebar.lines(shown(), sessionIDs(), Date.now())}>
             {(line) => (
               <text fg={colour(line.tone)}>

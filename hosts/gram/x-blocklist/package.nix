@@ -28,6 +28,7 @@ stdenvNoCC.mkDerivation {
       # bun reads every workspace manifest, so the others must be present
       # even though only this one is built.
       (root + "/hosts/pewter/flake-updater/package.json")
+      (root + "/modules/llm/opencode/kiro/package.json")
       ./package.json
       ./tsconfig.json
       ./vitest.config.ts

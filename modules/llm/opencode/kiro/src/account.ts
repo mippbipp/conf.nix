@@ -4,13 +4,20 @@
 
 import { Database } from "bun:sqlite";
 import { execFile } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
-import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import {
+  access,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from "node:fs/promises";
 import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import nodePath from "node:path";
 
 import {
   Array as Arr,
+  Cause,
   Clock,
   Context,
   DateTime,
@@ -22,11 +29,13 @@ import {
   Schema,
   Semaphore,
   String as Str,
+  type Types,
 } from "effect";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
 
+// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
 import * as Failure from "./failure.ts";
-import { deadline, field, isOk, send } from "./kiro.ts";
+import { deadline, field, isOk, isSet, send } from "./kiro.ts";
 import { decodeListedModel, type KiroModel, modelOf } from "./models.ts";
 import type { AccountUsage, Allowance } from "./rpc.ts";
 
@@ -36,17 +45,27 @@ const refreshURL = (region: string) =>
   `https://prod.${region}.auth.desktop.kiro.dev/refreshToken`;
 // how the Kiro IDE names itself when it refreshes a Google or GitHub sign-in
 const DESKTOP_UA = "Kiro-Desktop/0.2.13 (darwin; arm64)";
-// A Builder ID sign-in has no profile of its own and Kiro won't list one for
-// it (List-Available-Profiles answers 403, "AWS Builder ID is not supported
-// for this operation"). kiro-cli and the IDE use this service profile.
+// A Builder ID sign-in has no profile of its own, and Kiro won't list one
+// for it: List-Available-Profiles answers 403, "AWS Builder ID is not
+// supported for this operation". kiro-cli and the IDE use this service
+// profile.
 const BUILDER_ID_START = "https://view.awsapps.com/start";
 const BUILDER_ID_PROFILE =
   "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX";
 const isBuilderID = (provider: string | null | undefined) =>
   Str.toLowerCase(provider ?? "") === "builderid";
 
+const { delimiter, join } = nodePath;
+
+// filled is a string kiro-cli, the IDE or Kiro gave, unless it is missing or empty
+const filled = (text: string | null | undefined) =>
+  text === undefined || text === null || text === "" ? undefined : text;
+
 const env = (name: string) => process.env[name] ?? "";
-const home = () => env("HOME") || homedir();
+const home = () => filled(env("HOME")) ?? homedir();
+
+// a failure of Node or SQLite, which every caller lets go
+const unknownError = (cause: unknown) => new Cause.UnknownError(cause);
 
 // ---- where kiro-cli and the Kiro IDE keep their sign-in -------------------------
 
@@ -136,7 +155,7 @@ const parsed = <A>(
 function cliDB() {
   if (process.platform === "win32") {
     return join(
-      env("APPDATA") || join(home(), "AppData", "Roaming"),
+      filled(env("APPDATA")) ?? join(home(), "AppData", "Roaming"),
       "kiro-cli",
       "data.sqlite3"
     );
@@ -155,13 +174,13 @@ function cliDB() {
 const ideDir = () => join(home(), ".aws", "sso", "cache");
 
 // kiroExecutable finds kiro-cli, which refreshes its own sign-in.
-function kiroExecutable() {
+const kiroExecutable = Effect.fnUntraced(function* () {
   for (const dir of Str.split(env("PATH"), delimiter)) {
     const path = join(
       dir,
       process.platform === "win32" ? "kiro-cli.exe" : "kiro-cli"
     );
-    if (dir && isFile(path)) {
+    if (dir !== "" && (yield* isFile(path))) {
       return path;
     }
   }
@@ -171,22 +190,20 @@ function kiroExecutable() {
     "/usr/local/bin/kiro-cli",
     "/opt/homebrew/bin/kiro-cli",
   ]) {
-    if (isFile(path)) {
+    if (yield* isFile(path)) {
       return path;
     }
   }
   return "";
-}
-function isFile(path: string) {
-  try {
-    return statSync(path).isFile();
-  } catch {
-    return false;
-  }
-}
+});
+const isFile = (path: string) =>
+  Effect.tryPromise({ catch: unknownError, try: () => stat(path) }).pipe(
+    Effect.map((stats) => stats.isFile()),
+    Effect.orElseSucceed(() => false)
+  );
 
 const time = (date: string | null | undefined) =>
-  date
+  date !== undefined && date !== null && date !== ""
     ? Option.match(DateTime.make(date), {
         onNone: () => 0,
         onSome: DateTime.toEpochMillis,
@@ -197,11 +214,14 @@ const time = (date: string | null | undefined) =>
 const withDB = <A>(
   path: string,
   options: { readonly: true } | { readwrite: true },
-  use: (db: Database) => A
+  run: (db: Database) => A
 ) =>
   Effect.acquireUseRelease(
-    Effect.try(() => new Database(path, options)),
-    (db) => Effect.try(() => use(db)),
+    Effect.try({
+      catch: unknownError,
+      try: () => new Database(path, options),
+    }),
+    (db) => Effect.try({ catch: unknownError, try: () => run(db) }),
     (db) => Effect.sync(() => db.close())
   );
 
@@ -215,19 +235,21 @@ function readText(db: Database, table: "auth_kv" | "state", key: string) {
   const raw = db
     .query<Row, [string]>(`SELECT value FROM ${table} WHERE key = ?`)
     .get(key)?.value;
-  const value = raw instanceof Uint8Array ? new TextDecoder().decode(raw) : raw;
-  return value || undefined;
+  const value = Predicate.isUint8Array(raw)
+    ? new TextDecoder().decode(raw)
+    : raw;
+  return filled(value);
 }
 
 const CLI_KINDS = ["social", "odic", "external-idp"] as const;
 interface CliRows {
   profile: string | undefined;
   registration: string | undefined;
-  tokens: {
-    kind: (typeof CLI_KINDS)[number];
+  tokens: Array<{
     key: string;
+    kind: (typeof CLI_KINDS)[number];
     text: string | undefined;
-  }[];
+  }>;
 }
 
 // cliCred is kiro-cli's sign-in from the rows it keeps: Google or GitHub,
@@ -235,41 +257,46 @@ interface CliRows {
 function cliCred(rows: CliRows): Cred | null {
   for (const { key, kind, text } of rows.tokens) {
     const token = parsed(decodeCliToken, text);
-    if (!token?.access_token) {
-      continue;
-    }
-    const cred: Cred = {
-      access: token.access_token,
-      expires: time(token.expires_at),
-      refresh: token.refresh_token ?? "",
-      region: token.region || "us-east-1",
-      // an AWS sign-in's token names no profile; kiro-cli keeps the one it picked in its state
-      dbKey: key,
-      method: "social",
-      profile:
-        token.profile_arn || parsed(decodeCliProfile, rows.profile)?.arn || "",
-    };
-    if (kind === "odic") {
-      cred.method = "idc";
-      // kiro-cli tells Builder ID apart by its start URL, or by having none
-      cred.builderID = !token.start_url || token.start_url === BUILDER_ID_START;
-      const reg = parsed(decodeCliRegistration, rows.registration);
-      if (reg) {
-        [cred.clientId, cred.clientSecret] = [
-          reg.client_id ?? "",
-          reg.client_secret ?? "",
-        ];
+    const accessToken = filled(token?.access_token);
+    if (token !== undefined && accessToken !== undefined) {
+      const cred: Cred = {
+        access: accessToken,
+        expires: time(token.expires_at),
+        refresh: token.refresh_token ?? "",
+        region: filled(token.region) ?? "us-east-1",
+        // an AWS sign-in's token names no profile; kiro-cli keeps the one it picked in its state
+        dbKey: key,
+        method: "social",
+        profile:
+          filled(token.profile_arn) ??
+          filled(parsed(decodeCliProfile, rows.profile)?.arn) ??
+          "",
+      };
+      if (kind === "odic") {
+        cred.method = "idc";
+        // kiro-cli tells Builder ID apart by its start URL, or by having none
+        cred.builderID =
+          filled(token.start_url) === undefined ||
+          token.start_url === BUILDER_ID_START;
+        const reg = parsed(decodeCliRegistration, rows.registration);
+        if (reg !== undefined) {
+          [cred.clientId, cred.clientSecret] = [
+            reg.client_id ?? "",
+            reg.client_secret ?? "",
+          ];
+        }
+      } else if (kind === "external-idp") {
+        cred.method = "external-idp";
+        cred.clientId = token.client_id ?? "";
+        const issuer = filled(token.issuer_url);
+        cred.tokenURL =
+          filled(token.token_endpoint) ??
+          (issuer === undefined
+            ? ""
+            : `${Str.replace(/\/$/u, "")(issuer)}/v1/token`);
       }
-    } else if (kind === "external-idp") {
-      cred.method = "external-idp";
-      cred.clientId = token.client_id ?? "";
-      cred.tokenURL =
-        token.token_endpoint ||
-        (token.issuer_url
-          ? `${Str.replace(/\/$/, "")(token.issuer_url)}/v1/token`
-          : "");
+      return cred;
     }
-    return cred;
   }
   return null;
 }
@@ -278,7 +305,14 @@ function cliCred(rows: CliRows): Cred | null {
 const readCLI = Effect.fnUntraced(
   function* () {
     const path = cliDB();
-    if (!(yield* Effect.sync(() => existsSync(path)))) {
+    const exists = yield* Effect.tryPromise({
+      catch: unknownError,
+      try: () => access(path),
+    }).pipe(
+      Effect.as(true),
+      Effect.orElseSucceed(() => false)
+    );
+    if (!exists) {
       return null;
     }
     const rows = yield* withDB(path, { readonly: true }, (db) => ({
@@ -298,31 +332,34 @@ const readJson = <A>(
   path: string,
   decode: (text: string) => Option.Option<A>
 ) =>
-  Effect.tryPromise(() => readFile(path, "utf8")).pipe(
-    Effect.flatMap((text) => Effect.fromOption(decode(text)))
-  );
+  Effect.tryPromise({
+    catch: unknownError,
+    try: () => readFile(path, "utf8"),
+  }).pipe(Effect.flatMap((text) => Effect.fromOption(decode(text))));
 
 // readIDE reads the Kiro IDE's sign-in; null when there is none it can read.
 const readIDE = Effect.fnUntraced(
   function* () {
     const path = join(ideDir(), "kiro-auth-token.json");
     const token = yield* readJson(path, decodeIdeToken);
-    if (!token.accessToken) {
+    const accessToken = filled(token.accessToken);
+    if (accessToken === undefined) {
       return null;
     }
     const cred: Cred = {
-      access: token.accessToken,
+      access: accessToken,
       builderID: isBuilderID(token.provider),
       expires: time(token.expiresAt),
       idePath: path,
       method: "idc",
       profile: token.profileArn ?? "",
       refresh: token.refreshToken ?? "",
-      region: token.region || "us-east-1",
+      region: filled(token.region) ?? "us-east-1",
     };
-    if (token.clientIdHash) {
+    const clientIdHash = filled(token.clientIdHash);
+    if (clientIdHash !== undefined) {
       const reg = yield* readJson(
-        join(ideDir(), `${token.clientIdHash}.json`),
+        join(ideDir(), `${clientIdHash}.json`),
         decodeIdeRegistration
       ).pipe(Effect.option);
       if (Option.isSome(reg)) {
@@ -334,7 +371,8 @@ const readIDE = Effect.fnUntraced(
     }
     if (
       Str.toLowerCase(String(token.authMethod)) === "social" ||
-      !cred.clientId
+      cred.clientId === undefined ||
+      cred.clientId === ""
     ) {
       cred.method = "social";
     }
@@ -352,7 +390,7 @@ const readIDE = Effect.fnUntraced(
 const saveBack = Effect.fnUntraced(
   function* (cred: Cred, from: string) {
     const expires = DateTime.formatIso(DateTime.makeUnsafe(cred.expires));
-    if (cred.dbKey) {
+    if (cred.dbKey !== undefined && cred.dbKey !== "") {
       const key = cred.dbKey;
       yield* withDB(cliDB(), { readwrite: true }, (db) => {
         db.run("PRAGMA busy_timeout = 3000");
@@ -360,25 +398,27 @@ const saveBack = Effect.fnUntraced(
         // can't write between the check and the update
         db.transaction(() => {
           const stored = parsed(decodeJsonObject, readText(db, "auth_kv", key));
-          if (!stored || stored.access_token !== from) {
+          if (stored === undefined || stored.access_token !== from) {
             return;
           }
-          const next = {
+          const updated = {
             ...stored,
             access_token: cred.access,
             expires_at: expires,
             refresh_token: cred.refresh,
-            ...(cred.profile && cred.method === "social"
-              ? { profile_arn: cred.profile }
-              : {}),
           };
+          const next =
+            cred.profile !== "" && cred.method === "social"
+              ? { ...updated, profile_arn: cred.profile }
+              : updated;
           db.query("UPDATE auth_kv SET value = ? WHERE key = ?").run(
+            // oxlint-disable-next-line effecttsgo/global-json -- next is a JSON object read from kiro-cli's row with strings set on it, so stringify cannot throw
             JSON.stringify(next),
             key
           );
         }).immediate();
       });
-    } else if (cred.idePath) {
+    } else if (cred.idePath !== undefined && cred.idePath !== "") {
       const path = cred.idePath;
       const tmp = `${path}.opencode-tmp`;
       const stored = yield* readJson(path, decodeJsonObject);
@@ -388,14 +428,18 @@ const saveBack = Effect.fnUntraced(
         expiresAt: expires,
         refreshToken: cred.refresh,
       });
-      yield* Effect.tryPromise(() => writeFile(tmp, text, { mode: 0o600 }));
+      yield* Effect.tryPromise({
+        catch: unknownError,
+        try: () => writeFile(tmp, text, { mode: 0o600 }),
+      });
       // The IDE takes no lock on its file, so this checks just before the
       // rename. An IDE write between the check and the rename is still lost.
       const now = yield* readJson(path, decodeJsonObject).pipe(Effect.option);
       const newer = Option.isNone(now) || now.value.accessToken !== from;
-      yield* Effect.tryPromise(() =>
-        newer ? rm(tmp, { force: true }) : rename(tmp, path)
-      );
+      yield* Effect.tryPromise({
+        catch: unknownError,
+        try: () => (newer ? rm(tmp, { force: true }) : rename(tmp, path)),
+      });
     }
   },
   (effect) => Effect.ignore(effect)
@@ -409,7 +453,7 @@ const EXPIRED =
   "Kiro's sign-in has expired. Run `kiro-cli login`, then try again.";
 const EARLY_MS = 2 * 60 * 1000; // a token this close to its end is refreshed before a request
 const fresh = (cred: Cred, now: number) =>
-  !cred.expires || cred.expires - now > EARLY_MS;
+  !isSet(cred.expires) || cred.expires - now > EARLY_MS;
 
 // the fields the three token endpoints answer with, in their two spellings
 const TokenAnswer = Schema.Struct({
@@ -449,8 +493,8 @@ const tokenPost = Effect.fnUntraced(
   (effect, request) =>
     effect.pipe(
       deadline(request.url, 30),
-      Effect.catchTag("TimeoutError", (error) =>
-        Effect.fail(refreshFailed(error))
+      Effect.catchTag("TimeoutError", (timeout) =>
+        Effect.fail(refreshFailed(timeout))
       )
     )
 );
@@ -471,8 +515,70 @@ const kiroCli = (bin: string, args: Array<string>) =>
 interface TokenOut {
   access?: string | null;
   expiresIn?: number | null;
+  profile?: string | null;
   refresh?: string | null;
 }
+
+// askToken asks the sign-in's token endpoint for a new token, the way its
+// owner would; undefined when it has none to ask
+const askToken = Effect.fnUntraced(function* (
+  cred: Cred,
+  refreshToken: string
+): Effect.fn.Return<
+  TokenOut | undefined,
+  Failure.SignInError | Failure.RefreshError,
+  HttpClient.HttpClient
+> {
+  if (cred.method === "social") {
+    const answer = yield* tokenPost(
+      HttpClientRequest.post(refreshURL(cred.region)).pipe(
+        HttpClientRequest.setHeader("User-Agent", DESKTOP_UA),
+        HttpClientRequest.bodyJsonUnsafe({ refreshToken })
+      )
+    );
+    return {
+      access: answer.accessToken,
+      expiresIn: answer.expiresIn,
+      profile: answer.profileArn,
+      refresh: answer.refreshToken,
+    };
+  }
+  if (cred.method === "idc") {
+    const answer = yield* tokenPost(
+      HttpClientRequest.post(`${oidc(cred.region)}/token`).pipe(
+        HttpClientRequest.bodyJsonUnsafe({
+          clientId: cred.clientId,
+          clientSecret: cred.clientSecret,
+          grantType: "refresh_token",
+          refreshToken,
+        })
+      )
+    );
+    return {
+      access: answer.accessToken,
+      expiresIn: answer.expiresIn,
+      refresh: answer.refreshToken,
+    };
+  }
+  const tokenURL = filled(cred.tokenURL);
+  if (tokenURL === undefined) {
+    return undefined;
+  }
+  const answer = yield* tokenPost(
+    HttpClientRequest.post(tokenURL).pipe(
+      HttpClientRequest.bodyUrlParams({
+        client_id: cred.clientId ?? "",
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+      })
+    )
+  );
+  return {
+    access: answer.access_token,
+    expiresIn: answer.expires_in,
+    refresh: answer.refresh_token,
+  };
+});
 
 // refresh refreshes a sign-in's token the way its owner would, kiro-cli's
 // by kiro-cli first. byKiroCli says kiro-cli did it. Its sign-in is then
@@ -484,14 +590,14 @@ const refresh = Effect.fnUntraced(function* (
   Failure.SignInError | Failure.RefreshError,
   HttpClient.HttpClient
 > {
-  if (cred.dbKey) {
-    const bin = yield* Effect.sync(kiroExecutable);
-    if (bin) {
+  if (filled(cred.dbKey) !== undefined) {
+    const bin = yield* kiroExecutable();
+    if (bin !== "") {
       yield* kiroCli(bin, ["debug", "refresh-auth-token"]);
       const reread = yield* readCLI();
       const now = yield* Clock.currentTimeMillis;
       if (
-        reread &&
+        reread !== null &&
         reread.dbKey === cred.dbKey &&
         reread.access !== cred.access &&
         fresh(reread, now)
@@ -500,74 +606,28 @@ const refresh = Effect.fnUntraced(function* (
       }
     }
   }
-  if (!cred.refresh) {
+  if (cred.refresh === "") {
     return yield* Failure.SignInError.make({ message: EXPIRED });
   }
-  let { profile } = cred;
-  let out: TokenOut;
-  if (cred.method === "social") {
-    const answer = yield* tokenPost(
-      HttpClientRequest.post(refreshURL(cred.region)).pipe(
-        HttpClientRequest.setHeader("User-Agent", DESKTOP_UA),
-        HttpClientRequest.bodyJsonUnsafe({ refreshToken: cred.refresh })
-      )
-    );
-    out = {
-      access: answer.accessToken,
-      expiresIn: answer.expiresIn,
-      refresh: answer.refreshToken,
-    };
-    if (answer.profileArn) {
-      profile = answer.profileArn;
-    }
-  } else if (cred.method === "idc") {
-    const answer = yield* tokenPost(
-      HttpClientRequest.post(`${oidc(cred.region)}/token`).pipe(
-        HttpClientRequest.bodyJsonUnsafe({
-          clientId: cred.clientId,
-          clientSecret: cred.clientSecret,
-          grantType: "refresh_token",
-          refreshToken: cred.refresh,
-        })
-      )
-    );
-    out = {
-      access: answer.accessToken,
-      expiresIn: answer.expiresIn,
-      refresh: answer.refreshToken,
-    };
-  } else {
-    if (!cred.tokenURL) {
-      return yield* Failure.SignInError.make({ message: EXPIRED });
-    }
-    const answer = yield* tokenPost(
-      HttpClientRequest.post(cred.tokenURL).pipe(
-        HttpClientRequest.bodyUrlParams({
-          client_id: cred.clientId ?? "",
-          grant_type: "refresh_token",
-          refresh_token: cred.refresh,
-        })
-      )
-    );
-    out = {
-      access: answer.access_token,
-      expiresIn: answer.expires_in,
-      refresh: answer.refresh_token,
-    };
-  }
-  if (!out.access) {
+  const out = yield* askToken(cred, cred.refresh);
+  const token = filled(out?.access);
+  if (out === undefined || token === undefined) {
     return yield* Failure.SignInError.make({ message: EXPIRED });
   }
-  const expiresIn = out.expiresIn && out.expiresIn > 0 ? out.expiresIn : 3600;
+  const expiresIn =
+    out.expiresIn !== undefined && out.expiresIn !== null && out.expiresIn > 0
+      ? out.expiresIn
+      : 3600;
   const now = yield* Clock.currentTimeMillis;
   const refreshed: Cred = {
     ...cred,
-    access: out.access,
+    access: token,
     expires: now + expiresIn * 1000,
-    profile,
+    profile: filled(out.profile) ?? cred.profile,
   };
-  if (out.refresh) {
-    refreshed.refresh = out.refresh;
+  const refreshToken = filled(out.refresh);
+  if (refreshToken !== undefined) {
+    refreshed.refresh = refreshToken;
   }
   yield* saveBack(refreshed, cred.access);
   return { byKiroCli: false, cred: refreshed };
@@ -584,9 +644,9 @@ export interface Auth {
 // authHeaders are the headers that sign a call to Kiro.
 export function authHeaders(auth: Pick<Auth, "token" | "tokenType">) {
   const Authorization = `Bearer ${auth.token}`;
-  return auth.tokenType
-    ? { Authorization, tokentype: auth.tokenType }
-    : { Authorization };
+  return auth.tokenType === ""
+    ? { Authorization }
+    : { Authorization, tokentype: auth.tokenType };
 }
 const tokenType = (cred: Cred) =>
   cred.method === "external-idp" ? "EXTERNAL_IDP" : "";
@@ -594,13 +654,12 @@ const tokenType = (cred: Cred) =>
 // regionOf is where the account's API is: the region its profile is in,
 // else the nearer of Kiro's two to where it signed in.
 function regionOf(profile: string, signedIn: string) {
-  const parts = Str.split(String(profile ?? ""), ":");
-  if (parts.length > 4 && parts[3]) {
-    return parts[3];
+  const parts = Str.split(profile, ":");
+  const region = filled(parts[3]);
+  if (parts.length > 4 && region !== undefined) {
+    return region;
   }
-  return Str.startsWith("eu-")(String(signedIn ?? ""))
-    ? "eu-central-1"
-    : "us-east-1";
+  return Str.startsWith("eu-")(signedIn) ? "eu-central-1" : "us-east-1";
 }
 
 // what a management API call sends: a query, which makes it a GET, or a
@@ -609,14 +668,20 @@ type ManagementInput =
   | { query: Record<string, string> }
   | { body: Schema.JsonObject };
 
-// managementCall calls Kiro's management API in auth's region. decode reads
-// the answer. The 20 second deadline covers reading the answer too.
+// a management API call: the method, what it sends, and decode, which
+// reads the answer
+interface ManagementCall<A> {
+  decode: (json: Schema.Json) => Effect.Effect<A, Schema.SchemaError>;
+  input: ManagementInput;
+  method: string;
+}
+
+// managementCall calls Kiro's management API in auth's region. The 20
+// second deadline covers reading the answer too.
 const managementCall = Effect.fnUntraced(
   function* <A>(
-    decode: (json: Schema.Json) => Effect.Effect<A, Schema.SchemaError>,
     auth: Pick<Auth, "token" | "tokenType" | "region">,
-    method: string,
-    input: ManagementInput
+    { decode, input, method }: ManagementCall<A>
   ): Effect.fn.Return<A, Failure.KiroApiError, HttpClient.HttpClient> {
     const url = `${management(auth.region)}/${method}`;
     const request = (
@@ -635,10 +700,8 @@ const managementCall = Effect.fnUntraced(
     );
     const res = yield* send(request).pipe(Effect.mapError(unreachable(method)));
     if (!isOk(res.status)) {
-      return yield* Failure.KiroApiError.fromReply(
-        res.status,
-        yield* res.text.pipe(Effect.orElseSucceed(() => ""))
-      );
+      const body = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
+      return yield* Failure.KiroApiError.fromReply(res.status, body);
     }
     return yield* res.json.pipe(
       Effect.flatMap(decode),
@@ -651,11 +714,11 @@ const managementCall = Effect.fnUntraced(
       )
     );
   },
-  (effect, _decode, auth, method) =>
+  (effect, auth, { method }) =>
     effect.pipe(
       deadline(management(auth.region), 20),
-      Effect.catchTag("TimeoutError", (error) =>
-        Effect.fail(unreachable(method)(error))
+      Effect.catchTag("TimeoutError", (timeout) =>
+        Effect.fail(unreachable(method)(timeout))
       )
     )
 );
@@ -667,10 +730,10 @@ const unreachable = (method: string) => (error: { message: string }) =>
     status: 502,
   });
 
+const Profile = Schema.Struct({ arn: field(Schema.String) });
+const Profiles = Schema.Array(Profile);
 const decodeProfiles = Schema.decodeUnknownEffect(
-  Schema.Struct({
-    profiles: field(Schema.Array(Schema.Struct({ arn: field(Schema.String) }))),
-  })
+  Schema.Struct({ profiles: field(Profiles) })
 );
 
 // profileOf finds the profile for a sign-in that names none: Builder ID's,
@@ -678,42 +741,43 @@ const decodeProfiles = Schema.decodeUnknownEffect(
 const profileOf = Effect.fnUntraced(function* (
   cred: Cred
 ): Effect.fn.Return<string, Failure.KiroApiError, HttpClient.HttpClient> {
-  if (cred.builderID) {
+  if (cred.builderID === true) {
     return BUILDER_ID_PROFILE;
   }
-  let last: Failure.KiroApiError | undefined;
+  let last = Option.none<Failure.KiroApiError>();
   for (const region of ["us-east-1", "eu-central-1"]) {
     const out = yield* managementCall(
-      decodeProfiles,
       { region, token: cred.access, tokenType: tokenType(cred) },
-      "List-Available-Profiles",
-      { body: {} }
+      {
+        decode: decodeProfiles,
+        input: { body: {} },
+        method: "List-Available-Profiles",
+      }
     ).pipe(Effect.result);
     if (Result.isSuccess(out)) {
       for (const profile of out.success.profiles ?? []) {
-        if (profile.arn) {
-          return profile.arn;
+        const arn = filled(profile.arn);
+        if (arn !== undefined) {
+          return arn;
         }
       }
-      continue;
-    }
-    // a Builder ID sign-in the token didn't say was one
-    if (
+    } else if (
+      // a Builder ID sign-in the token didn't say was one
       cred.method === "idc" &&
       out.failure.status === 403 &&
       Str.includes("Builder ID")(out.failure.body)
     ) {
       return BUILDER_ID_PROFILE;
+    } else {
+      last = Option.some(out.failure);
     }
-    last = out.failure;
   }
-  return yield* (
-    last ??
-      Failure.KiroApiError.make({
-        body: "",
-        message: "Kiro has no profile for this sign-in",
-        status: 502,
-      })
+  return yield* Option.getOrElse(last, () =>
+    Failure.KiroApiError.make({
+      body: "",
+      message: "Kiro has no profile for this sign-in",
+      status: 502,
+    })
   );
 });
 
@@ -723,6 +787,14 @@ const profileOf = Effect.fnUntraced(function* (
 // shows it. Its userInfo (email, user id) is never read.
 const amount = field(Schema.Finite);
 const when = field(Schema.Union([Schema.Finite, Schema.String])); // epoch seconds, or a date
+const FreeTrialInfo = Schema.Struct({
+  currentUsage: amount,
+  currentUsageWithPrecision: amount,
+  freeTrialExpiry: when,
+  freeTrialStatus: field(Schema.String),
+  usageLimit: amount,
+  usageLimitWithPrecision: amount,
+});
 const Breakdown = Schema.Struct({
   currency: field(Schema.String),
   currentOverages: amount,
@@ -731,16 +803,7 @@ const Breakdown = Schema.Struct({
   currentUsageWithPrecision: amount,
   displayName: field(Schema.String),
   displayNamePlural: field(Schema.String),
-  freeTrialInfo: field(
-    Schema.Struct({
-      currentUsage: amount,
-      currentUsageWithPrecision: amount,
-      freeTrialExpiry: when,
-      freeTrialStatus: field(Schema.String),
-      usageLimit: amount,
-      usageLimitWithPrecision: amount,
-    })
-  ),
+  freeTrialInfo: field(FreeTrialInfo),
   nextDateReset: when,
   overageCap: amount,
   overageCapWithPrecision: amount,
@@ -750,16 +813,19 @@ const Breakdown = Schema.Struct({
   usageLimit: amount,
   usageLimitWithPrecision: amount,
 });
+const Breakdowns = Schema.Array(Breakdown);
+const OverageConfiguration = Schema.Struct({
+  overageStatus: field(Schema.String),
+});
+const SubscriptionInfo = Schema.Struct({
+  subscriptionTitle: field(Schema.String),
+});
 const decodeUsageLimits = Schema.decodeUnknownEffect(
   Schema.Struct({
     nextDateReset: when,
-    overageConfiguration: field(
-      Schema.Struct({ overageStatus: field(Schema.String) })
-    ),
-    subscriptionInfo: field(
-      Schema.Struct({ subscriptionTitle: field(Schema.String) })
-    ),
-    usageBreakdownList: field(Schema.Array(Breakdown)),
+    overageConfiguration: field(OverageConfiguration),
+    subscriptionInfo: field(SubscriptionInfo),
+    usageBreakdownList: field(Breakdowns),
   })
 );
 
@@ -768,7 +834,7 @@ const millis = (date: number | string | null | undefined) =>
 // "KIRO PRO" is Kiro Pro
 const planName = (title: string | null | undefined) =>
   // oxlint-disable-next-line effecttsgo/prefer-effect-string -- effect/String.replaceAll takes no replacer function
-  Str.toLowerCase(title || "Kiro").replaceAll(/\b\p{L}/gu, (letter) =>
+  Str.toLowerCase(filled(title) ?? "Kiro").replaceAll(/\b\p{L}/gu, (letter) =>
     Str.toUpperCase(letter)
   );
 
@@ -778,15 +844,19 @@ type Breakdown = typeof Breakdown.Type;
 // trialOf is a breakdown's free trial, while it is active
 function trialOf(breakdown: Breakdown) {
   const trial = breakdown.freeTrialInfo;
-  if (!trial || trial.freeTrialStatus !== "ACTIVE") {
-    return;
-  }
+  return trial?.freeTrialStatus === "ACTIVE" ? activeTrial(trial) : undefined;
+}
+
+function activeTrial(trial: typeof FreeTrialInfo.Type) {
   const expiresAt = millis(trial.freeTrialExpiry);
-  return {
+  const out: Types.Mutable<NonNullable<Allowance["trial"]>> = {
     limit: trial.usageLimitWithPrecision ?? trial.usageLimit ?? 0,
     used: trial.currentUsageWithPrecision ?? trial.currentUsage ?? 0,
-    ...(expiresAt ? { expiresAt } : {}),
   };
+  if (isSet(expiresAt)) {
+    out.expiresAt = expiresAt;
+  }
+  return out;
 }
 
 // overageOf is a breakdown's overage, when overages are on (enabled) or it
@@ -794,17 +864,18 @@ function trialOf(breakdown: Breakdown) {
 function overageOf(breakdown: Breakdown, enabled: boolean) {
   const over =
     breakdown.currentOveragesWithPrecision ?? breakdown.currentOverages ?? 0;
-  if (!enabled && !(over > 0) && !breakdown.overageCharges) {
-    return;
-  }
-  return {
-    cap: breakdown.overageCapWithPrecision ?? breakdown.overageCap ?? 0,
-    charges: breakdown.overageCharges ?? 0,
-    credits: over,
-    currency: breakdown.currency || "USD",
-    enabled,
-    rate: breakdown.overageRate ?? 0,
-  };
+  const charges = breakdown.overageCharges ?? 0;
+  const shown = enabled || over > 0 || isSet(charges);
+  return shown
+    ? {
+        cap: breakdown.overageCapWithPrecision ?? breakdown.overageCap ?? 0,
+        charges,
+        credits: over,
+        currency: filled(breakdown.currency) ?? "USD",
+        enabled,
+        rate: breakdown.overageRate ?? 0,
+      }
+    : undefined;
 }
 
 // allowanceOf is a breakdown as the sidebar shows it, or undefined for one
@@ -815,21 +886,26 @@ function allowanceOf(
 ): Allowance | undefined {
   const trial = trialOf(breakdown);
   const limit = breakdown.usageLimitWithPrecision ?? breakdown.usageLimit ?? 0;
-  if (!limit && !trial?.limit) {
+  if (!isSet(limit) && !isSet(trial?.limit ?? 0)) {
     return undefined;
   }
   const overage = overageOf(breakdown, enabled);
-  return {
+  const allowance: Types.Mutable<Allowance> = {
     limit,
     name:
-      breakdown.displayNamePlural ||
-      breakdown.displayName ||
-      breakdown.resourceType ||
+      filled(breakdown.displayNamePlural) ??
+      filled(breakdown.displayName) ??
+      filled(breakdown.resourceType) ??
       "Credits",
     used: breakdown.currentUsageWithPrecision ?? breakdown.currentUsage ?? 0,
-    ...(overage ? { overage } : {}),
-    ...(trial ? { trial } : {}),
   };
+  if (overage !== undefined) {
+    allowance.overage = overage;
+  }
+  if (trial !== undefined) {
+    allowance.trial = trial;
+  }
+  return allowance;
 }
 
 function accountUsage(limits: UsageLimits, checkedAt: number): AccountUsage {
@@ -837,15 +913,13 @@ function accountUsage(limits: UsageLimits, checkedAt: number): AccountUsage {
   const allowances: Array<Allowance> = [];
   let resetsAt = millis(limits.nextDateReset);
   for (const breakdown of limits.usageBreakdownList ?? []) {
-    if (!breakdown) {
-      continue;
-    }
     const allowance = allowanceOf(breakdown, enabled);
-    if (!allowance) {
-      continue;
+    if (allowance !== undefined) {
+      allowances.push(allowance);
+      if (!isSet(resetsAt)) {
+        resetsAt = millis(breakdown.nextDateReset);
+      }
     }
-    allowances.push(allowance);
-    resetsAt ||= millis(breakdown.nextDateReset);
   }
   return {
     allowances,
@@ -857,29 +931,31 @@ function accountUsage(limits: UsageLimits, checkedAt: number): AccountUsage {
 
 // readUsage reads the account's usage from Kiro
 const readUsage = Effect.fnUntraced(function* (auth: Auth) {
-  const limits = yield* managementCall(
-    decodeUsageLimits,
-    auth,
-    "Get-Usage-Limits",
-    {
+  const limits = yield* managementCall(auth, {
+    decode: decodeUsageLimits,
+    input: {
       query: {
         origin: "KIRO_CLI",
         profileArn: auth.profile,
         resourceType: "CREDIT",
       },
-    }
-  );
-  return accountUsage(limits, yield* Clock.currentTimeMillis);
+    },
+    method: "Get-Usage-Limits",
+  });
+  const checkedAt = yield* Clock.currentTimeMillis;
+  return accountUsage(limits, checkedAt);
 });
 
 // ---- models ----------------------------------------------------------------------
 
 // a page of List-Available-Models; each model is read on its own, so one
 // Kiro lists in a shape this doesn't know leaves the rest
+const UnknownModels = Schema.Array(Schema.Unknown);
+const DefaultModel = Schema.Struct({ modelId: field(Schema.String) });
 const decodeModelsPage = Schema.decodeUnknownEffect(
   Schema.Struct({
-    defaultModel: field(Schema.Struct({ modelId: field(Schema.String) })),
-    models: field(Schema.Array(Schema.Unknown)),
+    defaultModel: field(DefaultModel),
+    models: field(UnknownModels),
     nextToken: field(Schema.String),
   })
 );
@@ -887,30 +963,28 @@ const decodeModelsPage = Schema.decodeUnknownEffect(
 // listModels is List-Available-Models, every page of it, the default first.
 const listModels = Effect.fnUntraced(function* (auth: Auth) {
   const list: Array<KiroModel> = [];
-  let defaultModel: string | undefined;
-  let next: string | undefined;
-  for (let i = 0; i < 20; i++) {
-    const page = yield* managementCall(
-      decodeModelsPage,
-      auth,
-      "List-Available-Models",
-      {
-        query: {
-          origin: "KIRO_CLI",
-          profileArn: auth.profile,
-          ...(next ? { nextToken: next } : {}),
-        },
-      }
-    );
-    defaultModel ??= page.defaultModel?.modelId ?? undefined;
+  let defaultModel = Option.none<string>();
+  // the next page's token, "" for none
+  let next = "";
+  for (let i = 0; i < 20; i += 1) {
+    const first = { origin: "KIRO_CLI", profileArn: auth.profile };
+    const query = next === "" ? first : { ...first, nextToken: next };
+    const page = yield* managementCall(auth, {
+      decode: decodeModelsPage,
+      input: { query },
+      method: "List-Available-Models",
+    });
+    if (Option.isNone(defaultModel)) {
+      defaultModel = Option.fromNullishOr(page.defaultModel?.modelId);
+    }
     for (const model of page.models ?? []) {
       const listed = decodeListedModel(model);
       if (Option.isSome(listed)) {
         list.push(modelOf(listed.value));
       }
     }
-    next = page.nextToken ?? undefined;
-    if (!next) {
+    next = page.nextToken ?? "";
+    if (next === "") {
       break;
     }
   }
@@ -922,7 +996,9 @@ const listModels = Effect.fnUntraced(function* (auth: Auth) {
     });
   }
   const i = Option.getOrElse(
-    Arr.findFirstIndex(list, (model) => model.id === defaultModel),
+    Arr.findFirstIndex(list, (model) =>
+      Option.contains(defaultModel, model.id)
+    ),
     () => 0
   );
   if (i > 0) {
@@ -956,7 +1032,7 @@ export class KiroAccount extends Context.Service<
     readonly usage: Effect.Effect<AccountUsage, AccountError>;
   }
 >()("opencode-kiro/account/KiroAccount") {
-  static readonly layer = Layer.effect(
+  public static readonly layer = Layer.effect(
     KiroAccount,
     Effect.gen(function* () {
       const http = yield* HttpClient.HttpClient;
@@ -980,36 +1056,34 @@ export class KiroAccount extends Context.Service<
       const credentials = Effect.fn("KiroAccount.credentials")(
         function* (rejected?: string) {
           let cred = (yield* readCLI()) ?? (yield* readIDE());
-          if (!cred) {
+          if (cred === null) {
             return yield* Failure.SignInError.make({ message: NOT_SIGNED_IN });
           }
-          for (let i = 0; i < 16; i++) {
+          for (let i = 0; i < 16; i += 1) {
             const newer = refreshedFrom.get(cred.access);
-            if (!newer) {
+            if (newer === undefined) {
               break;
             }
             cred = newer;
           }
           // the refresh token a profile kept for this sign-in was listed under
           let listedUnder = cred.refresh;
-          if (
-            !fresh(cred, yield* Clock.currentTimeMillis) ||
-            cred.access === rejected
-          ) {
+          const now = yield* Clock.currentTimeMillis;
+          if (!fresh(cred, now) || cred.access === rejected) {
             const out = yield* refresh(cred);
             refreshedFrom.set(cred.access, out.cred);
             const [oldest] = refreshedFrom.keys();
             if (refreshedFrom.size > 16 && oldest !== undefined) {
               refreshedFrom.delete(oldest);
             }
-            cred = out.cred;
+            ({ cred } = out);
             if (out.byKiroCli) {
               listedUnder = cred.refresh;
             }
           }
           const source = cred.dbKey ?? cred.idePath;
           const known = profiles.get(source);
-          if (!cred.profile) {
+          if (cred.profile === "") {
             cred.profile =
               known?.refresh === listedUnder
                 ? known.profile

@@ -106,12 +106,10 @@ const shrink = Effect.fnUntraced(
         },
       }).pipe(Effect.result);
       if (Result.isFailure(out)) {
-        if (out.failure.code === "ERR_IMAGE_FORMAT_UNSUPPORTED") {
-          continue;
+        if (out.failure.code !== "ERR_IMAGE_FORMAT_UNSUPPORTED") {
+          return { note: "it couldn't be resized" };
         }
-        return { note: "it couldn't be resized" };
-      }
-      if (out.success.length <= IMAGE_LIMIT) {
+      } else if (out.success.length <= IMAGE_LIMIT) {
         return { bytes: out.success, format: attempt.format };
       }
     }
@@ -131,20 +129,19 @@ export class Images extends Context.Service<
   Images,
   { readonly fit: (out: KiroRequest) => Effect.Effect<KiroRequest> }
 >()("opencode-kiro/images") {
-  static readonly layer = Layer.sync(Images, () => {
+  public static readonly layer = Layer.sync(Images, () => {
     const fitted = new Map<string, Fitted>(); // sha256 of the Base64 → the result, newest last
 
     const fitOne = Effect.fnUntraced(function* (b64: string) {
       const key = createHash("sha256").update(b64).digest("hex");
       let result = fitted.get(key);
-      if (result) {
-        fitted.delete(key);
-      } // kept as the newest below
-      else {
+      if (result === undefined) {
         result =
           b64.length > IMAGE_MAX_INPUT
             ? { note: "it is too large to resize" }
             : yield* shrink(b64);
+      } else {
+        fitted.delete(key); // kept as the newest below
       }
       fitted.set(key, result);
       for (const old of fitted.keys()) {
@@ -156,29 +153,20 @@ export class Images extends Context.Service<
       return result;
     });
 
-    // fit changes the request in place; an image already under the limit is sent as it is
-    const fit = Effect.fn("Images.fit")(function* (out: KiroRequest) {
-      const state = out.conversationState;
-      const users = Arr.append(
-        Arr.flatMap(state.history ?? [], (entry) =>
-          entry.userInputMessage ? [entry.userInputMessage] : []
-        ),
-        state.currentMessage.userInputMessage
-      );
-      for (const input of users) {
-        if (!input.images?.length) {
-          continue;
-        }
-        const kept: Array<KiroImage> = [];
-        const notes: Array<string> = [];
-        for (const img of input.images) {
-          const b64 = img.source?.bytes;
-          if (!Predicate.isString(b64) || b64.length <= IMAGE_LIMIT) {
-            kept.push(img);
-            continue;
-          }
+    // fitInput fits one message's images, in place
+    const fitInput = Effect.fnUntraced(function* (
+      input: UserInput,
+      images: ReadonlyArray<KiroImage>
+    ) {
+      const kept: Array<KiroImage> = [];
+      const notes: Array<string> = [];
+      for (const img of images) {
+        const b64 = img.source?.bytes;
+        if (!Predicate.isString(b64) || b64.length <= IMAGE_LIMIT) {
+          kept.push(img);
+        } else {
           const result = yield* fitOne(b64);
-          if (result.bytes) {
+          if (result.bytes !== undefined && result.bytes !== "") {
             kept.push({
               ...img,
               format: result.format,
@@ -190,14 +178,31 @@ export class Images extends Context.Service<
             );
           }
         }
-        if (kept.length > 0) {
-          input.images = kept;
-        } else {
-          delete input.images;
-        }
-        if (notes.length > 0) {
-          const note = Arr.join(notes, "\n");
-          input.content = input.content ? `${input.content}\n\n${note}` : note;
+      }
+      if (kept.length > 0) {
+        input.images = kept;
+      } else {
+        delete input.images;
+      }
+      if (notes.length > 0) {
+        const note = Arr.join(notes, "\n");
+        input.content =
+          input.content === "" ? note : `${input.content}\n\n${note}`;
+      }
+    });
+
+    // fit changes the request in place; an image already under the limit is sent as it is
+    const fit = Effect.fn("Images.fit")(function* (out: KiroRequest) {
+      const state = out.conversationState;
+      const users = Arr.append(
+        Arr.flatMap(state.history ?? [], (entry) =>
+          entry.userInputMessage === undefined ? [] : [entry.userInputMessage]
+        ),
+        state.currentMessage.userInputMessage
+      );
+      for (const input of users) {
+        if (input.images !== undefined && input.images.length > 0) {
+          yield* fitInput(input, input.images);
         }
       }
       return out;

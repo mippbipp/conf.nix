@@ -23,8 +23,9 @@ import {
   String as Str,
 } from "effect";
 
+// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
 import * as Failure from "./failure.ts";
-import { field, IDLE_SECONDS } from "./kiro.ts";
+import { field, IDLE_SECONDS, isSet } from "./kiro.ts";
 import { BUDGETS, type KiroModel, thinks } from "./models.ts";
 
 // ---- the request: Messages → a Kiro conversation ---------------------------------------
@@ -40,7 +41,7 @@ interface Block {
   is_error?: boolean;
   name?: string;
   source?: {
-    content?: string | Block[];
+    content?: string | Array<Block>;
     data?: string;
     media_type?: string;
     type?: string;
@@ -132,7 +133,7 @@ type Fields = {
   max_tokens?: number;
   output_config?: { effort: string };
   reasoning?: { effort: string };
-  thinking?: { type: "adaptive" | "disabled"; display?: "summarized" };
+  thinking?: { display?: "summarized"; type: "adaptive" | "disabled" };
 };
 export interface KiroRequest {
   additionalModelRequestFields?: Fields;
@@ -150,32 +151,31 @@ export interface KiroRequest {
 const PROCEED = "Please proceed with the task."; // Kiro takes no empty message
 const NO_RESULT = "Tool use was interrupted and did not produce a result.";
 const RESULT_LIMIT = 250_000; // a tool's output is cut at this, as Kiro's own agent cuts it
-const TOOL_ID = /^[a-zA-Z0-9_.:-]{1,64}$/;
+const TOOL_ID = /^[a-zA-Z0-9_.:-]{1,64}$/u;
 
 // toolID is a tool call's id as Kiro takes one: another vendor's becomes
 // one of Kiro's own, the same each time.
 const toolID = (id: string | undefined) =>
-  id && TOOL_ID.test(id)
+  id !== undefined && id !== "" && TOOL_ID.test(id)
     ? id
     : `t_${Str.slice(
         0,
         32
       )(
         createHash("sha256")
-          .update(String(id ?? ""))
+          .update(id ?? "")
           .digest("base64url")
       )}`;
 
 // Kiro answers a tool named past 64 characters, or outside these, "Invalid
 // tool use format." and won't raise the limit (kirodotdev/Kiro#7684), and
 // MCP tool names can run longer.
-const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/;
+const TOOL_NAME = /^[a-zA-Z0-9_-]{1,64}$/u;
 
 // toolName is a tool's name as Kiro takes one: another is its head with a
 // hash of the whole name, the same each time, so later turns name it the
 // same way. toolNames maps each such name back.
-const toolName = (name: string | undefined) => {
-  const given = String(name ?? "");
+const toolName = (given = "") => {
   if (TOOL_NAME.test(given)) {
     return given;
   }
@@ -183,7 +183,7 @@ const toolName = (name: string | undefined) => {
     0,
     12
   )(createHash("sha256").update(given).digest("hex"));
-  const head = Str.replaceAll(/[^a-zA-Z0-9_-]/g, "_")(given);
+  const head = Str.replaceAll(/[^a-zA-Z0-9_-]/gu, "_")(given);
   return `${Str.slice(0, 64 - 1 - hash.length)(head)}_${hash}`;
 };
 
@@ -192,7 +192,7 @@ const toolName = (name: string | undefined) => {
 function toolNames(req: MessagesRequest) {
   const names = new Map<string, string>();
   const add = (name: string | undefined) => {
-    if (!Predicate.isString(name) || !name) {
+    if (!Predicate.isString(name) || name === "") {
       return;
     }
     const sentAs = toolName(name);
@@ -205,20 +205,23 @@ function toolNames(req: MessagesRequest) {
   }
   for (const message of req.messages ?? []) {
     if (Arr.isArray(message.content)) {
-      for (const block of message.content)
-        if (block?.type === "tool_use") add(block.name);
+      for (const block of message.content) {
+        if (block?.type === "tool_use") {
+          add(block.name);
+        }
+      }
     }
   }
   return names;
 }
 
 function imageFormat(mediaType: string | undefined) {
-  const lower = Str.toLowerCase(String(mediaType ?? ""));
-  const format = Str.replace(/^image\//, "")(lower);
+  const lower = Str.toLowerCase(mediaType ?? "");
+  const format = Str.replace(/^image\//u, "")(lower);
   if (format === "jpg") {
     return "jpeg";
   }
-  if (!format || format === lower) {
+  if (format === "" || format === lower) {
     return "png";
   }
   return format;
@@ -227,7 +230,11 @@ function imageFormat(mediaType: string | undefined) {
 // addImage puts an Anthropic image block in images as Kiro takes it, the
 // bytes inline. One named only by a URL has no bytes to send and is left out.
 function addImage(images: Array<KiroImage>, block: Block) {
-  if (block.source?.type === "base64" && block.source.data) {
+  if (
+    block.source?.type === "base64" &&
+    block.source.data !== undefined &&
+    block.source.data !== ""
+  ) {
     images.push({
       format: imageFormat(block.source.media_type),
       source: { bytes: block.source.data },
@@ -254,10 +261,11 @@ const textOf = (content: string | Array<Block> | undefined): string =>
         )
       : "";
 const joinNonEmpty = (head: string, tail: string) =>
-  head && tail ? `${head}\n\n${tail}` : head + tail;
+  head !== "" && tail !== "" ? `${head}\n\n${tail}` : head + tail;
 
 function documentText(block: Block) {
-  const title = block.title ? `${block.title}\n` : "";
+  const title =
+    block.title === undefined || block.title === "" ? "" : `${block.title}\n`;
   if (block.source?.type === "text") {
     return title + (block.source.data ?? "");
   }
@@ -282,14 +290,14 @@ function effortFields(kiroModel: KiroModel, effort: string): Fields {
       fields.reasoning = { effort };
     }
   } else if (effort === "none") {
-    if (kiroModel.off) {
+    if (kiroModel.off === true) {
       fields.thinking = { type: "disabled" };
     }
   } else if (kiroModel.efforts.includes(effort)) {
-    fields.thinking = {
-      type: "adaptive",
-      ...(kiroModel.summarized ? { display: "summarized" } : {}),
-    };
+    fields.thinking =
+      kiroModel.summarized === true
+        ? { display: "summarized", type: "adaptive" }
+        : { type: "adaptive" };
     fields.output_config = { effort };
   }
   return fields;
@@ -303,9 +311,16 @@ function thinkingFields(
   kiroModel: KiroModel,
   effort: string | undefined
 ): Fields {
-  const fields = effort ? effortFields(kiroModel, effort) : {};
+  const fields =
+    effort === undefined || effort === ""
+      ? {}
+      : effortFields(kiroModel, effort);
   const limits = kiroModel.maxTokens;
-  if (limits && req.max_tokens && req.max_tokens > 0) {
+  if (
+    limits !== undefined &&
+    req.max_tokens !== undefined &&
+    req.max_tokens > 0
+  ) {
     fields.max_tokens = Math.min(
       Math.max(req.max_tokens, limits[0]),
       limits[1]
@@ -324,7 +339,7 @@ function thinkingOf(
   kiroModel: KiroModel | undefined
 ): Thinking {
   const effort = req.output_config?.effort;
-  if (kiroModel?.fields) {
+  if (kiroModel !== undefined && kiroModel.fields !== "") {
     const fields = thinkingFields(req, kiroModel, effort);
     return Rec.isEmptyRecord<string, unknown>(fields) ? {} : { fields };
   }
@@ -333,13 +348,14 @@ function thinkingOf(
   }
   if (
     req.thinking?.type === "enabled" &&
-    req.thinking.budget_tokens &&
+    req.thinking.budget_tokens !== undefined &&
     req.thinking.budget_tokens > 0
   ) {
     return { budget: req.thinking.budget_tokens };
   }
-  const budget = effort ? BUDGETS.get(effort) : undefined;
-  return budget ? { budget } : {};
+  const budget =
+    effort === undefined || effort === "" ? undefined : BUDGETS.get(effort);
+  return budget === undefined || !isSet(budget) ? {} : { budget };
 }
 
 // formatText is the structured output a request asks for, said in words:
@@ -352,9 +368,9 @@ function formatText(req: MessagesRequest) {
   ) {
     return "";
   }
-  return `Respond with a single JSON value and nothing else, matching this JSON schema:\n${JSON.stringify(
-    format.schema
-  )}.`;
+  // oxlint-disable-next-line effecttsgo/global-json -- the schema was parsed from the request's JSON body, so stringify cannot throw
+  const schema = JSON.stringify(format.schema);
+  return `Respond with a single JSON value and nothing else, matching this JSON schema:\n${schema}.`;
 }
 
 type KiroMessage = UserInput | AssistantResponse;
@@ -379,7 +395,11 @@ function assistantResponse(blocks: Array<Block>): AssistantResponse {
   const texts: Array<string> = [];
   const uses: Array<ToolUse> = [];
   for (const block of blocks) {
-    if (block?.type === "text" && block.text) {
+    if (
+      block?.type === "text" &&
+      block.text !== undefined &&
+      block.text !== ""
+    ) {
       texts.push(block.text);
     } else if (block?.type === "tool_use") {
       const input = Predicate.isObject(block.input) ? block.input : {};
@@ -399,8 +419,8 @@ function toolResult(block: Block): ToolResult {
     out = `${Str.slice(0, RESULT_LIMIT)(out)}\n… (cut)`;
   }
   return {
-    content: [{ text: out || "(no output)" }],
-    status: block.is_error ? "error" : "success",
+    content: [{ text: out === "" ? "(no output)" : out }],
+    status: block.is_error === true ? "error" : "success",
     toolUseId: toolID(block.tool_use_id),
   };
 }
@@ -413,7 +433,7 @@ function userInput(blocks: Array<Block>, model: string): UserInput {
   const results: Array<ToolResult> = [];
   for (const block of blocks) {
     if (block?.type === "text") {
-      if (block.text) {
+      if (block.text !== undefined && block.text !== "") {
         texts.push(block.text);
       }
     } else if (block?.type === "document") {
@@ -448,7 +468,7 @@ function addAssistant(
   response: AssistantResponse
 ): AssistantResponse {
   const prev = entries.at(-1)?.assistantResponseMessage;
-  if (!prev) {
+  if (prev === undefined) {
     entries.push({ assistantResponseMessage: response });
     return response;
   }
@@ -461,7 +481,7 @@ function addAssistant(
 // is the user's too. It is the message input ends up in.
 function addUser(entries: Array<Entry>, input: UserInput): UserInput {
   const prev = entries.at(-1)?.userInputMessage;
-  if (!prev) {
+  if (prev === undefined) {
     entries.push({ userInputMessage: input });
     return input;
   }
@@ -486,22 +506,19 @@ function entriesOf(
     const blocks = blocksOf(message);
     // Kiro has no system role mid-conversation: an update's text is said as
     // the user's, and one with no text (an effort change) is dropped
-    if (
+    const dropped =
       message.role === "system" &&
       !Arr.some(
         blocks,
         (block) => block?.type === "text" && Boolean(block.text)
-      )
-    ) {
-      continue;
-    }
+      );
     if (message.role === "assistant") {
       const response = assistantResponse(blocks);
-      if (!response.content && !response.toolUses?.length) {
-        continue;
-      } // a turn that only thought
-      mark(marked, addAssistant(entries, response), blocks);
-    } else {
+      // a turn that only thought is dropped
+      if (response.content !== "" || (response.toolUses?.length ?? 0) > 0) {
+        mark(marked, addAssistant(entries, response), blocks);
+      }
+    } else if (!dropped) {
       mark(marked, addUser(entries, userInput(blocks, model)), blocks);
     }
   }
@@ -514,15 +531,14 @@ function entriesOf(
 function dropLeading(entries: Array<Entry>) {
   while (entries.length > 0) {
     const first = entries[0]?.userInputMessage;
-    if (first) {
-      if (
-        first.userInputMessageContext &&
-        !first.content &&
-        !first.images?.length
-      ) {
-        entries.shift();
-        continue;
-      }
+    if (
+      first !== undefined &&
+      !(
+        first.userInputMessageContext !== undefined &&
+        first.content === "" &&
+        (first.images?.length ?? 0) === 0
+      )
+    ) {
       delete first.userInputMessageContext;
       break;
     }
@@ -534,7 +550,7 @@ function dropLeading(entries: Array<Entry>) {
 // ends with: the user's last, or an empty one added
 function currentMessage(entries: Array<Entry>, model: string): UserInput {
   const last = entries.at(-1)?.userInputMessage;
-  if (last) {
+  if (last !== undefined) {
     return last;
   }
   const current: UserInput = {
@@ -552,7 +568,7 @@ function currentMessage(entries: Array<Entry>, model: string): UserInput {
 function answerCalls(entries: Array<Entry>) {
   Arr.forEach(entries, (entry, i) => {
     const input = entry.userInputMessage;
-    if (!input) {
+    if (input === undefined) {
       return;
     }
     const calls = entries[i - 1]?.assistantResponseMessage?.toolUses ?? [];
@@ -582,7 +598,7 @@ function answerCalls(entries: Array<Entry>) {
     if (kept.length > 0) {
       input.userInputMessageContext = { toolResults: kept };
     }
-    if (!input.content && !input.userInputMessageContext) {
+    if (input.content === "" && input.userInputMessageContext === undefined) {
       input.content = PROCEED;
     }
   });
@@ -592,15 +608,18 @@ function answerCalls(entries: Array<Entry>) {
 // sends only those again
 function keepLatestImages(entries: Array<Entry>) {
   let latest = -1;
-  for (let i = entries.length - 1; i >= 0; i--) {
-    if (entries[i]?.userInputMessage?.images?.length) {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if ((entries[i]?.userInputMessage?.images?.length ?? 0) > 0) {
       latest = i;
       break;
     }
   }
   Arr.forEach(entries, (entry, i) => {
     const input = entry.userInputMessage;
-    if (input && (i !== latest || !input.images?.length)) {
+    if (
+      input !== undefined &&
+      (i !== latest || (input.images?.length ?? 0) === 0)
+    ) {
       delete input.images;
     }
   });
@@ -612,12 +631,12 @@ function keepLatestImages(entries: Array<Entry>) {
 function systemText(req: MessagesRequest, budget: number | undefined) {
   let system = Predicate.isString(req.system) ? req.system : textOf(req.system);
   const format = formatText(req);
-  if (format) {
-    system = system ? `${system}\n\n${format}` : format;
+  if (format !== "") {
+    system = system === "" ? format : `${system}\n\n${format}`;
   }
-  if (budget) {
+  if (budget !== undefined && isSet(budget)) {
     system = `<thinking_mode>enabled</thinking_mode><max_thinking_length>${budget}</max_thinking_length>${
-      system ? `\n${system}` : ""
+      system === "" ? "" : `\n${system}`
     }`;
   }
   return system;
@@ -633,23 +652,29 @@ function kiroTools(
   const offered = new Set<string>();
   const EMPTY = { properties: {}, type: "object" };
   for (const tool of req.tools ?? []) {
-    if (
-      !tool?.name ||
-      (tool.type && tool.type !== "custom" && !tool.input_schema)
-    ) {
-      continue;
-    } // server tools Kiro hasn't
-    const name = toolName(tool.name);
-    offered.add(name);
-    tools.push({
-      toolSpecification: {
-        description: tool.description || tool.name,
-        inputSchema: { json: tool.input_schema ?? EMPTY },
-        name,
-      },
-    });
-    if (tool.cache_control) {
-      tools.push({ cachePoint: { type: "default" } });
+    const given = tool?.name;
+    // server tools Kiro hasn't are left out
+    const server = (kind: string | undefined) =>
+      kind !== undefined &&
+      kind !== "" &&
+      kind !== "custom" &&
+      !Predicate.isTruthy(tool.input_schema);
+    if (given !== undefined && given !== "" && !server(tool.type)) {
+      const name = toolName(given);
+      offered.add(name);
+      tools.push({
+        toolSpecification: {
+          description:
+            tool.description === undefined || tool.description === ""
+              ? given
+              : tool.description,
+          inputSchema: { json: tool.input_schema ?? EMPTY },
+          name,
+        },
+      });
+      if (Predicate.isTruthy(tool.cache_control)) {
+        tools.push({ cachePoint: { type: "default" } });
+      }
     }
   }
   for (const entry of entries) {
@@ -658,9 +683,9 @@ function kiroTools(
         offered.add(call.name);
         tools.push({
           toolSpecification: {
-            name: call.name,
             description: "Tool",
             inputSchema: { json: EMPTY },
+            name: call.name,
           },
         });
       }
@@ -680,7 +705,7 @@ function placeCachePoints(
 ) {
   const points: Array<() => void> = [];
   for (const tool of tools) {
-    if (tool.cachePoint) {
+    if (tool.cachePoint !== undefined) {
       points.push(() => {
         tools.splice(tools.indexOf(tool), 1);
       });
@@ -688,7 +713,7 @@ function placeCachePoints(
   }
   for (const entry of entries) {
     const message = entry.userInputMessage ?? entry.assistantResponseMessage;
-    if (message && marked.has(message)) {
+    if (message !== undefined && marked.has(message)) {
       message.cachePoint = { type: "default" };
       points.push(() => {
         delete message.cachePoint;
@@ -700,63 +725,61 @@ function placeCachePoints(
   }
 }
 
-function kiroRequest(
-  req: MessagesRequest,
-  model: string,
-  profile: string,
-  { budget, fields }: Thinking = {}
-): KiroRequest {
-  const marked: Marked = new WeakSet();
-  const entries = entriesOf(req, model, marked);
-  dropLeading(entries);
-  const current = currentMessage(entries, model);
-  answerCalls(entries);
-  keepLatestImages(entries);
-  for (const entry of entries) {
-    if (
-      entry.assistantResponseMessage &&
-      !entry.assistantResponseMessage.toolUses?.length
-    ) {
-      delete entry.assistantResponseMessage.toolUses;
+// kiroRequest builds the Kiro request for req, for the profile it is sent with
+const kiroRequest =
+  (req: MessagesRequest, model: string, { budget, fields }: Thinking) =>
+  (profile: string): KiroRequest => {
+    const marked: Marked = new WeakSet();
+    const entries = entriesOf(req, model, marked);
+    dropLeading(entries);
+    const current = currentMessage(entries, model);
+    answerCalls(entries);
+    keepLatestImages(entries);
+    for (const entry of entries) {
+      if (
+        entry.assistantResponseMessage !== undefined &&
+        (entry.assistantResponseMessage.toolUses?.length ?? 0) === 0
+      ) {
+        delete entry.assistantResponseMessage.toolUses;
+      }
     }
-  }
-  // the instructions go at the head of the first message, which the steps
-  // above made the user's
-  const first = entries[0]?.userInputMessage ?? current;
-  const system = systemText(req, budget);
-  if (system) {
-    first.content = `${system}\n\n${first.content}`;
-  }
-  if (Arr.isArray(req.system)) {
-    mark(marked, first, req.system);
-  }
+    // the instructions go at the head of the first message, which the steps
+    // above made the user's
+    const first = entries[0]?.userInputMessage ?? current;
+    const system = systemText(req, budget);
+    if (system !== "") {
+      first.content = `${system}\n\n${first.content}`;
+    }
+    if (Arr.isArray(req.system)) {
+      mark(marked, first, req.system);
+    }
 
-  const tools = kiroTools(req, entries);
-  if (tools.length > 0) {
-    (current.userInputMessageContext ??= {}).tools = tools;
-  }
-  placeCachePoints(tools, entries, marked);
+    const tools = kiroTools(req, entries);
+    if (tools.length > 0) {
+      (current.userInputMessageContext ??= {}).tools = tools;
+    }
+    placeCachePoints(tools, entries, marked);
 
-  const out: KiroRequest = {
-    agentMode: "vibe",
-    conversationState: {
-      agentTaskType: "vibe",
-      chatTriggerType: "MANUAL",
-      conversationId: randomUUID(),
-      currentMessage: { userInputMessage: current },
-    },
+    const out: KiroRequest = {
+      agentMode: "vibe",
+      conversationState: {
+        agentTaskType: "vibe",
+        chatTriggerType: "MANUAL",
+        conversationId: randomUUID(),
+        currentMessage: { userInputMessage: current },
+      },
+    };
+    if (entries.length > 1) {
+      out.conversationState.history = entries.slice(0, -1);
+    }
+    if (profile !== "") {
+      out.profileArn = profile;
+    }
+    if (fields !== undefined) {
+      out.additionalModelRequestFields = fields;
+    }
+    return out;
   };
-  if (entries.length > 1) {
-    out.conversationState.history = entries.slice(0, -1);
-  }
-  if (profile) {
-    out.profileArn = profile;
-  }
-  if (fields) {
-    out.additionalModelRequestFields = fields;
-  }
-  return out;
-}
 
 // ---- the reply: an AWS event stream → Messages ---------------------------------------
 
@@ -801,13 +824,13 @@ function frameHeaders(headers: Uint8Array) {
         out[name] = dec.decode(headers.subarray(i + 2, i + 2 + length));
       }
       i += 2 + length;
-      continue;
+    } else {
+      const size = HEADER_SIZES.get(type);
+      if (size === undefined || headers.length < i + size) {
+        break;
+      }
+      i += size;
     }
-    const size = HEADER_SIZES.get(type);
-    if (size === undefined || headers.length < i + size) {
-      break;
-    }
-    i += size;
   }
   return out;
 }
@@ -820,7 +843,7 @@ function partialSuffix(text: string, tag: string) {
   for (
     let length = Math.min(tag.length - 1, text.length);
     length > 0;
-    length--
+    length -= 1
   ) {
     if (Str.endsWith(Str.slice(0, length)(tag))(text)) {
       return length;
@@ -835,60 +858,21 @@ interface Said {
 }
 
 class ThinkParser {
-  state = 0; // 0: not yet known, 1: thinking, 2: text
-  buf = "";
-  said = false;
-  feed(piece: string): Array<Said> {
+  private state = 0; // 0: not yet known, 1: thinking, 2: text
+  private buf = "";
+  private said = false;
+  public feed(piece: string): Array<Said> {
     this.buf += piece;
     const out: Array<Said> = [];
-    for (;;) {
-      if (this.state === 0) {
-        const trimmed = Str.replace(/^[ \t\r\n]+/, "")(this.buf);
-        if (Str.startsWith(OPEN)(trimmed)) {
-          [this.buf, this.state] = [Str.slice(OPEN.length)(trimmed), 1];
-          continue;
-        }
-        if (trimmed.length < OPEN.length && Str.startsWith(trimmed)(OPEN)) {
-          return out;
-        } // may yet be the tag
-        this.state = 2;
-        continue;
-      }
-      if (this.state === 1) {
-        if (!this.said) {
-          this.buf = Str.replace(/^[\r\n]+/, "")(this.buf);
-          if (!this.buf) {
-            return out;
-          }
-        }
-        const found = Str.indexOf(CLOSE)(this.buf);
-        if (Option.isSome(found)) {
-          const i = found.value;
-          if (i > 0) {
-            out.push({ kind: "think", text: Str.slice(0, i)(this.buf) });
-            this.said = true;
-          }
-          const after = Str.slice(i + CLOSE.length)(this.buf);
-          [this.buf, this.state] = [Str.replace(/^[\r\n]+/, "")(after), 2];
-          continue;
-        }
-        // hold back what may be the start of the closing tag
-        const sure = this.buf.length - partialSuffix(this.buf, CLOSE);
-        if (sure > 0) {
-          out.push({ kind: "think", text: Str.slice(0, sure)(this.buf) });
-          [this.buf, this.said] = [Str.slice(sure)(this.buf), true];
-        }
-        return out;
-      }
-      if (this.buf) {
-        out.push({ kind: "text", text: this.buf });
-      }
-      this.buf = "";
-      return out;
+    // each step reads what it can, until one needs more of the reply
+    let more = true;
+    while (more) {
+      more = this.step(out);
     }
+    return out;
   }
-  end(): Array<Said> {
-    if (!this.buf) {
+  public end(): Array<Said> {
+    if (this.buf === "") {
       return [];
     }
     const ev: Said = {
@@ -900,6 +884,52 @@ class ThinkParser {
       this.state = 2;
     }
     return [ev];
+  }
+  // step reads the buffer in the current state, and says whether to read on
+  private step(out: Array<Said>): boolean {
+    if (this.state === 0) {
+      const trimmed = Str.replace(/^[ \t\r\n]+/u, "")(this.buf);
+      if (Str.startsWith(OPEN)(trimmed)) {
+        [this.buf, this.state] = [Str.slice(OPEN.length)(trimmed), 1];
+        return true;
+      }
+      if (trimmed.length < OPEN.length && Str.startsWith(trimmed)(OPEN)) {
+        return false; // may yet be the tag
+      }
+      this.state = 2;
+      return true;
+    }
+    if (this.state === 1) {
+      if (!this.said) {
+        this.buf = Str.replace(/^[\r\n]+/u, "")(this.buf);
+        if (this.buf === "") {
+          return false;
+        }
+      }
+      const found = Str.indexOf(CLOSE)(this.buf);
+      if (Option.isSome(found)) {
+        const i = found.value;
+        if (i > 0) {
+          out.push({ kind: "think", text: Str.slice(0, i)(this.buf) });
+          this.said = true;
+        }
+        const after = Str.slice(i + CLOSE.length)(this.buf);
+        [this.buf, this.state] = [Str.replace(/^[\r\n]+/u, "")(after), 2];
+        return true;
+      }
+      // hold back what may be the start of the closing tag
+      const sure = this.buf.length - partialSuffix(this.buf, CLOSE);
+      if (sure > 0) {
+        out.push({ kind: "think", text: Str.slice(0, sure)(this.buf) });
+        [this.buf, this.said] = [Str.slice(sure)(this.buf), true];
+      }
+      return false;
+    }
+    if (this.buf !== "") {
+      out.push({ kind: "text", text: this.buf });
+    }
+    this.buf = "";
+    return false;
   }
 }
 
@@ -980,27 +1010,29 @@ class ReplyDecoder {
   private pct = 0;
   private said = 0;
   private heard = false; // a message of the stream arrived
-  private failed: Failure.Failure | undefined;
+  private failed: Failure.Failure | undefined = undefined;
   private ended = false;
+  private readonly window: number; // the model's context, to reckon the input from
+  private readonly budget: number | undefined; // the thinking budget the prompt set
 
-  constructor(
-    private readonly window: number, // the model's context, to reckon the input from
-    private readonly budget: number | undefined // the thinking budget the prompt set
-  ) {}
+  public constructor(window: number, budget: number | undefined) {
+    this.window = window;
+    this.budget = budget;
+  }
 
   // done is whether the reply has failed, so no more of it need be read
-  get done() {
+  public get done() {
     return this.failed !== undefined;
   }
 
   // push reads a piece of the body: the events of each message it completes.
-  push(chunk: Uint8Array): Array<KiroEvent> {
+  public push(chunk: Uint8Array): Array<KiroEvent> {
     const out: Array<KiroEvent> = [];
     const joined = new Uint8Array(this.buf.length + chunk.length);
     joined.set(this.buf);
     joined.set(chunk, this.buf.length);
     this.buf = joined;
-    while (!this.failed && this.buf.length >= 12) {
+    while (this.failed === undefined && this.buf.length >= 12) {
       const view = new DataView(
         this.buf.buffer,
         this.buf.byteOffset,
@@ -1008,7 +1040,7 @@ class ReplyDecoder {
       );
       const total = view.getUint32(0);
       const hlen = view.getUint32(4);
-      if (total < 16 || total > 16 << 20 || hlen > total - 16) {
+      if (total < 16 || total > 16 * 2 ** 20 || hlen > total - 16) {
         this.broke("its event stream was malformed");
         break;
       }
@@ -1028,12 +1060,12 @@ class ReplyDecoder {
   }
 
   // broke is the body failing before its end
-  broke(message: string) {
+  public broke(message: string) {
     this.fail(Failure.brokeOff(message));
   }
 
   // fail is the reply failing: the first failure is the one said
-  fail(failure: Failure.Failure) {
+  public fail(failure: Failure.Failure) {
     this.failed ??= failure;
   }
 
@@ -1041,7 +1073,7 @@ class ReplyDecoder {
   // why it stopped, or the failure. A body with no message at all is an
   // empty reply. One with any, even a meteringEvent alone, is a reply, so
   // what it cost is counted and it isn't sent (and charged for) again.
-  end(): Array<KiroEvent> {
+  public end(): Array<KiroEvent> {
     if (this.ended) {
       return [];
     }
@@ -1052,24 +1084,24 @@ class ReplyDecoder {
       this.fail(Failure.emptyReply);
     }
     const out: Array<KiroEvent> = this.think.end();
-    if (this.failed) {
+    if (this.failed !== undefined) {
       out.push({ kind: "error", ...this.failed });
       return out;
     }
     const { usage } = this;
     // Kiro says how full the context is rather than how many tokens
-    if (!usage.input && this.pct > 0 && this.window > 0) {
+    if (!isSet(usage.input) && this.pct > 0 && this.window > 0) {
       usage.input = Math.floor((this.pct / 100) * this.window);
     }
-    if (!usage.output) {
+    if (!isSet(usage.output)) {
       usage.output = Math.floor((this.said + 3) / 4);
     }
     let reason = "end_turn";
     if (this.tools > 0) {
       reason = "tool_use";
-    } else if (/^max_tokens$/i.test(this.stop)) {
+    } else if (/^max_tokens$/iu.test(this.stop)) {
       reason = "max_tokens";
-    } else if (/^content_filtered$/i.test(this.stop)) {
+    } else if (/^content_filtered$/iu.test(this.stop)) {
       reason = "refusal";
     }
     out.push({ kind: "stop", reason, usage });
@@ -1083,14 +1115,17 @@ class ReplyDecoder {
   ) {
     const type = headers[":message-type"];
     if (type === "exception" || type === "error") {
+      const exception = headers[":exception-type"];
       this.failed = Failure.fromException(
-        headers[":exception-type"] || headers[":error-code"],
+        exception === undefined || exception === ""
+          ? headers[":error-code"]
+          : exception,
         new TextDecoder().decode(payload)
       );
       return;
     }
     const kind = headers[":event-type"];
-    if (kind && FAILURE_EVENTS.has(kind)) {
+    if (kind !== undefined && kind !== "" && FAILURE_EVENTS.has(kind)) {
       this.failed = Failure.fromException(
         kind,
         new TextDecoder().decode(payload)
@@ -1100,7 +1135,7 @@ class ReplyDecoder {
     const event = Option.getOrUndefined(
       decodePayload(new TextDecoder().decode(payload))
     );
-    if (!event) {
+    if (event === undefined) {
       return;
     }
     if (kind === "assistantResponseEvent") {
@@ -1112,40 +1147,47 @@ class ReplyDecoder {
     } else if (kind === "metadataEvent" || kind === "messageMetadataEvent") {
       this.metadata(event);
     } else if (kind === "contextUsageEvent") {
-      if (event.contextUsagePercentage && event.contextUsagePercentage > 0) {
-        this.pct = event.contextUsagePercentage;
+      const pct = event.contextUsagePercentage ?? 0;
+      if (pct > 0) {
+        this.pct = pct;
       }
-    } else if (kind === "meteringEvent" && event.usage && event.usage > 0) {
-      this.usage.credits += event.usage;
+    } else if (kind === "meteringEvent") {
+      const credits = event.usage ?? 0;
+      if (credits > 0) {
+        this.usage.credits += credits;
+      }
     }
   }
 
   private assistantResponse(event: Payload, out: Array<KiroEvent>) {
     const text = Predicate.isString(event.content) ? event.content : "";
     this.said += text.length;
-    if (this.budget) {
+    if (this.budget !== undefined && isSet(this.budget)) {
       out.push(...this.think.feed(text));
-    } else if (text) {
+    } else if (text !== "") {
       out.push({ kind: "text", text });
     }
   }
 
   private reasoningContent(event: Payload, out: Array<KiroEvent>) {
-    if (event.text) {
-      this.said += event.text.length;
-      out.push({ kind: "think", text: event.text });
-    } else if (event.signature) {
-      out.push({ kind: "sig", text: event.signature });
+    const text = event.text ?? "";
+    const signature = event.signature ?? "";
+    if (text !== "") {
+      this.said += text.length;
+      out.push({ kind: "think", text });
+    } else if (signature !== "") {
+      out.push({ kind: "sig", text: signature });
     }
   }
 
   private toolUse(event: Payload, out: Array<KiroEvent>) {
-    if (event.toolUseId && event.toolUseId !== this.tool) {
+    const id = event.toolUseId ?? "";
+    if (id !== "" && id !== this.tool) {
       out.push(...this.think.end()); // the text before a call is all said
-      this.tool = event.toolUseId;
-      this.tools++;
+      this.tool = id;
+      this.tools += 1;
       out.push({
-        id: event.toolUseId,
+        id,
         kind: "toolStart",
         name: event.name ?? "",
       });
@@ -1154,11 +1196,12 @@ class ReplyDecoder {
       return;
     }
     if (Predicate.isString(event.input)) {
-      if (event.input) {
+      if (event.input !== "") {
         out.push({ kind: "toolArgs", text: event.input });
       }
       this.said += event.input.length;
     } else {
+      // oxlint-disable-next-line effecttsgo/global-json -- the input was decoded from Kiro's JSON payload, so stringify cannot throw
       const json = JSON.stringify(event.input);
       if (json !== "{}") {
         out.push({ kind: "toolArgs", text: json });
@@ -1168,11 +1211,12 @@ class ReplyDecoder {
   }
 
   private metadata(event: Payload) {
-    if (event.stopReason) {
-      this.stop = event.stopReason;
+    const stopReason = event.stopReason ?? "";
+    if (stopReason !== "") {
+      this.stop = stopReason;
     }
     const tokens = event.tokenUsage;
-    if (!tokens) {
+    if (tokens === undefined || tokens === null) {
       return;
     }
     const { usage } = this;
@@ -1183,8 +1227,9 @@ class ReplyDecoder {
     usage.output += tokens.outputTokens ?? 0;
     usage.cacheRead += tokens.cacheReadInputTokens ?? 0;
     usage.cacheWrite += tokens.cacheWriteInputTokens ?? 0;
-    if (tokens.contextUsagePercentage && tokens.contextUsagePercentage > 0) {
-      this.pct = tokens.contextUsagePercentage;
+    const pct = tokens.contextUsagePercentage ?? 0;
+    if (pct > 0) {
+      this.pct = pct;
     }
   }
 }
@@ -1192,11 +1237,17 @@ class ReplyDecoder {
 // events is Kiro's reply body as events. However the body ends, the last
 // event says how: a stop, or an error. A body that sends nothing for
 // idleSeconds, before its first event or between two, ends in a stall.
+// how events reads a reply: the model's context, the thinking budget the
+// prompt set, and how long the body may send nothing
+interface Reading {
+  budget: number | undefined;
+  idleSeconds: number;
+  window: number;
+}
+
 const events = (
   body: Stream.Stream<Uint8Array, unknown>,
-  window: number,
-  budget: number | undefined,
-  idleSeconds: number
+  { budget, idleSeconds, window }: Reading
 ): Stream.Stream<KiroEvent> =>
   Stream.suspend(() => {
     const reader = new ReplyDecoder(window, budget);
@@ -1244,29 +1295,30 @@ class MessagesEncoder {
   private index = -1;
   private open = ""; // the kind of block open
   private started = false;
+  private readonly model: string;
+  private readonly names: Map<string, string>;
 
-  constructor(
-    private readonly model: string,
-    private readonly names: Map<string, string>
-  ) {}
+  public constructor(model: string, names: Map<string, string>) {
+    this.model = model;
+    this.names = names;
+  }
 
-  encode(event: KiroEvent): Array<Uint8Array> {
+  public encode(event: KiroEvent): Array<Uint8Array> {
     const out: Array<Uint8Array> = [];
-    const sse = (type: string, data: SseData) =>
-      out.push(
-        this.enc.encode(
-          `event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`
-        )
-      );
+    const sse = (type: string, data: SseData) => {
+      // oxlint-disable-next-line effecttsgo/global-json -- SseData holds only JSON values, so stringify cannot throw
+      const json = JSON.stringify({ type, ...data });
+      out.push(this.enc.encode(`event: ${type}\ndata: ${json}\n\n`));
+    };
     const close = () => {
-      if (this.open) {
+      if (this.open !== "") {
         sse("content_block_stop", { index: this.index });
       }
       this.open = "";
     };
     const begin = (kind: string, block: SseData) => {
       close();
-      this.index++;
+      this.index += 1;
       this.open = kind;
       sse("content_block_start", { content_block: block, index: this.index });
     };
@@ -1289,20 +1341,20 @@ class MessagesEncoder {
     switch (event.kind) {
       case "text": {
         if (this.open !== "text") {
-          begin("text", { type: "text", text: "" });
+          begin("text", { text: "", type: "text" });
         }
         sse("content_block_delta", {
-          delta: { type: "text_delta", text: event.text },
+          delta: { text: event.text, type: "text_delta" },
           index: index(),
         });
         break;
       }
       case "think": {
         if (this.open !== "thinking") {
-          begin("thinking", { type: "thinking", thinking: "", signature: "" });
+          begin("thinking", { signature: "", thinking: "", type: "thinking" });
         }
         sse("content_block_delta", {
-          delta: { type: "thinking_delta", thinking: event.text },
+          delta: { thinking: event.text, type: "thinking_delta" },
           index: index(),
         });
         break;
@@ -1310,8 +1362,8 @@ class MessagesEncoder {
       case "sig": {
         if (this.open === "thinking") {
           sse("content_block_delta", {
+            delta: { signature: event.text, type: "signature_delta" },
             index: index(),
-            delta: { type: "signature_delta", signature: event.text },
           });
         }
         break;
@@ -1328,8 +1380,8 @@ class MessagesEncoder {
       case "toolArgs": {
         if (this.open === "tool") {
           sse("content_block_delta", {
+            delta: { partial_json: event.text, type: "input_json_delta" },
             index: index(),
-            delta: { type: "input_json_delta", partial_json: event.text },
           });
         }
         break;
@@ -1348,6 +1400,9 @@ class MessagesEncoder {
         sse("message_stop", {});
         break;
       }
+      default: {
+        break;
+      }
     }
     return out;
   }
@@ -1358,10 +1413,16 @@ const isLast = (event: KiroEvent) =>
 
 // reply answers the Messages request from Kiro's events, as a stream of
 // Messages events. finished is told the usage of a reply that ends well.
+// what reply answers with: the model the caller asked for, and its names
+// for the tools Kiro was sent under others
+interface Answering {
+  model: string;
+  names: Map<string, string>;
+}
+
 const reply = Effect.fnUntraced(function* (
   kiro: Stream.Stream<KiroEvent>,
-  model: string,
-  names: Map<string, string>,
+  { model, names }: Answering,
   finished: (usage: Usage) => Effect.Effect<void>
 ) {
   // the first event is read before answering: an error before any of the
@@ -1378,7 +1439,7 @@ const reply = Effect.fnUntraced(function* (
     Effect.onError(() => Scope.close(scope, Exit.void))
   );
   const first = Option.getOrUndefined(head);
-  if (!first || first.kind === "error") {
+  if (first === undefined || first.kind === "error") {
     yield* Scope.close(scope, Exit.void);
     return Failure.toResponse(first ?? Failure.emptyReply);
   }
@@ -1426,7 +1487,7 @@ export function open(
   req: MessagesRequest,
   models: ReadonlyArray<KiroModel>
 ): Turn {
-  const model = String(req.model ?? "auto");
+  const model = req.model ?? "auto";
   const kiroModel = Option.getOrUndefined(
     Arr.findFirst(models, (listed) => listed.id === model)
   );
@@ -1435,11 +1496,14 @@ export function open(
   return {
     answer: (body, finished, idleSeconds = IDLE_SECONDS) =>
       reply(
-        events(body, kiroModel?.context ?? 0, thinking.budget, idleSeconds),
-        model,
-        names,
+        events(body, {
+          budget: thinking.budget,
+          idleSeconds,
+          window: kiroModel?.context ?? 0,
+        }),
+        { model, names },
         finished
       ),
-    request: (profile) => kiroRequest(req, model, profile, thinking),
+    request: kiroRequest(req, model, thinking),
   };
 }

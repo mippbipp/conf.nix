@@ -4,10 +4,15 @@
   config,
   host,
   globals,
+  inputs,
   ...
 }:
 let
   hostRecord = globals.hosts.${host};
+  # The plugin's src/, once its typecheck, tests and lint pass.
+  kiro = pkgs.callPackage ./kiro/package.nix {
+    bun2nix = inputs.bun2nix.packages.${pkgs.stdenv.hostPlatform.system}.default;
+  };
 in
 {
   programs.opencode = lib.mkIf (!hostRecord.isWorkPc) {
@@ -57,7 +62,7 @@ in
   };
   home = {
     file = {
-      ".config/opencode/plugins/kiro".source = ./kiro/src;
+      ".config/opencode/plugins/kiro".source = kiro;
       ".config/opencode/commands".source =
         config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents/pstack/opencode/commands";
       ".config/opencode/agents".source =

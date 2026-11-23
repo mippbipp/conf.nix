@@ -1,10 +1,12 @@
 # TypeScript programs live in one Bun workspace beside their Nix modules
 
 Status: accepted. Amended: the workspace moved from pnpm and Node.js to Bun,
-as the sourdough template did.
+as the sourdough template did. Amended again: the OpenCode Kiro plugin joined
+the workspace.
 
 The repo root is a Bun workspace with turbo, holding every TypeScript
-program the fleet runs (`flake-updater` on pewter, `x-blocklist` on gram).
+program the fleet runs (`flake-updater` on pewter, `x-blocklist` on gram, and
+the OpenCode Kiro plugin in `modules/llm/opencode/kiro`).
 Each package stays in the host or module directory whose Nix code runs it,
 rather than in the `apps/` and `packages/` layout of the sourdough template,
 and the `workspaces` field of the root `package.json` lists the packages by
@@ -59,5 +61,14 @@ workstation.
   instances as the workspace's runtime. `@effect/tsgo` patches oxlint and
   supports only the versions it lists, so bump the `oxlint` catalog entry
   only to a version the installed `@effect/tsgo` accepts.
-- `modules/llm/opencode/kiro` is a separate Bun project with its own
-  lockfile and lint setup; the root configs ignore it.
+- The Kiro plugin runs inside OpenCode, which loads `src/` as it is and
+  supplies `effect`, `@opencode/plugin`, `solid-js` and `@opentui/*`. Its
+  dependencies are dev dependencies, pinned to the versions the installed
+  OpenCode ships, and the Effect catalog must match OpenCode's `effect`. An
+  override in the root `oxlint.config.ts` limits what `src/` may import and
+  turns off the Effect rules that need a platform layer OpenCode doesn't
+  provide. Its `package.nix` runs the checks and outputs `src/`, which Home
+  Manager installs as the plugin, so the Build gate tests it.
+- The plugin's dev dependencies (`@opencode/plugin` pulls in the AWS SDK and
+  OpenTUI) are in the shared `bun.nix`, so every package's Nix build fetches
+  them.

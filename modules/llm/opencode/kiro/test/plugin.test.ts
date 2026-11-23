@@ -29,7 +29,7 @@ import { TestClock } from "effect/testing";
 import { KiroAccount } from "../src/account.ts";
 import type { KiroRequest, MessagesRequest } from "../src/conversation.ts";
 import { Images } from "../src/images.ts";
-import { _internal as plugin } from "../src/index.ts";
+import { internal as plugin } from "../src/index.ts";
 import { errorOf, frame, sse } from "./eventstream.ts";
 import { codex, imagesOf, LIMIT, REPORTED } from "./messages.ts";
 import { throwawayHome } from "./signin.ts";

@@ -14,41 +14,42 @@ import { HttpClientError } from "effect/http";
 
 // SignInError is a sign-in that is missing or that Kiro refused; OpenCode
 // is told 401.
-export class SignInError extends Schema.TaggedError<SignInError>()(
-  "SignInError",
-  {
-    message: Schema.String,
-  }
-) {}
+export class SignInError extends Schema.TaggedError<
+  SignInError,
+  { readonly brand: unique symbol }
+>()("SignInError", {
+  message: Schema.String,
+}) {}
 
 // RefreshError is a refresh that got no usable answer; OpenCode is told 502
 // and retries.
-export class RefreshError extends Schema.TaggedError<RefreshError>()(
-  "RefreshError",
-  {
-    message: Schema.String,
-  }
-) {}
+export class RefreshError extends Schema.TaggedError<
+  RefreshError,
+  { readonly brand: unique symbol }
+>()("RefreshError", {
+  message: Schema.String,
+}) {}
 
 // KiroApiError is a call to Kiro's management API that failed: Kiro's
 // status and body when it answered, 502 when it didn't.
-export class KiroApiError extends Schema.TaggedError<KiroApiError>()(
-  "KiroApiError",
-  {
-    body: Schema.String,
-    message: Schema.String,
-    status: Schema.Finite,
-  }
-) {
+export class KiroApiError extends Schema.TaggedError<
+  KiroApiError,
+  { readonly brand: unique symbol }
+>()("KiroApiError", {
+  body: Schema.String,
+  message: Schema.String,
+  status: Schema.Finite,
+}) {
   // fromReply is the error for an answer that wasn't OK, in Kiro's words
   // when its body has a message
-  static fromReply(status: number, body: string) {
-    const said = readErrorBody(body)?.message;
+  public static fromReply(status: number, body: string) {
+    const said = readErrorBody(body)?.message ?? "";
     return KiroApiError.make({
       body,
-      message: said
-        ? `Kiro: ${said} (HTTP ${status})`
-        : `Kiro answered HTTP ${status}`,
+      message:
+        said === ""
+          ? `Kiro answered HTTP ${status}`
+          : `Kiro: ${said} (HTTP ${status})`,
       status,
     });
   }
@@ -81,9 +82,11 @@ const readErrorBody = (body: string) =>
 // kiroSaid is what Kiro's error says: its message and reason, or the body as it is
 function kiroSaid(body: string) {
   const error = readErrorBody(body);
-  const said = error?.message || error?.Message;
-  if (said) {
-    return said + (error?.reason ? ` (${error.reason})` : "");
+  const message = error?.message ?? "";
+  const said = message === "" ? (error?.Message ?? "") : message;
+  if (said !== "") {
+    const reason = error?.reason ?? "";
+    return said + (reason === "" ? "" : ` (${reason})`);
   }
   return Str.trim(body);
 }
@@ -97,22 +100,22 @@ const messageOf = (cause: unknown) =>
 const REASONS = [
   {
     pattern:
-      /CONTENT_LENGTH_EXCEEDS_THRESHOLD|ContentLengthExceeds|input is too long/i,
+      /CONTENT_LENGTH_EXCEEDS_THRESHOLD|ContentLengthExceeds|input is too long/iu,
     status: 400,
     words: "prompt is too long for this model's context window",
   },
   {
-    pattern: /MONTHLY_REQUEST_COUNT|MonthlyLimitReached|USAGE_LIMIT/i,
+    pattern: /MONTHLY_REQUEST_COUNT|MonthlyLimitReached|USAGE_LIMIT/iu,
     status: 402,
     words: "Kiro's monthly usage limit has been reached",
   },
   {
-    pattern: /DAILY_REQUEST_COUNT/i,
+    pattern: /DAILY_REQUEST_COUNT/iu,
     status: 402,
     words: "Kiro's daily request limit has been reached",
   },
   {
-    pattern: /INSUFFICIENT_MODEL_CAPACITY/i,
+    pattern: /INSUFFICIENT_MODEL_CAPACITY/iu,
     status: 503,
     words:
       "Kiro has no capacity for this model right now. If it keeps happening, switch models",
@@ -126,19 +129,19 @@ const REASONS = [
 const KINDS = [
   {
     statuses: [429],
-    type: /throttl/i,
+    type: /throttl/iu,
     words: "Kiro is rate limiting requests",
   },
-  { statuses: [400], type: /validation/i, words: "Kiro rejected the request" },
+  { statuses: [400], type: /validation/iu, words: "Kiro rejected the request" },
   {
     statuses: [403, 401],
-    type: /accessdenied/i,
+    type: /accessdenied/iu,
     words:
       "Kiro refused the request. If you signed out of kiro-cli or switched accounts, run `kiro-cli login`",
   },
   {
     statuses: [503],
-    type: /unavailable/i,
+    type: /unavailable/iu,
     words: "Kiro is unavailable right now",
   },
 ] as const;
@@ -146,12 +149,12 @@ const KINDS = [
 // classify gives a Kiro failure the status and words OpenCode acts on, with
 // what Kiro said kept at the end.
 function classify(status: number, said: string, type: string): Failure {
-  const tail = said ? `. Kiro said: ${said}` : "";
+  const tail = said === "" ? "" : `. Kiro said: ${said}`;
   const all = `${type} ${said}`;
   const reason = Option.getOrUndefined(
     Arr.findFirst(REASONS, (known) => known.pattern.test(all))
   );
-  if (reason) {
+  if (reason !== undefined) {
     return { message: reason.words + tail, status: reason.status };
   }
   const has = (known: (typeof KINDS)[number]) =>
@@ -159,7 +162,7 @@ function classify(status: number, said: string, type: string): Failure {
   const kind = Option.getOrUndefined(
     Arr.findFirst(KINDS, (known) => known.type.test(type) || has(known))
   );
-  if (kind) {
+  if (kind !== undefined) {
     return {
       message: kind.words + tail,
       status: has(kind) ? status : kind.statuses[0],
@@ -178,10 +181,12 @@ export function fromReply(
   body: string,
   headers: Readonly<Record<string, string | undefined>> = {}
 ): Failure {
-  const type = Str.split(headers["x-amzn-errortype"] ?? "", ":")[0];
+  const [type] = Str.split(headers["x-amzn-errortype"] ?? "", ":");
   const failure = classify(status, kiroSaid(body), type);
   const retryAfter = headers["retry-after"];
-  return retryAfter ? { ...failure, retryAfter } : failure;
+  return retryAfter !== undefined && retryAfter !== ""
+    ? { ...failure, retryAfter }
+    : failure;
 }
 
 // fromException is the failure for an exception in Kiro's event stream:
@@ -195,12 +200,12 @@ export function fromException(
   const kind = Option.getOrUndefined(
     Arr.findFirst(KINDS, (candidate) => candidate.type.test(known))
   );
-  if (kind) {
+  if (kind !== undefined) {
     return classify(kind.statuses[0], said, known);
   }
   return classify(
     500,
-    known && known !== "error" ? `${known}: ${said}` : said,
+    known !== "" && known !== "error" ? `${known}: ${said}` : said,
     known
   );
 }
@@ -283,7 +288,7 @@ export const toError = (failure: Failure) => ({
 // toResponse is the failure as an Anthropic Messages error response
 export function toResponse(failure: Failure) {
   const headers = new Headers({ "Content-Type": "application/json" });
-  if (failure.retryAfter) {
+  if (failure.retryAfter !== undefined && failure.retryAfter !== "") {
     headers.set("retry-after", failure.retryAfter);
   }
   if (failure.retry === false) {

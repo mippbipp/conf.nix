@@ -10,7 +10,9 @@ import type { Plugin } from "@opencode/plugin/effect";
 import { Effect, Exit, Option, Schema, Semaphore, String as Str } from "effect";
 
 import { KiroAccount } from "./account.ts";
+// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Conversation.Usage
 import type * as Conversation from "./conversation.ts";
+// oxlint-disable-next-line import/no-namespace -- its exports are named to be read qualified, as Failure.fromCause
 import * as Failure from "./failure.ts";
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
 
@@ -70,10 +72,8 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
     if (known !== undefined) {
       return known;
     }
-    const saved = Option.getOrElse(
-      decodeCredits(yield* host.storage.get(creditsKey(sessionID))),
-      () => 0
-    );
+    const stored = yield* host.storage.get(creditsKey(sessionID));
+    const saved = Option.getOrElse(decodeCredits(stored), () => 0);
     // a reply may have added to the session's credits during the read
     const total = credits.get(sessionID) ?? saved;
     credits.set(sessionID, total);
@@ -103,16 +103,15 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
     })
     .pipe(
       Effect.catchCause((cause) =>
-        Effect.logWarning("Kiro: registering the usage RPC failed", cause).pipe(
-          Effect.as(undefined)
-        )
+        Effect.logWarning("Kiro: registering the usage RPC failed", cause)
       )
     );
   // telling the sidebar is best effort
-  const emitUpdated = registration
-    ? // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC fails with unknown
-      registration.events.emit("updated", {}).pipe(Effect.ignore)
-    : Effect.void;
+  const emitUpdated =
+    registration === undefined
+      ? Effect.void
+      : // oxlint-disable-next-line effecttsgo/any-unknown-in-error-context -- OpenCode's RPC fails with unknown
+        registration.events.emit("updated", {}).pipe(Effect.ignore);
 
   // after a reply, the account read again and the sidebar told. One read
   // runs at a time; a reply ending during one is in what it tells.
@@ -126,7 +125,7 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
 
   const record: Tracker["record"] = Effect.fnUntraced(
     function* (sessionID, usage) {
-      if (sessionID && usage.credits > 0) {
+      if (sessionID !== undefined && sessionID !== "" && usage.credits > 0) {
         yield* addCredits(sessionID, usage.credits);
       }
       yield* refreshUsage;

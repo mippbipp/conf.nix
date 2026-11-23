@@ -23,6 +23,9 @@ export const field = <S extends Schema.Constraint>(schema: S) =>
 // reads the status and body itself.
 export const isOk = (status: number) => status >= 200 && status <= 299;
 
+// isSet is whether a number Kiro or the request gave is set: not 0, and not NaN
+export const isSet = (value: number) => value !== 0 && !Number.isNaN(value);
+
 // send makes a request with tracing off: OpenCode's tracer then adds no
 // headers to what Kiro and AWS are sent, and records none of them. A
 // request with a deadline fails with a TimeoutError that names the host if

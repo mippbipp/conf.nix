@@ -4,7 +4,7 @@
 
 import { Array as Arr, Option, Schema, String as Str } from "effect";
 
-import { ID } from "./kiro.ts";
+import { ID, isSet } from "./kiro.ts";
 import { type Allowance, UsageAnswer } from "./rpc.ts";
 
 // what the RPC answers, or why there is no answer
@@ -18,7 +18,6 @@ const decodeReason = Schema.decodeUnknownOption(
 );
 
 // answerOf is what the usage RPC answered, read against this plugin's schema
-// oxlint-disable-next-line anti-slop/no-unknown-parameters -- this is the decode of what OpenCode's client passes on unchecked
 export const answerOf = (out: unknown): UsageAnswer =>
   Option.getOrElse(decodeAnswer(out), () => ({
     account: null,
@@ -45,7 +44,10 @@ export function sessionsCounted(
   session: { readonly parentID?: string } | undefined,
   family: ReadonlyArray<string>
 ): ReadonlyArray<string> {
-  if (!session || session.parentID) {
+  if (
+    session === undefined ||
+    (session.parentID !== undefined && session.parentID !== "")
+  ) {
     return [sessionID];
   }
   return [...new Set([sessionID, ...family])];
@@ -63,7 +65,7 @@ export function shown(
   answer: UsageAnswer | undefined,
   sessionIDs: ReadonlyArray<string>
 ): boolean {
-  if (!answer) {
+  if (answer === undefined) {
     return false;
   }
   return providerID === ID || creditsOf(answer, sessionIDs) > 0;
@@ -92,7 +94,7 @@ const spent = (credits: number) => amount(credits, credits < 10 ? 2 : 1);
 
 // "Kiro Pro · resets 31 Oct (3d)"
 function planLine(plan: string, resetsAt: number, now: number) {
-  if (!resetsAt) {
+  if (!isSet(resetsAt)) {
     return plan;
   }
   const days = Math.max(0, Math.ceil((resetsAt - now) / DAY));
@@ -104,7 +106,7 @@ function allowanceLines(allowance: Allowance): Array<Line> {
   // the overage cap while overages are on and it is set (not 0), else the
   // plan's limit
   const cap =
-    allowance.overage?.enabled && allowance.overage.cap !== 0
+    allowance.overage?.enabled === true && allowance.overage.cap !== 0
       ? allowance.overage.cap
       : allowance.limit;
   const out: Array<Line> = [
@@ -114,8 +116,11 @@ function allowanceLines(allowance: Allowance): Array<Line> {
     },
   ];
   const { trial } = allowance;
-  if (trial) {
-    const ends = trial.expiresAt ? ` · ends ${day(trial.expiresAt)}` : "";
+  if (trial !== undefined) {
+    const ends =
+      trial.expiresAt !== undefined && isSet(trial.expiresAt)
+        ? ` · ends ${day(trial.expiresAt)}`
+        : "";
     out.push({
       text: `Trial ${amount(trial.used)} / ${amount(trial.limit)} ${unit}${ends}`,
       tone: "muted",
@@ -133,7 +138,7 @@ export function lines(
   now: number
 ): Array<Line> {
   const out: Array<Line> = [{ text: "Kiro", tone: "title" }];
-  if (answer.account) {
+  if (answer.account !== null) {
     out.push({
       text: planLine(answer.account.plan, answer.account.resetsAt, now),
       tone: "muted",
@@ -142,7 +147,7 @@ export function lines(
       out.push(...allowanceLines(allowance));
     }
   }
-  if (answer.error) {
+  if (answer.error !== undefined && answer.error !== "") {
     out.push({ text: answer.error, tone: "error" });
   }
   out.push({
