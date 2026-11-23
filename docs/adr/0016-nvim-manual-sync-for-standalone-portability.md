@@ -8,7 +8,7 @@ Manual sync. The `nvim` colorscheme in `modules/hm/devenv/nvim/lua/plugins/color
 
 This keeps the submodule self-contained. No Nix-generated colors and no `config.lib.stylix.colors` import.
 
-* `stylix.targets.neovim.enable = false` in `modules/theme/hm.nix` so Stylix does not inject a plugin via `programs.neovim`. That injection conflicts with the whole-dir symlink and would tie startup to Home Manager.
+* `stylix.autoEnable = false` in `modules/theme/system.nix`, and `modules/theme/hm.nix` never enables `stylix.targets.neovim`, so Stylix does not inject a plugin via `programs.neovim`. That injection conflicts with the whole-dir symlink and would tie startup to Home Manager.
 * `LazyVim` must point at the same scheme as the plugin. Its default is `tokyonight`, so the override is required once that plugin is disabled.
 * `lualine` must use `theme = "tinted"` in `modules/hm/devenv/nvim/lua/plugins/lualine.lua`. The `base16` lualine theme requires `base16-nvim`, which is not installed with `tinted-nvim`.
 
