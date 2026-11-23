@@ -10,22 +10,32 @@ import type { UsageAnswer } from "../src/rpc.ts";
 import * as Sidebar from "../src/sidebar.ts";
 
 test("a root session counts itself and its family, a child only itself", () => {
-  expect(Sidebar.sessionsCounted("ses_root", {}, ["ses_root", "ses_a", "ses_b"])).toEqual([
+  expect(
+    Sidebar.sessionsCounted("ses_root", {}, ["ses_root", "ses_a", "ses_b"])
+  ).toEqual(["ses_root", "ses_a", "ses_b"]);
+  expect(Sidebar.sessionsCounted("ses_root", {}, ["ses_a"])).toEqual([
     "ses_root",
     "ses_a",
-    "ses_b",
   ]);
-  expect(Sidebar.sessionsCounted("ses_root", {}, ["ses_a"])).toEqual(["ses_root", "ses_a"]);
   expect(
-    Sidebar.sessionsCounted("ses_a", { parentID: "ses_root" }, ["ses_root", "ses_a", "ses_b"])
+    Sidebar.sessionsCounted("ses_a", { parentID: "ses_root" }, [
+      "ses_root",
+      "ses_a",
+      "ses_b",
+    ])
   ).toEqual(["ses_a"]);
   // a session OpenCode hasn't loaded yet
-  expect(Sidebar.sessionsCounted("ses_new", undefined, [])).toEqual(["ses_new"]);
+  expect(Sidebar.sessionsCounted("ses_new", undefined, [])).toEqual([
+    "ses_new",
+  ]);
 });
 
 test("the section shows on a Kiro model, or when the sessions counted have spent credits", () => {
   const none: UsageAnswer = { account: null, credits: { ses_a: 0 } };
-  const spent: UsageAnswer = { account: null, credits: { ses_a: 0, ses_b: 0.02 } };
+  const spent: UsageAnswer = {
+    account: null,
+    credits: { ses_a: 0, ses_b: 0.02 },
+  };
   expect(Sidebar.shown("kiro", none, ["ses_a"])).toBe(true);
   expect(Sidebar.shown("anthropic", none, ["ses_a"])).toBe(false);
   expect(Sidebar.shown(undefined, none, ["ses_a"])).toBe(false);
@@ -40,14 +50,17 @@ test("the section shows on a Kiro model, or when the sessions counted have spent
 // is the same in any time zone from UTC-11 to UTC+11.
 const NOW = 1_793_192_400_000;
 const ACCOUNT = {
+  allowances: [{ limit: 10_000, name: "Credits", used: 8978.62 }],
+  checkedAt: NOW,
   plan: "Kiro Pro",
   resetsAt: 1_793_448_000_000, // 31 Oct 2026, 12:00 UTC
-  allowances: [{ name: "Credits", used: 8978.62, limit: 10_000 }],
-  checkedAt: NOW,
 };
 
 test("an account's lines: the plan and its reset, each allowance, and the session's credits", () => {
-  const answer: UsageAnswer = { account: ACCOUNT, credits: { ses_a: 0.341, ses_b: 1 } };
+  const answer: UsageAnswer = {
+    account: ACCOUNT,
+    credits: { ses_a: 0.341, ses_b: 1 },
+  };
   expect(Sidebar.lines(answer, ["ses_a", "ses_b"], NOW)).toEqual([
     { text: "Kiro", tone: "title" },
     { text: "Kiro Pro · resets 31 Oct (3d)", tone: "muted" },
@@ -62,25 +75,27 @@ test("an allowance over its limit counts up to the overage cap, and a trial has 
       ...ACCOUNT,
       allowances: [
         {
-          name: "Credit",
-          used: 8978.62,
           limit: 1000,
+          name: "Credit",
           overage: {
-            credits: 7978.62,
-            charges: 319.14,
-            currency: "USD",
-            rate: 0.04,
             cap: 40_000,
+            charges: 319.14,
+            credits: 7978.62,
+            currency: "USD",
             enabled: true,
+            rate: 0.04,
           },
-          trial: { used: 10, limit: 500, expiresAt: 1_793_793_600_000 }, // 4 Nov 2026
+          trial: { expiresAt: 1_793_793_600_000, limit: 500, used: 10 }, // 4 Nov 2026
+          used: 8978.62,
         },
-        { name: "Spec", used: 3, limit: 50, trial: { used: 0, limit: 5 } },
+        { limit: 50, name: "Spec", trial: { limit: 5, used: 0 }, used: 3 },
       ],
     },
     credits: { ses_a: 12.345 },
   };
-  expect(Arr.map(Sidebar.lines(answer, ["ses_a"], NOW), (line) => line.text)).toEqual([
+  expect(
+    Arr.map(Sidebar.lines(answer, ["ses_a"], NOW), (line) => line.text)
+  ).toEqual([
     "Kiro",
     "Kiro Pro · resets 31 Oct (3d)",
     "8,978.6 / 40,000 credit",
@@ -98,17 +113,17 @@ test("with overages turned off, an allowance counts up to the plan's limit", () 
       ...ACCOUNT,
       allowances: [
         {
+          limit: 1000,
           name: "Credits",
           used: 1200,
-          limit: 1000,
           // this month's overage, from before they were turned off
           overage: {
-            credits: 200,
-            charges: 8,
-            currency: "USD",
-            rate: 0.04,
             cap: 40_000,
+            charges: 8,
+            credits: 200,
+            currency: "USD",
             enabled: false,
+            rate: 0.04,
           },
         },
       ],
@@ -120,21 +135,29 @@ test("with overages turned off, an allowance counts up to the plan's limit", () 
 
 test("the days to the reset round up, stop at none, and a reset Kiro didn't say leaves the plan", () => {
   const plan = (resetsAt: number, now: number) =>
-    Sidebar.lines({ account: { ...ACCOUNT, resetsAt }, credits: {} }, [], now)[1]?.text;
+    Sidebar.lines(
+      { account: { ...ACCOUNT, resetsAt }, credits: {} },
+      [],
+      now
+    )[1]?.text;
   // 2.04 days
   expect(plan(ACCOUNT.resetsAt, NOW)).toBe("Kiro Pro · resets 31 Oct (3d)");
   // an hour before
-  expect(plan(ACCOUNT.resetsAt, 1_793_444_400_000)).toBe("Kiro Pro · resets 31 Oct (1d)");
+  expect(plan(ACCOUNT.resetsAt, 1_793_444_400_000)).toBe(
+    "Kiro Pro · resets 31 Oct (1d)"
+  );
   // a day after, before the account is read again
-  expect(plan(ACCOUNT.resetsAt, 1_793_534_400_000)).toBe("Kiro Pro · resets 31 Oct (0d)");
+  expect(plan(ACCOUNT.resetsAt, 1_793_534_400_000)).toBe(
+    "Kiro Pro · resets 31 Oct (0d)"
+  );
   expect(plan(0, NOW)).toBe("Kiro Pro");
 });
 
 test("an account that couldn't be read shows why, and the session's credits still", () => {
   const answer: UsageAnswer = {
     account: null,
-    error: "Kiro: Not allowed (HTTP 403)",
     credits: { ses_a: 0.091 },
+    error: "Kiro: Not allowed (HTTP 403)",
   };
   expect(Sidebar.lines(answer, ["ses_a", "ses_gone"], NOW)).toEqual([
     { text: "Kiro", tone: "title" },
@@ -147,10 +170,12 @@ test("what the RPC answers is read against this plugin's schema", () => {
   const answer = { account: ACCOUNT, credits: { ses_a: 1 } };
   expect(Sidebar.answerOf(answer)).toEqual(answer);
   // a server still running an older plugin
-  expect(Sidebar.answerOf({ account: { plan: "Kiro Pro" }, credits: {} })).toEqual({
+  expect(
+    Sidebar.answerOf({ account: { plan: "Kiro Pro" }, credits: {} })
+  ).toEqual({
     account: null,
-    error: "Kiro's usage didn't read as expected",
     credits: {},
+    error: "Kiro's usage didn't read as expected",
   });
 });
 
@@ -158,10 +183,12 @@ test("an RPC that fails answers why", () => {
   const why = (cause: unknown) => Sidebar.unanswered(cause);
   expect(why(new Error("Unable to connect"))).toEqual({
     account: null,
-    error: "Unable to connect",
     credits: {},
+    error: "Unable to connect",
   });
   // the client throws the RPC's own errors as plain objects
-  expect(why({ type: "rpc.not_found", message: "No RPC kiro" }).error).toBe("No RPC kiro");
+  expect(why({ message: "No RPC kiro", type: "rpc.not_found" }).error).toBe(
+    "No RPC kiro"
+  );
   expect(why("offline").error).toBe("offline");
 });

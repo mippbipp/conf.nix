@@ -37,89 +37,91 @@ import { throwawayHome } from "./signin.ts";
 const { signIn, signOut } = throwawayHome();
 
 // the fake network: each test sets how it answers
-type Answer = (request: HttpClientRequest.HttpClientRequest) => Promise<Response>;
+type Answer = (
+  request: HttpClientRequest.HttpClientRequest
+) => Promise<Response>;
 const offline: Answer = async () => {
   throw new Error("no network in tests");
 };
 let answer = offline;
 const http = HttpClient.make((request) =>
   Effect.tryPromise({
-    try: async () => HttpClientResponse.fromWeb(request, await answer(request)),
     catch: (cause) =>
       new HttpClientError.HttpClientError({
-        reason: new HttpClientError.TransportError({ request, cause }),
+        reason: new HttpClientError.TransportError({ cause, request }),
       }),
+    try: async () => HttpClientResponse.fromWeb(request, await answer(request)),
   })
 );
 const layer = Layer.mergeAll(KiroAccount.layer, Images.layer).pipe(
   Layer.provideMerge(Layer.succeed(HttpClient.HttpClient, http))
 );
-const run = <A, E>(effect: Effect.Effect<A, E, Layer.Success<typeof layer> | Scope.Scope>) => {
-  const result = Effect.runPromise(effect.pipe(Effect.scoped, Effect.provide(layer)));
+const run = <A, E>(
+  effect: Effect.Effect<A, E, Layer.Success<typeof layer> | Scope.Scope>
+) => {
+  const result = Effect.runPromise(
+    effect.pipe(Effect.scoped, Effect.provide(layer))
+  );
   return result.finally(() => {
     answer = offline;
   });
 };
 
 // Kiro answering with these AWS event stream messages
-const stream = (...frames: Uint8Array[]) => new Response(new Blob(frames), { status: 200 });
+const stream = (...frames: Array<Uint8Array>) =>
+  new Response(new Blob(frames), { status: 200 });
 
 // the parts of a session hook's event the plugin reads
-type HookEvent = { request: Request; response?: Response; sessionID?: string };
+interface HookEvent {
+  request: Request;
+  response?: Response;
+  sessionID?: string;
+}
 type Hook = (event: HookEvent) => Effect.Effect<void>;
 
 // a fake OpenCode plugin context, recording what the plugin registers; its
 // storage holds the model list an earlier run saved
 const SAVED = [
   {
-    id: "claude-x",
-    name: "claude-x",
     context: 1000,
-    output: 100,
-    images: true,
-    fields: "claude",
     efforts: ["low"],
+    fields: "claude",
+    id: "claude-x",
+    images: true,
+    name: "claude-x",
+    output: 100,
   },
 ];
 function fakeHost() {
   const hooks: Record<string, { fn: Hook; options: unknown }> = {};
-  const added: { info: { id: string }; models: { id: string }[] }[] = [];
-  const saved: unknown[] = [];
+  const added: Array<{ info: { id: string }; models: Array<{ id: string }> }> =
+    [];
+  const saved: Array<unknown> = [];
   const store = new Map<string, unknown>([["models", SAVED]]);
   const registered = { dispose: Effect.void };
   // the RPC's handlers, by method, and the events it emitted
-  const rpc: Record<string, (input: unknown, context: unknown) => Effect.Effect<any>> = {};
-  const emitted: string[] = [];
+  const rpc: Record<
+    string,
+    (input: unknown, context: unknown) => Effect.Effect<any>
+  > = {};
+  const emitted: Array<string> = [];
   // how many times the plugin had the provider reloaded
   const fake = { reloads: 0 };
   const ctx = {
-    storage: {
-      get: (key: string) => Effect.sync(() => store.get(key)),
-      set: (key: string, value: unknown) =>
-        Effect.sync(() => {
-          if (key === "models") saved.push(value);
-          store.set(key, value);
-        }),
-    },
     provider: {
-      transform: (fn: (editor: { add: (entry: (typeof added)[number]) => void }) => void) =>
+      reload: () =>
+        Effect.sync(() => {
+          fake.reloads++;
+        }),
+      transform: (
+        fn: (editor: { add: (entry: (typeof added)[number]) => void }) => void
+      ) =>
         Effect.sync(() => {
           fn({
             add: (entry) => {
               added.push(entry);
             },
           });
-          return registered;
-        }),
-      reload: () =>
-        Effect.sync(() => {
-          fake.reloads++;
-        }),
-    },
-    session: {
-      hook: (name: string, fn: Hook, options: unknown) =>
-        Effect.sync(() => {
-          hooks[name] = { fn, options };
           return registered;
         }),
     },
@@ -129,45 +131,68 @@ function fakeHost() {
           Object.assign(rpc, handlers);
           return {
             ...registered,
-            events: { emit: (name: string) => Effect.sync(() => void emitted.push(name)) },
+            events: {
+              emit: (name: string) =>
+                Effect.sync(() => void emitted.push(name)),
+            },
           };
+        }),
+    },
+    session: {
+      hook: (name: string, fn: Hook, options: unknown) =>
+        Effect.sync(() => {
+          hooks[name] = { fn, options };
+          return registered;
+        }),
+    },
+    storage: {
+      get: (key: string) => Effect.sync(() => store.get(key)),
+      set: (key: string, value: unknown) =>
+        Effect.sync(() => {
+          if (key === "models") {
+            saved.push(value);
+          }
+          store.set(key, value);
         }),
     },
   };
   return Object.assign(fake, {
     // SAFETY: the fake has only what the plugin calls
-    ctx: ctx as unknown as Parameters<typeof plugin.make>[0],
-    hooks,
     added,
+    ctx: ctx as unknown as Parameters<typeof plugin.make>[0],
+    emitted,
+    hooks,
+    rpc,
     saved,
     store,
-    rpc,
-    emitted,
   });
 }
 async function load() {
-  const { ctx, hooks, added } = fakeHost();
+  const { added, ctx, hooks } = fakeHost();
   await run(plugin.make(ctx));
   const hook = (name: string) => {
     const found = hooks[name]!;
     return {
-      options: found.options,
       fn: (event: HookEvent) => Effect.runPromise(found.fn(event)),
+      options: found.options,
     };
   };
-  return { hook, added };
+  return { added, hook };
 }
 const messages = (body: MessagesRequest) =>
   new Request("https://runtime.us-east-1.kiro.dev/messages", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": "unused" },
     body: JSON.stringify(body),
+    headers: { "content-type": "application/json", "x-api-key": "unused" },
+    method: "POST",
   });
 // ask sends a Messages request through both hooks, Kiro answering with response
 async function ask(
   hook: Awaited<ReturnType<typeof load>>["hook"],
   response: Response,
-  body: MessagesRequest = { model: "claude-x", messages: [{ role: "user", content: "hi" }] },
+  body: MessagesRequest = {
+    messages: [{ content: "hi", role: "user" }],
+    model: "claude-x",
+  },
   sessionID?: string
 ) {
   const event: HookEvent = { request: messages(body), sessionID };
@@ -182,7 +207,9 @@ test("hooks: Kiro is sent the fitted image", async () => {
   const { hook } = await load();
   const event: HookEvent = { request: messages(codex(REPORTED, true)) };
   await hook("http.request").fn(event);
-  expect(event.request.url).toBe("https://runtime.us-east-1.kiro.dev/generateAssistantResponse");
+  expect(event.request.url).toBe(
+    "https://runtime.us-east-1.kiro.dev/generateAssistantResponse"
+  );
   // SAFETY: http.request sent on the Kiro request the plugin built
   const body = (await event.request.json()) as KiroRequest;
   const sentImages = imagesOf(body.conversationState);
@@ -192,27 +219,32 @@ test("hooks: Kiro is sent the fitted image", async () => {
 
 test("hooks: a Messages request goes to Kiro, and its event stream comes back as Messages events", async () => {
   signIn({ access: "tok" });
-  const { hook, added } = await load();
+  const { added, hook } = await load();
   expect(hook("http.request").options).toEqual({ providerID: "kiro" });
   expect(added[0]!.info).toMatchObject({
+    activation: "enabled",
     id: "kiro",
     package: "@opencode/ai/providers/anthropic",
-    activation: "enabled",
   });
   expect(Arr.map(added[0]!.models, (model) => model.id)).toEqual(["claude-x"]);
 
-  const longTool = "mcp__a_very_long_server_name__and_an_even_longer_tool_name_for_this";
+  const longTool =
+    "mcp__a_very_long_server_name__and_an_even_longer_tool_name_for_this";
   const event: HookEvent = {
     request: messages({
-      model: "claude-x",
       max_tokens: 1000,
+      messages: [
+        { content: [{ type: "text", text: "weather?" }], role: "user" },
+      ],
+      model: "claude-x",
       stream: true,
-      messages: [{ role: "user", content: [{ type: "text", text: "weather?" }] }],
-      tools: [{ name: longTool, input_schema: { type: "object" } }],
+      tools: [{ input_schema: { type: "object" }, name: longTool }],
     }),
   };
   await hook("http.request").fn(event);
-  expect(event.request.url).toBe("https://runtime.us-east-1.kiro.dev/generateAssistantResponse");
+  expect(event.request.url).toBe(
+    "https://runtime.us-east-1.kiro.dev/generateAssistantResponse"
+  );
   expect(event.request.headers.get("authorization")).toBe("Bearer tok");
   expect(event.request.headers.get("content-type")).toBe("application/json");
   expect(event.request.headers.get("traceparent")).toBeNull();
@@ -220,7 +252,8 @@ test("hooks: a Messages request goes to Kiro, and its event stream comes back as
   const body = (await event.request.clone().json()) as KiroRequest;
   const current = body.conversationState.currentMessage.userInputMessage;
   expect(current).toMatchObject({ content: "weather?", modelId: "claude-x" });
-  const kiroTool = current.userInputMessageContext?.tools?.[0]?.toolSpecification?.name ?? "";
+  const kiroTool =
+    current.userInputMessageContext?.tools?.[0]?.toolSpecification?.name ?? "";
   expect(kiroTool.length).toBeLessThanOrEqual(64);
 
   const res: HookEvent = {
@@ -228,9 +261,17 @@ test("hooks: a Messages request goes to Kiro, and its event stream comes back as
     response: stream(
       frame("reasoningContentEvent", { text: "hmm" }),
       frame("assistantResponseEvent", { content: "Let me look." }),
-      frame("toolUseEvent", { toolUseId: "t1", name: kiroTool }),
-      frame("toolUseEvent", { toolUseId: "t1", name: kiroTool, input: '{"city":' }),
-      frame("toolUseEvent", { toolUseId: "t1", name: kiroTool, input: '"Paris"}' }),
+      frame("toolUseEvent", { name: kiroTool, toolUseId: "t1" }),
+      frame("toolUseEvent", {
+        input: '{"city":',
+        name: kiroTool,
+        toolUseId: "t1",
+      }),
+      frame("toolUseEvent", {
+        input: '"Paris"}',
+        name: kiroTool,
+        toolUseId: "t1",
+      }),
       frame("contextUsageEvent", { contextUsagePercentage: 10 }),
       frame("metadataEvent", { stopReason: "TOOL_USE" })
     ),
@@ -253,7 +294,10 @@ test("hooks: a Messages request goes to Kiro, and its event stream comes back as
     "message_stop",
   ]);
   expect(out[1].content_block.type).toBe("thinking");
-  expect(out[7].content_block).toMatchObject({ type: "tool_use", name: longTool });
+  expect(out[7].content_block).toMatchObject({
+    name: longTool,
+    type: "tool_use",
+  });
   expect(out[11]).toMatchObject({
     delta: { stop_reason: "tool_use" },
     usage: { input_tokens: 100 },
@@ -265,10 +309,15 @@ test.each([401, 403])(
   async (status) => {
     signIn({ access: "stale" });
     const { hook } = await load();
-    const sent: (string | undefined)[] = [];
+    const sent: Array<string | undefined> = [];
     answer = async (request) => {
-      if (Str.includes("oidc")(request.url))
-        return Response.json({ accessToken: "fresh", refreshToken: "r2", expiresIn: 3600 });
+      if (Str.includes("oidc")(request.url)) {
+        return Response.json({
+          accessToken: "fresh",
+          expiresIn: 3600,
+          refreshToken: "r2",
+        });
+      }
       sent.push(request.headers.authorization);
       return stream(
         frame("assistantResponseEvent", { content: "ok" }),
@@ -279,7 +328,10 @@ test.each([401, 403])(
     answer = offline;
     expect(sent).toEqual(["Bearer fresh"]);
     const delta = Option.getOrThrow(
-      Arr.findFirst(await sse(res), (event) => event.type === "content_block_delta")
+      Arr.findFirst(
+        await sse(res),
+        (event) => event.type === "content_block_delta"
+      )
     );
     expect(delta.delta.text).toBe("ok");
   }
@@ -290,33 +342,40 @@ test("hooks: an error Kiro answers with, or an exception before the answer, is a
   const { hook } = await load();
   const answered = async (response: Response) => {
     const res = await ask(hook, response);
-    return { status: res.status, headers: res.headers, error: await errorOf(res) };
+    return {
+      error: await errorOf(res),
+      headers: res.headers,
+      status: res.status,
+    };
   };
   // a 429 keeps Kiro's Retry-After, which OpenCode waits for
   const throttled = await answered(
     Response.json(
       { message: "Too many requests" },
       {
-        status: 429,
         headers: {
           "retry-after": "7",
-          "x-amzn-errortype": "ThrottlingException:http://internal.amazon.com/coral/",
+          "x-amzn-errortype":
+            "ThrottlingException:http://internal.amazon.com/coral/",
         },
+        status: 429,
       }
     )
   );
   expect(throttled.status).toBe(429);
   expect(throttled.headers.get("retry-after")).toBe("7");
   expect(throttled.error).toEqual({
-    type: "rate_limit_error",
     message: "Kiro is rate limiting requests. Kiro said: Too many requests",
+    type: "rate_limit_error",
   });
   // an exception before any of the answer is a status too
   const streamed = await answered(
     stream(frame("ThrottlingException", { message: "slow down" }, "exception"))
   );
   expect(streamed.status).toBe(429);
-  expect(streamed.error.message).toBe("Kiro is rate limiting requests. Kiro said: slow down");
+  expect(streamed.error.message).toBe(
+    "Kiro is rate limiting requests. Kiro said: slow down"
+  );
 });
 
 test("hooks: a request the plugin can't handle says so, and isn't retried", async () => {
@@ -324,12 +383,15 @@ test("hooks: a request the plugin can't handle says so, and isn't retried", asyn
   const { hook } = await load();
   const event: HookEvent = {
     request: new Request("https://runtime.us-east-1.kiro.dev/messages", {
-      method: "POST",
       body: "not json",
+      method: "POST",
     }),
   };
   await hook("http.request").fn(event);
-  const res: HookEvent = { request: event.request, response: await fetch(event.request) };
+  const res: HookEvent = {
+    request: event.request,
+    response: await fetch(event.request),
+  };
   await hook("http.response").fn(res);
   expect(res.response!.status).toBe(500);
   expect(res.response!.headers.get("x-should-retry")).toBe("false");
@@ -345,7 +407,12 @@ test("hooks: a reply that breaks off after it began ends in an error event", asy
     start(ctl) {
       ctl.enqueue(frame("assistantResponseEvent", { content: "Half" }));
       // the next message's header, and no more of it
-      ctl.enqueue(frame("assistantResponseEvent", { content: " an answer" }).subarray(0, 20));
+      ctl.enqueue(
+        frame("assistantResponseEvent", { content: " an answer" }).subarray(
+          0,
+          20
+        )
+      );
       ctl.close();
     },
   });
@@ -360,9 +427,9 @@ test("hooks: a reply that breaks off after it began ends in an error event", asy
     "error",
   ]);
   expect(out[4].error).toEqual({
-    type: "api_error",
     message:
       "Kiro's reply broke off before it finished: the connection closed partway through an event",
+    type: "api_error",
   });
 });
 
@@ -372,8 +439,12 @@ test("models: a listing Kiro fails is tried again, 5 and then 20 seconds later",
   let calls = 0;
   answer = async () => {
     calls++;
-    if (calls < 3) return Response.json({ message: "busy" }, { status: 500 });
-    return Response.json({ models: [{ modelId: "claude-y", modelName: "Claude Y" }] });
+    if (calls < 3) {
+      return Response.json({ message: "busy" }, { status: 500 });
+    }
+    return Response.json({
+      models: [{ modelId: "claude-y", modelName: "Claude Y" }],
+    });
   };
   // the fake network answers on the event loop, so each step gives it a moment
   const settle = TestClock.withLive(Effect.sleep("20 millis"));
@@ -393,16 +464,20 @@ test("models: a listing Kiro fails is tried again, 5 and then 20 seconds later",
       expect(calls).toBe(3);
     }).pipe(Effect.provide(TestClock.layer()))
   );
-  expect(saved).toEqual([[expect.objectContaining({ id: "claude-y", name: "Claude Y" })]]);
+  expect(saved).toEqual([
+    [expect.objectContaining({ id: "claude-y", name: "Claude Y" })],
+  ]);
 });
 
 test("models: a listing that found no sign-in is made again once a request finds one", async () => {
   signOut();
   const host = fakeHost();
-  const listings: string[] = [];
+  const listings: Array<string> = [];
   answer = async (request) => {
     listings.push(new URL(request.url).pathname);
-    return Response.json({ models: [{ modelId: "claude-y", modelName: "Claude Y" }] });
+    return Response.json({
+      models: [{ modelId: "claude-y", modelName: "Claude Y" }],
+    });
   };
   const settle = Effect.sleep("30 millis");
   await run(
@@ -413,13 +488,18 @@ test("models: a listing that found no sign-in is made again once a request finds
       // kiro-cli login, then the next request
       signIn({ access: "tok" });
       yield* host.hooks["http.request"]!.fn({
-        request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
+        request: messages({
+          messages: [{ content: "hi", role: "user" }],
+          model: "claude-x",
+        }),
       });
       yield* settle;
     })
   );
   expect(listings).toEqual(["/List-Available-Models"]);
-  expect(host.saved).toEqual([[expect.objectContaining({ id: "claude-y", name: "Claude Y" })]]);
+  expect(host.saved).toEqual([
+    [expect.objectContaining({ id: "claude-y", name: "Claude Y" })],
+  ]);
   expect(host.reloads).toBe(1);
 });
 
@@ -430,8 +510,12 @@ test("models: a listing that gave up on Kiro's errors is made again by the next 
   let busy = true;
   answer = async () => {
     calls++;
-    if (busy) return Response.json({ message: "busy" }, { status: 503 });
-    return Response.json({ models: [{ modelId: "claude-y", modelName: "Claude Y" }] });
+    if (busy) {
+      return Response.json({ message: "busy" }, { status: 503 });
+    }
+    return Response.json({
+      models: [{ modelId: "claude-y", modelName: "Claude Y" }],
+    });
   };
   const settle = TestClock.withLive(Effect.sleep("20 millis"));
   await run(
@@ -449,13 +533,18 @@ test("models: a listing that gave up on Kiro's errors is made again by the next 
       expect(host.saved).toEqual([]);
       busy = false;
       yield* host.hooks["http.request"]!.fn({
-        request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
+        request: messages({
+          messages: [{ content: "hi", role: "user" }],
+          model: "claude-x",
+        }),
       });
       yield* settle;
     }).pipe(Effect.provide(TestClock.layer()))
   );
   expect(calls).toBe(5);
-  expect(host.saved).toEqual([[expect.objectContaining({ id: "claude-y", name: "Claude Y" })]]);
+  expect(host.saved).toEqual([
+    [expect.objectContaining({ id: "claude-y", name: "Claude Y" })],
+  ]);
   expect(host.reloads).toBe(1);
 });
 
@@ -473,7 +562,10 @@ test("models: a listing Kiro refused (403) isn't made again by a request", async
       yield* plugin.make(host.ctx);
       yield* settle;
       yield* host.hooks["http.request"]!.fn({
-        request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
+        request: messages({
+          messages: [{ content: "hi", role: "user" }],
+          model: "claude-x",
+        }),
       });
       yield* settle;
     })
@@ -486,12 +578,18 @@ test("hooks: with no sign-in, the request answers with why instead of reaching K
   signOut();
   const { hook } = await load();
   const event: HookEvent = {
-    request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
+    request: messages({
+      messages: [{ content: "hi", role: "user" }],
+      model: "claude-x",
+    }),
   };
   await hook("http.request").fn(event);
   expect(event.request.url).toStartWith("data:");
   // what OpenCode's HTTP client gets for the stand-in, which never leaves the process
-  const res: HookEvent = { request: event.request, response: await fetch(event.request) };
+  const res: HookEvent = {
+    request: event.request,
+    response: await fetch(event.request),
+  };
   await hook("http.response").fn(res);
   expect(res.response!.status).toBe(401);
   expect((await errorOf(res.response!)).message).toContain("kiro-cli login");
@@ -501,7 +599,9 @@ test("hooks: with no sign-in, the request answers with why instead of reaching K
 // these events and no tokenUsage, so no input, output or cache counts at all.
 // Saying cache_read_input_tokens 0 would read as a cache that never hits.
 const usageOf = async (res: Response) =>
-  Option.getOrThrow(Arr.findFirst(await sse(res), (event) => event.type === "message_delta")).usage;
+  Option.getOrThrow(
+    Arr.findFirst(await sse(res), (event) => event.type === "message_delta")
+  ).usage;
 
 test("hooks: a reply with no token counts leaves the cache out, and reckons the input", async () => {
   signIn({ access: "tok" });
@@ -511,8 +611,14 @@ test("hooks: a reply with no token counts leaves the cache out, and reckons the 
     stream(
       frame("assistantResponseEvent", { content: "OK" }),
       frame("metadataEvent", { stopReason: "END_TURN" }),
-      frame("contextUsageEvent", { contextUsagePercentage: 11.032500267028809 }),
-      frame("meteringEvent", { unit: "credit", unitPlural: "credits", usage: 0.091 })
+      frame("contextUsageEvent", {
+        contextUsagePercentage: 11.032500267028809,
+      }),
+      frame("meteringEvent", {
+        unit: "credit",
+        unitPlural: "credits",
+        usage: 0.091,
+      })
     )
   );
   // claude-x's window is 1000 tokens; "OK" is about 1 token
@@ -523,11 +629,11 @@ test("hooks: a reply whose metadataEvent counts tokens tells them, cache include
   signIn({ access: "tok" });
   const { hook } = await load();
   const tokenUsage = {
-    uncachedInputTokens: 120,
-    outputTokens: 3,
     cacheReadInputTokens: 9000,
     cacheWriteInputTokens: 0,
+    outputTokens: 3,
     totalTokens: 9123,
+    uncachedInputTokens: 120,
   };
   const res = await ask(
     hook,
@@ -537,10 +643,10 @@ test("hooks: a reply whose metadataEvent counts tokens tells them, cache include
     )
   );
   expect(await usageOf(res)).toEqual({
+    cache_creation_input_tokens: 0,
+    cache_read_input_tokens: 9000,
     input_tokens: 120,
     output_tokens: 3,
-    cache_read_input_tokens: 9000,
-    cache_creation_input_tokens: 0,
   });
 });
 
@@ -573,7 +679,9 @@ test("hooks: a refresh failing after Kiro turned the token down is a status, not
   answer = async () => new Response("", { status: 503 });
   const retried = await ask(hook, new Response("{}", { status: 403 }));
   expect(retried.status).toBe(502);
-  expect((await errorOf(retried)).message).toStartWith("Couldn't refresh Kiro's sign-in");
+  expect((await errorOf(retried)).message).toStartWith(
+    "Couldn't refresh Kiro's sign-in"
+  );
   answer = async (request) =>
     request.url === "https://oidc.us-east-1.amazonaws.com/token"
       ? Response.json({}, { status: 400 })
@@ -633,8 +741,9 @@ const withPlugin = <A>(
 ) => {
   answer = async (request) => {
     const url = new URL(request.url);
-    if (!Str.endsWith("/Get-Usage-Limits")(url.pathname))
+    if (!Str.endsWith("/Get-Usage-Limits")(url.pathname)) {
       throw new Error(`unexpected ${url.pathname}`);
+    }
     return Response.json(usage);
   };
   const host = fakeHost();
@@ -645,17 +754,30 @@ const withPlugin = <A>(
     })
   );
 };
-const usageOfRpc = (host: ReturnType<typeof fakeHost>, sessionIDs: string[] = []) =>
-  host.rpc.usage!({ sessionIDs }, {});
+const usageOfRpc = (
+  host: ReturnType<typeof fakeHost>,
+  sessionIDs: Array<string> = []
+) => host.rpc.usage!({ sessionIDs }, {});
 // a reply through both hooks, its body read to the end
-const replyIn = (host: ReturnType<typeof fakeHost>, sessionID: string, ...frames: Uint8Array[]) =>
+const replyIn = (
+  host: ReturnType<typeof fakeHost>,
+  sessionID: string,
+  ...frames: Array<Uint8Array>
+) =>
   Effect.gen(function* () {
     const event: HookEvent = {
-      request: messages({ model: "claude-x", messages: [{ role: "user", content: "hi" }] }),
+      request: messages({
+        messages: [{ content: "hi", role: "user" }],
+        model: "claude-x",
+      }),
       sessionID,
     };
     yield* host.hooks["http.request"]!.fn(event);
-    const res: HookEvent = { request: event.request, response: stream(...frames), sessionID };
+    const res: HookEvent = {
+      request: event.request,
+      response: stream(...frames),
+      sessionID,
+    };
     yield* host.hooks["http.response"]!.fn(res);
     yield* Effect.promise(() => sse(res.response!));
     // what a finished reply starts runs beside it
@@ -666,27 +788,32 @@ const metering = (usage: number) =>
 
 test("usage: a reply's meteringEvents add up, and a session's replies add up in storage", async () => {
   signIn({ access: "tok" });
-  const { store, emitted, account, credits } = await withPlugin(PRO_USAGE, (host) =>
-    Effect.gen(function* () {
-      yield* replyIn(
-        host,
-        "ses_a",
-        frame("assistantResponseEvent", { content: "OK" }),
-        metering(0.091)
-      );
-      expect(host.store.get("credits/ses_a")).toBeCloseTo(0.091);
-      yield* replyIn(
-        host,
-        "ses_a",
-        frame("assistantResponseEvent", { content: "OK" }),
-        metering(0.2),
-        metering(0.05)
-      );
-      const out = yield* usageOfRpc(host, ["ses_a", "ses_b"]);
-      return { ...host, account: out.account, credits: out.credits };
-    })
+  const { account, credits, emitted, store } = await withPlugin(
+    PRO_USAGE,
+    (host) =>
+      Effect.gen(function* () {
+        yield* replyIn(
+          host,
+          "ses_a",
+          frame("assistantResponseEvent", { content: "OK" }),
+          metering(0.091)
+        );
+        expect(host.store.get("credits/ses_a")).toBeCloseTo(0.091);
+        yield* replyIn(
+          host,
+          "ses_a",
+          frame("assistantResponseEvent", { content: "OK" }),
+          metering(0.2),
+          metering(0.05)
+        );
+        const out = yield* usageOfRpc(host, ["ses_a", "ses_b"]);
+        return { ...host, account: out.account, credits: out.credits };
+      })
   );
-  expect(account).toMatchObject({ plan: "Kiro Pro", resetsAt: 1_793_491_200_000 });
+  expect(account).toMatchObject({
+    plan: "Kiro Pro",
+    resetsAt: 1_793_491_200_000,
+  });
   expect(store.get("credits/ses_a")).toBeCloseTo(0.341);
   expect(store.has("credits/ses_b")).toBe(false);
   expect(credits.ses_a).toBeCloseTo(0.341);

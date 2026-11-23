@@ -7,39 +7,49 @@ import { Array as Arr } from "effect";
 
 import { modelInfo, modelOf } from "../src/models.ts";
 
-const variants = (listed: Parameters<typeof modelOf>[0]): string[] =>
+const variants = (listed: Parameters<typeof modelOf>[0]): Array<string> =>
   Arr.map(modelInfo(modelOf(listed)).variants, (variant) => variant.id);
 
 test("each model offers the levels of the thinking Kiro lists request fields for", () => {
   const claude = {
-    modelId: "claude-x",
-    tokenLimits: { maxInputTokens: 1000, maxOutputTokens: 100 },
-    supportedInputTypes: ["TEXT", "IMAGE"],
     additionalModelRequestFieldsSchema: {
       properties: {
+        max_tokens: { minimum: 1024, maximum: 64_000 },
+        output_config: { properties: { effort: { enum: ["low", "high"] } } },
         thinking: {
           properties: {
             type: { enum: ["adaptive", "disabled"] },
             display: { enum: ["summarized"] },
           },
         },
-        output_config: { properties: { effort: { enum: ["low", "high"] } } },
-        max_tokens: { minimum: 1024, maximum: 64_000 },
       },
     },
+    modelId: "claude-x",
+    supportedInputTypes: ["TEXT", "IMAGE"],
+    tokenLimits: { maxInputTokens: 1000, maxOutputTokens: 100 },
   };
   expect(variants(claude)).toEqual(["none", "low", "high"]);
-  expect(modelInfo(modelOf(claude)).capabilities.input).toEqual(["text", "image"]);
+  expect(modelInfo(modelOf(claude)).capabilities.input).toEqual([
+    "text",
+    "image",
+  ]);
   expect(
     variants({
-      modelId: "gpt-x",
       additionalModelRequestFieldsSchema: {
-        properties: { reasoning: { properties: { effort: { enum: ["none", "low"] } } } },
+        properties: {
+          reasoning: { properties: { effort: { enum: ["none", "low"] } } },
+        },
       },
+      modelId: "gpt-x",
     })
   ).toEqual(["none", "low"]);
   // a model Kiro lists no fields for thinks in the prompt
-  expect(variants({ modelId: "claude-sonnet-4.5" })).toEqual(["low", "medium", "high", "max"]);
+  expect(variants({ modelId: "claude-sonnet-4.5" })).toEqual([
+    "low",
+    "medium",
+    "high",
+    "max",
+  ]);
 });
 
 // Claude Code's levels are low, medium, high, xhigh and max; xhigh isn't
@@ -47,12 +57,14 @@ test("each model offers the levels of the thinking Kiro lists request fields for
 test("xhigh is offered as its own level, and a model that doesn't think offers none", () => {
   expect(
     variants({
-      modelId: "claude-y",
       additionalModelRequestFieldsSchema: {
         properties: {
-          output_config: { properties: { effort: { enum: ["high", "xhigh", "max"] } } },
+          output_config: {
+            properties: { effort: { enum: ["high", "xhigh", "max"] } },
+          },
         },
       },
+      modelId: "claude-y",
     })
   ).toEqual(["high", "xhigh", "max"]);
   expect(variants({ modelId: "deepseek-3.2" })).toEqual([]);

@@ -15,10 +15,10 @@ import * as Failure from "./failure.ts";
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
 
 // Host is the part of OpenCode's plugin context the tracker uses.
-export type Host = {
-  readonly storage: Pick<Plugin.Context["storage"], "get" | "set">;
+export interface Host {
   readonly rpc: Pick<Plugin.Context["rpc"], "register">;
-};
+  readonly storage: Pick<Plugin.Context["storage"], "get" | "set">;
+}
 
 // the account part of the usage RPC's answer
 type AccountNow = Omit<UsageAnswer, "credits">;
@@ -48,8 +48,9 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
 
   // the account's usage, read at most once a minute (a failure, every 10
   // seconds), and a short reason when it can't be
-  const [usageCached, usageStale] = yield* Effect.cachedInvalidateWithTTL(account.usage, (exit) =>
-    Exit.isSuccess(exit) ? "60 seconds" : "10 seconds"
+  const [usageCached, usageStale] = yield* Effect.cachedInvalidateWithTTL(
+    account.usage,
+    (exit) => (Exit.isSuccess(exit) ? "60 seconds" : "10 seconds")
   );
   const accountNow = usageCached.pipe(
     Effect.map((usage): AccountNow => ({ account: usage })),
@@ -66,7 +67,9 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
   const creditLock = yield* Semaphore.make(1);
   const creditsOf = Effect.fnUntraced(function* (sessionID: string) {
     const known = credits.get(sessionID);
-    if (known !== undefined) return known;
+    if (known !== undefined) {
+      return known;
+    }
     const saved = Option.getOrElse(
       decodeCredits(yield* host.storage.get(creditsKey(sessionID))),
       () => 0
@@ -76,7 +79,10 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
     credits.set(sessionID, total);
     return total;
   });
-  const addCredits = Effect.fnUntraced(function* (sessionID: string, spent: number) {
+  const addCredits = Effect.fnUntraced(function* (
+    sessionID: string,
+    spent: number
+  ) {
     const total = (yield* creditsOf(sessionID)) + spent;
     credits.set(sessionID, total);
     yield* host.storage.set(creditsKey(sessionID), total);
@@ -88,7 +94,9 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
     .register(KiroRpc, {
       usage: Effect.fnUntraced(function* ({ sessionIDs }) {
         const spent: Record<string, number> = {};
-        for (const id of sessionIDs) spent[id] = yield* creditsOf(id);
+        for (const id of sessionIDs) {
+          spent[id] = yield* creditsOf(id);
+        }
         const answer: UsageAnswer = { ...(yield* accountNow), credits: spent };
         return answer;
       }),
@@ -118,7 +126,9 @@ export const make = Effect.fn("Usage.make")(function* (host: Host) {
 
   const record: Tracker["record"] = Effect.fnUntraced(
     function* (sessionID, usage) {
-      if (sessionID && usage.credits > 0) yield* addCredits(sessionID, usage.credits);
+      if (sessionID && usage.credits > 0) {
+        yield* addCredits(sessionID, usage.credits);
+      }
       yield* refreshUsage;
     },
     Effect.catchCause((cause) =>

@@ -5,7 +5,11 @@
 import { Array as Arr, Option, type Schema, String as Str } from "effect";
 
 // frame is an AWS event stream message; the reader doesn't check the checksums
-export function frame(eventType: string, payload: Schema.JsonObject, messageType = "event") {
+export function frame(
+  eventType: string,
+  payload: Schema.JsonObject,
+  messageType = "event"
+) {
   const enc = new TextEncoder();
   const header = (name: string, value: string) => {
     const nameBytes = enc.encode(name);
@@ -21,7 +25,10 @@ export function frame(eventType: string, payload: Schema.JsonObject, messageType
   };
   const headers = new Uint8Array([
     ...header(":message-type", messageType),
-    ...header(messageType === "exception" ? ":exception-type" : ":event-type", eventType),
+    ...header(
+      messageType === "exception" ? ":exception-type" : ":event-type",
+      eventType
+    ),
   ]);
   const body = enc.encode(JSON.stringify(payload));
   const total = 12 + headers.length + body.length + 4;
@@ -36,9 +43,15 @@ export function frame(eventType: string, payload: Schema.JsonObject, messageType
 
 // sse reads an Anthropic SSE body into its events
 export async function sse(res: Response) {
-  const blocks = Arr.filter(Str.split(await res.text(), "\n\n"), (block) => block !== "");
+  const blocks = Arr.filter(
+    Str.split(await res.text(), "\n\n"),
+    (block) => block !== ""
+  );
   return Arr.map(blocks, (block) => {
-    const data = Arr.findFirst(Str.split(block, "\n"), Str.startsWith("data: "));
+    const data = Arr.findFirst(
+      Str.split(block, "\n"),
+      Str.startsWith("data: ")
+    );
     return JSON.parse(Str.slice(6)(Option.getOrThrow(data)));
   });
 }
@@ -46,4 +59,4 @@ export async function sse(res: Response) {
 // errorOf reads an Anthropic error body
 // SAFETY: every error response the plugin writes has this shape (Failure.toResponse)
 export const errorOf = async (res: Response) =>
-  ((await res.json()) as { error: { type: string; message: string } }).error;
+  ((await res.json()) as { error: { message: string; type: string } }).error;

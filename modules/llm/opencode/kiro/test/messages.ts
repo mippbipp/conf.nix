@@ -19,26 +19,33 @@ export const JPG =
   "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/yQALCAABAAEBAREA/8wABgAQEAX/2gAIAQEAAD8A0s8g/9k=";
 
 export const image = (data: string, media_type = "image/png") => ({
+  source: { data, media_type, type: "base64" },
   type: "image",
-  source: { type: "base64", media_type, data },
 });
 
 // Codex's turn: view_image called, and answered with content
 export const viewImage = (
   content: Blocks
-): MessagesRequest & { messages: NonNullable<MessagesRequest["messages"]> } => ({
-  model: "claude-sonnet-4.5",
-  system: [{ type: "text", text: "You are Codex." }],
+): MessagesRequest & {
+  messages: NonNullable<MessagesRequest["messages"]>;
+} => ({
   messages: [
-    { role: "user", content: [{ type: "text", text: "take a screenshot and look at it" }] },
     {
-      role: "assistant",
-      content: [
-        { type: "tool_use", id: "call_view1", name: "view_image", input: { path: "/tmp/a.png" } },
-      ],
+      content: [{ type: "text", text: "take a screenshot and look at it" }],
+      role: "user",
     },
     {
-      role: "user",
+      content: [
+        {
+          type: "tool_use",
+          id: "call_view1",
+          name: "view_image",
+          input: { path: "/tmp/a.png" },
+        },
+      ],
+      role: "assistant",
+    },
+    {
       content: [
         {
           type: "tool_result",
@@ -47,13 +54,19 @@ export const viewImage = (
           cache_control: { type: "ephemeral" },
         },
       ],
+      role: "user",
     },
   ],
+  model: "claude-sonnet-4.5",
+  system: [{ text: "You are Codex.", type: "text" }],
   tools: [
     {
-      name: "view_image",
       description: "View a local image",
-      input_schema: { type: "object", properties: { path: { type: "string" } } },
+      input_schema: {
+        properties: { path: { type: "string" } },
+        type: "object",
+      },
+      name: "view_image",
     },
   ],
 });
@@ -62,11 +75,15 @@ export const viewImage = (
 // and a text-only question, the image still in history
 export function codex(data: string, follow = false) {
   const req = viewImage([image(data)]);
-  if (follow)
+  if (follow) {
     req.messages.push(
-      { role: "assistant", content: [{ type: "text", text: "It is a contact sheet." }] },
-      { role: "user", content: [{ type: "text", text: "now make it smaller" }] }
+      {
+        content: [{ type: "text", text: "It is a contact sheet." }],
+        role: "assistant",
+      },
+      { content: [{ type: "text", text: "now make it smaller" }], role: "user" }
     );
+  }
   return req;
 }
 
@@ -91,12 +108,16 @@ export const REPORTED_B64 = 5_561_904;
 
 const CRC = new Uint32Array(256).map((_, index) => {
   let crc = index;
-  for (let i = 0; i < 8; i++) crc = crc & 1 ? 0xed_b8_83_20 ^ (crc >>> 1) : crc >>> 1;
+  for (let i = 0; i < 8; i++) {
+    crc = crc & 1 ? 0xed_b8_83_20 ^ (crc >>> 1) : crc >>> 1;
+  }
   return crc >>> 0;
 });
 const crc32 = (buf: Uint8Array) => {
   let crc = 0xff_ff_ff_ff;
-  for (const byte of buf) crc = CRC[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  for (const byte of buf) {
+    crc = CRC[(crc ^ byte) & 0xff]! ^ (crc >>> 8);
+  }
   return (crc ^ 0xff_ff_ff_ff) >>> 0;
 };
 function pngChunk(type: string, data: Buffer) {
@@ -139,13 +160,23 @@ export function png(
       seed ^= seed << 5;
       rows[i] = seed & 0xff;
     }
-  } else for (let line = 0; line < height; line++) rows[line * row] = 0;
+  } else {
+    for (let line = 0; line < height; line++) {
+      rows[line * row] = 0;
+    }
+  }
   const idat = pngChunk("IDAT", deflateSync(rows, { level: noise ? 0 : 9 }));
   const end = pngChunk("IEND", Buffer.alloc(0));
   const file = Buffer.concat([PNG_SIG, ihdr(width, height), idat, end]);
-  if (size === undefined) return file;
+  if (size === undefined) {
+    return file;
+  }
   const pad = size - file.length - 12;
-  if (pad < 0) throw new Error(`a ${width}x${height} PNG is ${file.length} bytes, over ${size}`);
+  if (pad < 0) {
+    throw new Error(
+      `a ${width}x${height} PNG is ${file.length} bytes, over ${size}`
+    );
+  }
   return Buffer.concat([
     PNG_SIG,
     ihdr(width, height),
@@ -161,7 +192,12 @@ export function bomb(size: number) {
   const end = pngChunk("IEND", Buffer.alloc(0));
   const head = Buffer.concat([PNG_SIG, ihdr(20_000, 20_000)]);
   const pad = size - head.length - idat.length - end.length - 12;
-  return Buffer.concat([head, pngChunk("pdNg", Buffer.alloc(pad, 0x2a)), idat, end]);
+  return Buffer.concat([
+    head,
+    pngChunk("pdNg", Buffer.alloc(pad, 0x2a)),
+    idat,
+    end,
+  ]);
 }
 
 // the reporter's image: a 1389×1000 noise PNG, 4,171,428 bytes

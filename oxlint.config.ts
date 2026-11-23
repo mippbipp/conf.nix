@@ -5,6 +5,19 @@ import { defineConfig } from "oxlint";
 const MANUAL_EFFECT_RUNNER_MESSAGE =
   "Write the test with `it.effect(...)` or `layer(...)(...)` from `@effect/vitest`.";
 
+// What OpenCode lets the Kiro plugin import at runtime, as gitignore-style
+// exceptions to a "*" pattern.
+const KIRO_RUNTIME_IMPORTS = [
+  "!effect",
+  "!effect/**",
+  "!@opencode/plugin",
+  "!@opencode/plugin/**",
+  "!bun:*",
+  "!node:*",
+  "!node:*/*",
+  "!./*",
+];
+
 // Adapted from the sourdough template: same categories and presets, minus the
 // React, shadcn and turbo plugins this repo has no use for. It lints the Bun
 // workspace packages listed in package.json.
@@ -43,8 +56,6 @@ export default defineConfig({
     "**/test/fixtures/**",
     // build output
     "**/dist/**",
-    // separate Bun project outside the workspace, with its own lint setup
-    "modules/llm/opencode/kiro/**",
     // ~/.agents submodule
     "modules/llm/.agents/**",
   ],
@@ -121,6 +132,63 @@ export default defineConfig({
         "vitest/prefer-expect-assertions": "off",
         // test harnesses provide their layers at the test's own entry point
         "effecttsgo/strict-effect-provide": "off",
+      },
+    },
+    {
+      // OpenCode loads the Kiro plugin's src/ as it is and supplies only
+      // effect and @opencode/plugin, so any other package fails to load.
+      // src/ is installed on its own, so nothing outside it can be imported
+      // either. With no @effect/platform-* package there is no FileSystem,
+      // Path or ChildProcess layer, so the plugin uses Node's modules and
+      // reads HOME and PATH from process.env.
+      files: ["modules/llm/opencode/kiro/src/**"],
+      rules: {
+        "effecttsgo/node-builtin-import": "off",
+        "effecttsgo/process-env": "off",
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: ["*", ...KIRO_RUNTIME_IMPORTS],
+                message:
+                  "The Kiro plugin may import only effect, @opencode/plugin, bun:*, node:* and files in src/.",
+              },
+            ],
+          },
+        ],
+        "node/no-process-env": "off",
+      },
+    },
+    {
+      // OpenCode also gives the Kiro sidebar solid-js and OpenTUI, which
+      // renders it with Solid's JSX. The React rules misread Solid.
+      files: ["modules/llm/opencode/kiro/src/tui.tsx"],
+      rules: {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            patterns: [
+              {
+                group: [
+                  "*",
+                  ...KIRO_RUNTIME_IMPORTS,
+                  "!solid-js",
+                  "!solid-js/**",
+                  "!@opentui/**",
+                ],
+                message:
+                  "The Kiro sidebar may import only effect, @opencode/plugin, solid-js, @opentui/*, bun:*, node:* and files in src/.",
+              },
+            ],
+          },
+        ],
+        "react/jsx-filename-extension": "off",
+        "react/jsx-max-depth": "off",
+        "react/no-unknown-property": "off",
+        "react/only-export-components": "off",
+        "react/purity": "off",
+        "react/react-in-jsx-scope": "off",
       },
     },
   ],

@@ -15,10 +15,10 @@ import * as Usage from "../src/usage.ts";
 
 // the account as the sidebar is told it, its numbers made up
 const ACCOUNT: AccountUsage = {
+  allowances: [{ limit: 1000, name: "Credits", used: 12 }],
+  checkedAt: 1_793_000_000_000,
   plan: "Kiro Pro",
   resetsAt: 1_793_491_200_000,
-  allowances: [{ name: "Credits", used: 12, limit: 1000 }],
-  checkedAt: 1_793_000_000_000,
 };
 
 // a KiroAccount whose usage reads are counted; read is what the next one gives
@@ -27,7 +27,10 @@ function fakeAccount() {
   const fake = {
     reads: 0,
     // SAFETY: widens the error type, so a test can swap in a failing read
-    read: Effect.succeed(ACCOUNT) as Effect.Effect<AccountUsage, Failure.KiroApiError>,
+    read: Effect.succeed(ACCOUNT) as Effect.Effect<
+      AccountUsage,
+      Failure.KiroApiError
+    >,
   };
   const service = KiroAccount.of({
     credentials: () => unused,
@@ -46,22 +49,15 @@ function fakeAccount() {
 // value storage held when it was asked, as a slow storage would.
 function fakeHost(registers = true) {
   const store = new Map<string, unknown>();
-  const emitted: string[] = [];
+  const emitted: Array<string> = [];
   let usage:
-    | ((input: { sessionIDs: string[] }, context: unknown) => Effect.Effect<UsageAnswer>)
+    | ((
+        input: { sessionIDs: Array<string> },
+        context: unknown
+      ) => Effect.Effect<UsageAnswer>)
     | undefined;
   let held: Deferred.Deferred<boolean> | undefined;
   const host = {
-    storage: {
-      get: (key: string) =>
-        Effect.suspend(() => {
-          const value = store.get(key);
-          const gate = held;
-          held = undefined;
-          return gate ? Deferred.await(gate).pipe(Effect.as(value)) : Effect.succeed(value);
-        }),
-      set: (key: string, value: unknown) => Effect.sync(() => void store.set(key, value)),
-    },
     rpc: {
       register: (_definition: unknown, handlers: { usage: typeof usage }) =>
         registers
@@ -69,21 +65,37 @@ function fakeHost(registers = true) {
               usage = handlers.usage;
               return {
                 dispose: Effect.void,
-                events: { emit: (name: string) => Effect.sync(() => void emitted.push(name)) },
+                events: {
+                  emit: (name: string) =>
+                    Effect.sync(() => void emitted.push(name)),
+                },
               };
             })
           : Effect.fail("the RPC is unavailable"),
     },
+    storage: {
+      get: (key: string) =>
+        Effect.suspend(() => {
+          const value = store.get(key);
+          const gate = held;
+          held = undefined;
+          return gate
+            ? Deferred.await(gate).pipe(Effect.as(value))
+            : Effect.succeed(value);
+        }),
+      set: (key: string, value: unknown) =>
+        Effect.sync(() => void store.set(key, value)),
+    },
   };
   return {
     // SAFETY: the fake has only what the tracker calls
-    host: host as unknown as Usage.Host,
-    store,
+    ask: (...sessionIDs: Array<string>) => usage!({ sessionIDs }, {}),
     emitted,
     holdNextRead: (gate: Deferred.Deferred<boolean>) => {
       held = gate;
     },
-    ask: (...sessionIDs: string[]) => usage!({ sessionIDs }, {}),
+    host: host as unknown as Usage.Host,
+    store,
   };
 }
 
@@ -147,7 +159,10 @@ test("usage: a session's credits from an earlier run are read from storage", asy
 
 test("usage: an account Kiro won't show is an error in the answer, not a failure", async () => {
   const account = fakeAccount();
-  account.read = Failure.KiroApiError.fromReply(403, '{"message":"Not allowed","reason":null}');
+  account.read = Failure.KiroApiError.fromReply(
+    403,
+    '{"message":"Not allowed","reason":null}'
+  );
   const fake = fakeHost();
   const answer = await run(
     account,
@@ -158,8 +173,8 @@ test("usage: an account Kiro won't show is an error in the answer, not a failure
   );
   expect(answer).toEqual({
     account: null,
-    error: "Kiro: Not allowed (HTTP 403)",
     credits: { ses_x: 0 },
+    error: "Kiro: Not allowed (HTTP 403)",
   });
 });
 
@@ -170,7 +185,7 @@ test("usage: the account is read again 60 seconds after a read that worked, not 
     account,
     Effect.gen(function* () {
       yield* Usage.make(fake.host);
-      const seen: number[] = [];
+      const seen: Array<number> = [];
       yield* fake.ask();
       seen.push(account.reads);
       yield* TestClock.adjust("59 seconds");
@@ -193,7 +208,7 @@ test("usage: the account is read again 10 seconds after a read that failed", asy
     account,
     Effect.gen(function* () {
       yield* Usage.make(fake.host);
-      const seen: number[] = [];
+      const seen: Array<number> = [];
       yield* fake.ask();
       seen.push(account.reads);
       yield* TestClock.adjust("9 seconds");
@@ -222,13 +237,13 @@ test("usage: a reply ending while the account is being read counts, and starts n
       yield* settle;
       yield* tracker.record("ses_a", { credits: 2 });
       yield* settle;
-      const during = { reads: account.reads, emitted: [...fake.emitted] };
+      const during = { emitted: [...fake.emitted], reads: account.reads };
       yield* Deferred.succeed(gate, ACCOUNT);
       yield* settle;
-      return { during, answer: yield* fake.ask("ses_a") };
+      return { answer: yield* fake.ask("ses_a"), during };
     })
   );
-  expect(out.during).toEqual({ reads: 1, emitted: [] });
+  expect(out.during).toEqual({ emitted: [], reads: 1 });
   expect(fake.emitted).toEqual(["updated"]);
   expect(account.reads).toBe(1);
   expect(out.answer.credits.ses_a).toBe(3);

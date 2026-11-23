@@ -24,7 +24,11 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   const session = () => data.get(props.sessionID);
   const sessionIDs = createMemo(
     () =>
-      Sidebar.sessionsCounted(props.sessionID, session(), data.family(data.root(props.sessionID))),
+      Sidebar.sessionsCounted(
+        props.sessionID,
+        session(),
+        data.family(data.root(props.sessionID))
+      ),
     undefined,
     { equals: (before, now) => before.join(",") === now.join(",") }
   );
@@ -49,26 +53,32 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   // whose account read failed too. A reply's end still asks because events
   // can be missed: the subscription is on the client at mount, which a
   // server restart replaces, and a disconnected one misses what is sent.
-  const stop = props.context.client.rpc(KiroRpc).events.on("updated", () => void refetch());
+  const stop = props.context.client
+    .rpc(KiroRpc)
+    .events.on("updated", () => void refetch());
   onCleanup(stop);
   createEffect(
     on(
       () => data.status(props.sessionID),
       (now, before) => {
-        if (before === "running" && now === "idle") void refetch();
+        if (before === "running" && now === "idle") {
+          void refetch();
+        }
       }
     )
   );
 
   const answer = () => {
-    const latest = usage.latest;
-    return Sidebar.shown(session()?.model?.providerID, latest, sessionIDs()) ? latest : undefined;
+    const { latest } = usage;
+    return Sidebar.shown(session()?.model?.providerID, latest, sessionIDs())
+      ? latest
+      : undefined;
   };
   const colour = (tone: Sidebar.Line["tone"]) =>
     ({
-      title: theme().text.base,
-      muted: theme().text.muted,
       error: theme().text.feedback.error.base,
+      muted: theme().text.muted,
+      title: theme().text.base,
     })[tone];
 
   return (
@@ -93,7 +103,9 @@ export default Plugin.define({
   setup(context) {
     return context.ui.slot({
       append: "sidebar.content",
-      render: (input) => <KiroUsage context={context} sessionID={input.sessionID} />,
+      render: (input) => (
+        <KiroUsage context={context} sessionID={input.sessionID} />
+      ),
     });
   },
 });

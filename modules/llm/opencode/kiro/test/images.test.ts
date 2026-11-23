@@ -30,12 +30,14 @@ const run = <A>(effect: Effect.Effect<A, never, Images>) =>
 const built = (req: MessagesRequest) => open(req, []).request("");
 
 // fitted is each request as Kiro would be sent it, fitted by one Images
-const fitted = (...reqs: MessagesRequest[]) =>
+const fitted = (...reqs: Array<MessagesRequest>) =>
   run(
     Effect.gen(function* () {
       const images = yield* Images;
-      const out: Conversation[] = [];
-      for (const req of reqs) out.push((yield* images.fit(built(req))).conversationState);
+      const out: Array<Conversation> = [];
+      for (const req of reqs) {
+        out.push((yield* images.fit(built(req))).conversationState);
+      }
       return out;
     })
   );
@@ -47,12 +49,18 @@ const withoutImageBytes = (conversation: Conversation) => {
   const copy = structuredClone(conversation) as Partial<Conversation>;
   delete copy.conversationId;
   // SAFETY: only the id is gone, which usersOf doesn't read
-  for (const input of usersOf(copy as Conversation))
-    if (input.images)
-      input.images = Arr.map(input.images, () => ({ format: "", source: { bytes: "…" } }));
+  for (const input of usersOf(copy as Conversation)) {
+    if (input.images) {
+      input.images = Arr.map(input.images, () => ({
+        format: "",
+        source: { bytes: "…" },
+      }));
+    }
+  }
   return copy;
 };
-const meta = (b64: string) => new Bun.Image(Buffer.from(b64, "base64")).metadata();
+const meta = (b64: string) =>
+  new Bun.Image(Buffer.from(b64, "base64")).metadata();
 
 test("an image over Kiro's limit is made small enough to send", async () => {
   // a BMP of noise, which no lossless format makes small: 1200² pixels is
@@ -73,8 +81,11 @@ test("an image over Kiro's limit is made small enough to send", async () => {
   const state = await fit({
     messages: [
       {
+        content: [
+          { text: "what is this?", type: "text" },
+          image(b64, "image/bmp"),
+        ],
         role: "user",
-        content: [{ type: "text", text: "what is this?" }, image(b64, "image/bmp")],
       },
     ],
   });
@@ -89,7 +100,9 @@ test("the fixture is the reported image's size: under 5 MiB as a file, over it a
   expect(REPORTED.length).toBe(REPORTED_B64);
   // and the request alone leaves it as it is, which is what Kiro refused
   const state = built(codex(REPORTED)).conversationState;
-  expect(state.currentMessage.userInputMessage.images?.[0]?.source.bytes.length).toBe(REPORTED_B64);
+  expect(
+    state.currentMessage.userInputMessage.images?.[0]?.source.bytes.length
+  ).toBe(REPORTED_B64);
 });
 
 test("the reported tool image goes under the limit as an image Kiro can read, the conversation otherwise the same", async () => {
@@ -103,7 +116,9 @@ test("the reported tool image goes under the limit as an image Kiro can read, th
   const decoded = await meta(sent!.source.bytes);
   expect<string>(decoded.format).toBe(sent!.format);
   expect(decoded.width / decoded.height).toBeCloseTo(1389 / 1000, 2);
-  expect(withoutImageBytes(state)).toEqual(withoutImageBytes(built(req).conversationState));
+  expect(withoutImageBytes(state)).toEqual(
+    withoutImageBytes(built(req).conversationState)
+  );
   // the caller's request is untouched
   expect(req).toEqual(before);
 }, 60_000);
@@ -114,7 +129,9 @@ test("a text-only turn after the image goes too: the image in history is fitted,
   const plain = built(req).conversationState;
   // the image stays where the latest-image rule left it, in history
   expect(state.currentMessage.userInputMessage.images).toBeUndefined();
-  expect(state.currentMessage.userInputMessage.content).toBe("now make it smaller");
+  expect(state.currentMessage.userInputMessage.content).toBe(
+    "now make it smaller"
+  );
   const where = (conversation: Conversation) =>
     Arr.map(usersOf(conversation), (input) => input.images?.length ?? 0);
   expect(where(state)).toEqual(where(plain));
@@ -126,9 +143,14 @@ test("a text-only turn after the image goes too: the image in history is fitted,
 test("at the limit an image is sent byte for byte; one Base64 quad over, it is fitted", async () => {
   // 3,932,160 bytes is 5,242,880 Base64 characters, no padding;
   // 3,932,159 is the same length ending in "="; 3,932,161 is 5,242,884
-  const b64 = (size: number) => png(64, 48, { noise: false, size }).toString("base64");
+  const b64 = (size: number) =>
+    png(64, 48, { noise: false, size }).toString("base64");
   const [at, padded, over] = [b64(3_932_160), b64(3_932_159), b64(3_932_161)];
-  expect([at.length, padded.length, over.length]).toEqual([LIMIT, LIMIT, LIMIT + 4]);
+  expect([at.length, padded.length, over.length]).toEqual([
+    LIMIT,
+    LIMIT,
+    LIMIT + 4,
+  ]);
   expect(padded).toEndWith("=");
   for (const data of [at, padded]) {
     const [sent] = imagesOf(await fit(codex(data)));
@@ -137,13 +159,22 @@ test("at the limit an image is sent byte for byte; one Base64 quad over, it is f
   const [sent] = imagesOf(await fit(codex(over)));
   expect(sent!.source.bytes.length).toBeLessThan(LIMIT);
   const decoded = await meta(sent!.source.bytes);
-  expect([decoded.format, decoded.width, decoded.height]).toEqual(["png", 64, 48]);
+  expect([decoded.format, decoded.width, decoded.height]).toEqual([
+    "png",
+    64,
+    48,
+  ]);
 });
 
 test("small images beside a large one are left as they are, in their order", async () => {
   const small = png(8, 8, { noise: false }).toString("base64");
   const state = await fit(
-    viewImage([image(small), image(REPORTED), { type: "text", text: "two images" }, image(small)])
+    viewImage([
+      image(small),
+      image(REPORTED),
+      { text: "two images", type: "text" },
+      image(small),
+    ])
   );
   const got = state.currentMessage.userInputMessage.images ?? [];
   expect(got).toHaveLength(3);
@@ -151,7 +182,8 @@ test("small images beside a large one are left as they are, in their order", asy
   expect(got[2]).toEqual({ format: "png", source: { bytes: small } });
   expect(got[1]!.source.bytes.length).toBeLessThanOrEqual(LIMIT);
   expect(
-    state.currentMessage.userInputMessage.userInputMessageContext?.toolResults?.[0]?.content
+    state.currentMessage.userInputMessage.userInputMessageContext
+      ?.toolResults?.[0]?.content
   ).toEqual([{ text: "two images" }]);
 }, 60_000);
 
@@ -167,7 +199,9 @@ test("an image that can't be read, or claims too many pixels, becomes a note and
     const state = await fit(codex(data, true));
     expect(imagesOf(state)).toEqual([]);
     const noted = Option.getOrUndefined(
-      Arr.findFirst(usersOf(state), (input) => Str.includes("was left out")(input.content))
+      Arr.findFirst(usersOf(state), (input) =>
+        Str.includes("was left out")(input.content)
+      )
     );
     expect(noted?.content).toContain(why);
     expect(noted?.content).toContain("5.0 MB");
@@ -175,8 +209,12 @@ test("an image that can't be read, or claims too many pixels, becomes a note and
     expect(noted!.content.length).toBeLessThan(300);
     expect(noted?.content).not.toContain("/tmp");
     // the tool's answer is still paired with its call
-    expect(noted?.userInputMessageContext?.toolResults?.[0]?.toolUseId).toBe("call_view1");
-    expect(state.currentMessage.userInputMessage.content).toBe("now make it smaller");
+    expect(noted?.userInputMessageContext?.toolResults?.[0]?.toolUseId).toBe(
+      "call_view1"
+    );
+    expect(state.currentMessage.userInputMessage.content).toBe(
+      "now make it smaller"
+    );
   }
 });
 
@@ -190,7 +228,10 @@ test("an image is fitted once, and the next turn sends the same fitted bytes", a
     }
   };
   try {
-    const flat = png(64, 48, { noise: false, size: 3_932_161 + 3 * 7 }).toString("base64");
+    const flat = png(64, 48, {
+      noise: false,
+      size: 3_932_161 + 3 * 7,
+    }).toString("base64");
     let once = 0;
     const [first, second] = await run(
       Effect.gen(function* () {
@@ -203,7 +244,9 @@ test("an image is fitted once, and the next turn sends the same fitted bytes", a
     );
     expect(once).toBeGreaterThan(0);
     expect(made).toBe(once);
-    expect(imagesOf(second!)[0]!.source.bytes).toBe(imagesOf(first!)[0]!.source.bytes);
+    expect(imagesOf(second!)[0]!.source.bytes).toBe(
+      imagesOf(first!)[0]!.source.bytes
+    );
   } finally {
     Bun.Image = real;
   }
@@ -214,7 +257,10 @@ test("a host without Bun.Image sends a note in the image's place", async () => {
   // SAFETY: Bun's Image is writable; the test puts it back afterwards
   (Bun as { Image?: unknown }).Image = undefined;
   try {
-    const flat = png(64, 48, { noise: false, size: 3_932_161 + 3 * 11 }).toString("base64");
+    const flat = png(64, 48, {
+      noise: false,
+      size: 3_932_161 + 3 * 11,
+    }).toString("base64");
     const state = await fit(codex(flat));
     expect(imagesOf(state)).toEqual([]);
     expect(state.currentMessage.userInputMessage.content).toContain(

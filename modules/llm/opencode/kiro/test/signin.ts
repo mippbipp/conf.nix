@@ -4,13 +4,20 @@
 
 import { Database } from "bun:sqlite";
 import { afterAll } from "bun:test";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Schema } from "effect";
 
-export const PROFILE = "arn:aws:codewhisperer:us-east-1:111111111111:profile/TEST";
+export const PROFILE =
+  "arn:aws:codewhisperer:us-east-1:111111111111:profile/TEST";
 
 export function throwawayHome() {
   const was = { HOME: process.env.HOME, PATH: process.env.PATH };
@@ -19,7 +26,7 @@ export function throwawayHome() {
   process.env.PATH = "";
   afterAll(() => {
     Object.assign(process.env, was);
-    rmSync(HOME, { recursive: true, force: true });
+    rmSync(HOME, { force: true, recursive: true });
   });
   const dbDir = join(HOME, ".local", "share", "kiro-cli");
   const dbPath = join(dbDir, "data.sqlite3");
@@ -27,38 +34,60 @@ export function throwawayHome() {
   const ideToken = join(ideDir, "kiro-auth-token.json");
 
   // kiroCli writes kiro-cli's database with these rows, in place of any before it
-  function kiroCli(rows: { table?: "auth_kv" | "state"; key: string; value: Schema.JsonObject }[]) {
+  function kiroCli(
+    rows: Array<{
+      key: string;
+      table?: "auth_kv" | "state";
+      value: Schema.JsonObject;
+    }>
+  ) {
     rmSync(dbPath, { force: true });
     mkdirSync(dbDir, { recursive: true });
     const db = new Database(dbPath, { create: true });
-    db.run("CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT)");
-    db.run("CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value BLOB)");
-    const put = (table: "auth_kv" | "state", key: string, value: Schema.JsonObject) =>
+    db.run(
+      "CREATE TABLE IF NOT EXISTS auth_kv (key TEXT PRIMARY KEY, value TEXT)"
+    );
+    db.run(
+      "CREATE TABLE IF NOT EXISTS state (key TEXT PRIMARY KEY, value BLOB)"
+    );
+    const put = (
+      table: "auth_kv" | "state",
+      key: string,
+      value: Schema.JsonObject
+    ) =>
       db
         .query(`INSERT OR REPLACE INTO ${table} (key, value) VALUES (?, ?)`)
         .run(key, JSON.stringify(value));
-    for (const { table = "auth_kv", key, value } of rows) put(table, key, value);
+    for (const { key, table = "auth_kv", value } of rows) {
+      put(table, key, value);
+    }
     db.close();
   }
 
   // signIn writes a kiro-cli IAM Identity Center sign-in, as kiro-cli keeps
   // it. A null start or profile leaves it out.
-  // SAFETY: the casts widen a default to the type its parameter takes
   function signIn({
     access = "old",
     expires = Date.now() + 60 * 60_000,
+    profile = PROFILE,
     refresh = "r1",
     region = "us-east-1",
-    start = "https://example.awsapps.com/start" as string | null,
-    profile = PROFILE as string | null,
+    start = "https://example.awsapps.com/start",
+  }: {
+    access?: string;
+    expires?: number;
+    profile?: string | null;
+    refresh?: string;
+    region?: string;
+    start?: string | null;
   } = {}) {
     kiroCli([
       {
         key: "kirocli:odic:token",
         value: {
           access_token: access,
-          refresh_token: refresh,
           expires_at: new Date(expires).toISOString(),
+          refresh_token: refresh,
           region,
           ...(start ? { start_url: start } : {}),
           scopes: ["codewhisperer:conversations"],
@@ -71,8 +100,8 @@ export function throwawayHome() {
       ...(profile
         ? [
             {
-              table: "state" as const,
               key: "api.codewhisperer.profile",
+              table: "state" as const,
               value: { arn: profile, profile_name: "TEST" },
             },
           ]
@@ -84,7 +113,9 @@ export function throwawayHome() {
   function stored(key = "kirocli:odic:token") {
     const db = new Database(dbPath, { readonly: true });
     const row = db
-      .query<{ value: string }, [string]>("SELECT value FROM auth_kv WHERE key = ?")
+      .query<{ value: string }, [string]>(
+        "SELECT value FROM auth_kv WHERE key = ?"
+      )
       .get(key);
     db.close();
     return JSON.parse(row?.value ?? "null");
@@ -92,18 +123,33 @@ export function throwawayHome() {
 
   // signInIDE writes the Kiro IDE's token file, and the client registration
   // its clientIdHash names
-  function signInIDE(token: Schema.JsonObject, registration?: Schema.JsonObject) {
+  function signInIDE(
+    token: Schema.JsonObject,
+    registration?: Schema.JsonObject
+  ) {
     mkdirSync(ideDir, { recursive: true });
     writeFileSync(ideToken, JSON.stringify(token));
-    if (registration) writeFileSync(join(ideDir, "h.json"), JSON.stringify(registration));
+    if (registration) {
+      writeFileSync(join(ideDir, "h.json"), JSON.stringify(registration));
+    }
   }
   const storedIDE = () => JSON.parse(readFileSync(ideToken, "utf8"));
 
   // signOut leaves neither kiro-cli nor the IDE signed in
   function signOut() {
     rmSync(dbPath, { force: true });
-    rmSync(join(HOME, ".aws"), { recursive: true, force: true });
+    rmSync(join(HOME, ".aws"), { force: true, recursive: true });
   }
 
-  return { dbPath, ideDir, ideToken, kiroCli, signIn, stored, signInIDE, storedIDE, signOut };
+  return {
+    dbPath,
+    ideDir,
+    ideToken,
+    kiroCli,
+    signIn,
+    signInIDE,
+    signOut,
+    stored,
+    storedIDE,
+  };
 }

@@ -13,25 +13,27 @@ import { type Allowance, UsageAnswer } from "./rpc.ts";
 // older plugin checked it against that plugin's schema, not this one
 const decodeAnswer = Schema.decodeUnknownOption(UsageAnswer);
 // the client throws an Error, or the RPC's own error as a plain object
-const decodeReason = Schema.decodeUnknownOption(Schema.Struct({ message: Schema.NonEmptyString }));
+const decodeReason = Schema.decodeUnknownOption(
+  Schema.Struct({ message: Schema.NonEmptyString })
+);
 
 // answerOf is what the usage RPC answered, read against this plugin's schema
 // oxlint-disable-next-line anti-slop/no-unknown-parameters -- this is the decode of what OpenCode's client passes on unchecked
 export const answerOf = (out: unknown): UsageAnswer =>
   Option.getOrElse(decodeAnswer(out), () => ({
     account: null,
-    error: "Kiro's usage didn't read as expected",
     credits: {},
+    error: "Kiro's usage didn't read as expected",
   }));
 
 // unanswered is the answer when the usage RPC fails: why, and no credits
 export const unanswered = (cause: unknown): UsageAnswer => ({
   account: null,
-  error: Option.match(decodeReason(cause), {
-    onSome: (reason) => reason.message,
-    onNone: () => String(cause),
-  }),
   credits: {},
+  error: Option.match(decodeReason(cause), {
+    onNone: () => String(cause),
+    onSome: (reason) => reason.message,
+  }),
 });
 
 // sessionsCounted is whose credits the sidebar adds up for sessionID. A
@@ -41,14 +43,16 @@ export const unanswered = (cause: unknown): UsageAnswer => ({
 export function sessionsCounted(
   sessionID: string,
   session: { readonly parentID?: string } | undefined,
-  family: readonly string[]
-): readonly string[] {
-  if (!session || session.parentID) return [sessionID];
+  family: ReadonlyArray<string>
+): ReadonlyArray<string> {
+  if (!session || session.parentID) {
+    return [sessionID];
+  }
   return [...new Set([sessionID, ...family])];
 }
 
 // what the sessions counted have spent, from the answer
-const creditsOf = (answer: UsageAnswer, sessionIDs: readonly string[]) =>
+const creditsOf = (answer: UsageAnswer, sessionIDs: ReadonlyArray<string>) =>
   Arr.reduce(sessionIDs, 0, (sum, id) => sum + (answer.credits[id] ?? 0));
 
 // shown is whether the Kiro section shows: once there is an answer, for a
@@ -57,9 +61,11 @@ const creditsOf = (answer: UsageAnswer, sessionIDs: readonly string[]) =>
 export function shown(
   providerID: string | undefined,
   answer: UsageAnswer | undefined,
-  sessionIDs: readonly string[]
+  sessionIDs: ReadonlyArray<string>
 ): boolean {
-  if (!answer) return false;
+  if (!answer) {
+    return false;
+  }
   return providerID === ID || creditsOf(answer, sessionIDs) > 0;
 }
 
@@ -73,20 +79,27 @@ export interface Line {
 const DAY = 24 * 60 * 60 * 1000;
 // one locale throughout: en-GB, for "31 Oct" and "8,978.6"
 const amount = (value: number, digits = 1) =>
-  new Intl.NumberFormat("en-GB", { maximumFractionDigits: digits }).format(value);
-const dayFormat = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+  new Intl.NumberFormat("en-GB", { maximumFractionDigits: digits }).format(
+    value
+  );
+const dayFormat = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+});
 const day = (ms: number) => dayFormat.format(ms);
 // a session's credits are often under one, so they keep two decimals
 const spent = (credits: number) => amount(credits, credits < 10 ? 2 : 1);
 
 // "Kiro Pro · resets 31 Oct (3d)"
 function planLine(plan: string, resetsAt: number, now: number) {
-  if (!resetsAt) return plan;
+  if (!resetsAt) {
+    return plan;
+  }
   const days = Math.max(0, Math.ceil((resetsAt - now) / DAY));
   return `${plan} · resets ${day(resetsAt)} (${days}d)`;
 }
 
-function allowanceLines(allowance: Allowance): Line[] {
+function allowanceLines(allowance: Allowance): Array<Line> {
   const unit = Str.toLowerCase(allowance.name);
   // the overage cap while overages are on and it is set (not 0), else the
   // plan's limit
@@ -94,10 +107,13 @@ function allowanceLines(allowance: Allowance): Line[] {
     allowance.overage?.enabled && allowance.overage.cap !== 0
       ? allowance.overage.cap
       : allowance.limit;
-  const out: Line[] = [
-    { text: `${amount(allowance.used)} / ${amount(cap)} ${unit}`, tone: "muted" },
+  const out: Array<Line> = [
+    {
+      text: `${amount(allowance.used)} / ${amount(cap)} ${unit}`,
+      tone: "muted",
+    },
   ];
-  const trial = allowance.trial;
+  const { trial } = allowance;
   if (trial) {
     const ends = trial.expiresAt ? ` · ends ${day(trial.expiresAt)}` : "";
     out.push({
@@ -111,13 +127,27 @@ function allowanceLines(allowance: Allowance): Line[] {
 // lines is the section for answer: the account's plan and allowances when
 // it was read, why not when it wasn't, then what the sessions counted have
 // spent. now is the time the days to the reset count from.
-export function lines(answer: UsageAnswer, sessionIDs: readonly string[], now: number): Line[] {
-  const out: Line[] = [{ text: "Kiro", tone: "title" }];
+export function lines(
+  answer: UsageAnswer,
+  sessionIDs: ReadonlyArray<string>,
+  now: number
+): Array<Line> {
+  const out: Array<Line> = [{ text: "Kiro", tone: "title" }];
   if (answer.account) {
-    out.push({ text: planLine(answer.account.plan, answer.account.resetsAt, now), tone: "muted" });
-    for (const allowance of answer.account.allowances) out.push(...allowanceLines(allowance));
+    out.push({
+      text: planLine(answer.account.plan, answer.account.resetsAt, now),
+      tone: "muted",
+    });
+    for (const allowance of answer.account.allowances) {
+      out.push(...allowanceLines(allowance));
+    }
   }
-  if (answer.error) out.push({ text: answer.error, tone: "error" });
-  out.push({ text: `Session ${spent(creditsOf(answer, sessionIDs))} credits`, tone: "muted" });
+  if (answer.error) {
+    out.push({ text: answer.error, tone: "error" });
+  }
+  out.push({
+    text: `Session ${spent(creditsOf(answer, sessionIDs))} credits`,
+    tone: "muted",
+  });
   return out;
 }
