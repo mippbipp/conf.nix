@@ -60,6 +60,21 @@ in
       cli = true;
     };
   };
+  # when the plugin directory's symlink points somewhere new, opencode drops
+  # the running kiro provider until it restarts.
+  home.activation.restartOpencodeForKiro = lib.mkIf (!hostRecord.isWorkPc) (
+    lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      old=""
+      if [[ -n "''${oldGenPath:-}" ]]; then
+        old="$(readlink -f "$oldGenPath/home-files/.config/opencode/plugins/kiro" || true)"
+      fi
+      if [[ "$old" != "${kiro}" ]]; then
+        run ${pkgs.coreutils}/bin/timeout 30 \
+          ${lib.getExe config.programs.opencode.package} service stop \
+          || warnEcho "Couldn't stop the OpenCode server; restart it to load the new Kiro plugin."
+      fi
+    ''
+  );
   home = {
     file = {
       ".config/opencode/plugins/kiro".source = kiro;
