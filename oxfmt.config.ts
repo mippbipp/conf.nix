@@ -7,8 +7,6 @@ export default defineConfig({
     // captured CI and API output kept verbatim as test data
     "**/test/fixtures/**",
     "**/dist/**",
-    // separate Bun project outside the workspace, with its own format setup
-    "modules/llm/opencode/kiro/**",
     // ~/.agents submodule
     "modules/llm/.agents/**",
   ],

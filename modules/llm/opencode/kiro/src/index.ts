@@ -15,7 +15,8 @@
 // OpenCode loads this file as it is: Bun strips the types, and OpenCode
 // supplies `effect` and `@opencode/plugin` itself, so the plugin may import
 // only those, Bun's and Node's own modules, and the files beside it. The
-// no-restricted-imports rule in ../oxlint.config.ts fails lint on any other.
+// no-restricted-imports override in the repo's oxlint.config.ts fails lint
+// on any other.
 //
 // The sidebar (tui.tsx) shows the account's usage and what each session has
 // spent, which it asks for over the RPC in rpc.ts. usage.ts answers it.
@@ -23,16 +24,39 @@
 import { randomUUID } from "node:crypto";
 
 import type { Plugin, Provider } from "@opencode/plugin/effect";
-import { Array as Arr, Effect, Layer, Option, Ref, Schedule, Schema, String as Str } from "effect";
-import { FetchHttpClient, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/http";
+import {
+  Array as Arr,
+  Cause,
+  Effect,
+  Layer,
+  Option,
+  Ref,
+  Schedule,
+  Schema,
+  String as Str,
+} from "effect";
+import {
+  FetchHttpClient,
+  HttpClient,
+  HttpClientRequest,
+  HttpClientResponse,
+} from "effect/http";
 
 import { type Auth, authHeaders, KiroAccount } from "./account.ts";
-import * as Conversation from "./conversation.ts";
-import * as Failure from "./failure.ts";
+import { type MessagesRequest, type Turn, open } from "./conversation.ts";
+import {
+  type Failure,
+  KiroApiError,
+  RefreshError,
+  SignInError,
+  fromCause,
+  fromReply,
+  toResponse,
+} from "./failure.ts";
 import { Images } from "./images.ts";
 import { HEADERS_SECONDS, ID, IDLE_SECONDS, isOk, send } from "./kiro.ts";
 import { decodeSaved, FALLBACK, modelInfo, sameModels } from "./models.ts";
-import * as Usage from "./usage.ts";
+import { type Host as UsageHost, make as makeUsage } from "./usage.ts";
 
 const PACKAGE = "@opencode/ai/providers/anthropic";
 // where the Anthropic route posts; http.request sends it on to the account's region
@@ -64,16 +88,18 @@ const PROVIDER: Provider.Info = {
 // kiroCall is a generateAssistantResponse request, with kiro-cli's headers.
 function kiroCall(auth: Auth, body: string) {
   const ua = `aws-sdk-rust/1.0.0 ua/2.1 os/other lang/rust api/codewhispererstreaming#1.28.3 m/E app/AmazonQ-For-CLI md/appVersion-1.28.3-${Str.replaceAll("-", "")(randomUUID())}`;
-  return HttpClientRequest.post(`${runtime(auth.region)}/generateAssistantResponse`).pipe(
+  return HttpClientRequest.post(
+    `${runtime(auth.region)}/generateAssistantResponse`
+  ).pipe(
     HttpClientRequest.setHeaders({
       ...authHeaders(auth),
       Accept: "application/vnd.amazon.eventstream",
-      "x-amzn-codewhisperer-optout": "true",
       "amz-sdk-invocation-id": randomUUID(),
       "amz-sdk-request": "attempt=1; max=1",
-      "x-amzn-kiro-agent-mode": "vibe",
-      "x-amz-user-agent": ua,
       "User-Agent": ua,
+      "x-amz-user-agent": ua,
+      "x-amzn-codewhisperer-optout": "true",
+      "x-amzn-kiro-agent-mode": "vibe",
     }),
     HttpClientRequest.bodyText(body, "application/json")
   );
@@ -83,15 +109,16 @@ function kiroCall(auth: Auth, body: string) {
 
 // a request that never leaves the process: what http.request sends instead
 // when it can't reach Kiro, so http.response can say why
-const standIn = () => new Request("data:application/json,%7B%7D", { method: "POST", body: "{}" });
+const standIn = () =>
+  new Request("data:application/json,%7B%7D", { body: "{}", method: "POST" });
 
 // what http.response needs to turn a call's answer back, by the call: the
 // turn, and the sign-in it was sent with, so a token Kiro turns down is
 // refreshed once; or why it couldn't be sent
-type Sent = { turn: Conversation.Turn; auth: Auth; error?: never } | { error: Failure.Failure };
+type Sent = { auth: Auth; error?: never; turn: Turn } | { error: Failure };
 
 // Host is the part of OpenCode's plugin context this plugin uses.
-type Host = Usage.Host & {
+type Host = UsageHost & {
   readonly provider: Pick<Plugin.Context["provider"], "transform" | "reload">;
   readonly session: Pick<Plugin.Context["session"], "hook">;
 };
@@ -103,11 +130,12 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   // each request sent to Kiro → what turning its answer back needs
   const sent = new WeakMap<Request, Sent>();
   // the account's models: last run's until Kiro lists them
+  const saved = yield* ctx.storage.get(MODELS_KEY);
   const models = yield* Ref.make(
-    Option.getOrElse(decodeSaved(yield* ctx.storage.get(MODELS_KEY)), () => FALLBACK)
+    Option.getOrElse(decodeSaved(saved), () => FALLBACK)
   );
   // what each reply cost, for the sidebar
-  const usage = yield* Usage.make(ctx);
+  const usage = yield* makeUsage(ctx);
 
   // the account's own models once Kiro lists them. A listing that fails on
   // the network or on Kiro's side is tried again 5, 20 and 80 seconds later.
@@ -119,18 +147,26 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   // each failed listing leads to one more try at most.
   const listAgain = yield* Ref.make(false);
   const mayPass = (error: Effect.Error<typeof account.models>) =>
-    Schema.is(Failure.RefreshError)(error) ||
-    (Schema.is(Failure.KiroApiError)(error) && (error.status === 429 || error.status >= 500));
+    Schema.is(RefreshError)(error) ||
+    (Schema.is(KiroApiError)(error) &&
+      (error.status === 429 || error.status >= 500));
   const listModels = Effect.gen(function* () {
     const found = yield* account.models;
-    if (sameModels(found, yield* Ref.get(models))) return;
+    const known = yield* Ref.get(models);
+    if (sameModels(found, known)) {
+      return;
+    }
     yield* Ref.set(models, found);
     yield* ctx.storage.set(MODELS_KEY, found);
     yield* ctx.provider.reload();
   }).pipe(
-    Effect.retry({ schedule: Schedule.exponential("5 seconds", 4), times: 3, while: mayPass }),
-    Effect.tapError((error) =>
-      Schema.is(Failure.SignInError)(error) || mayPass(error)
+    Effect.retry({
+      schedule: Schedule.exponential("5 seconds", 4),
+      times: 3,
+      while: mayPass,
+    }),
+    Effect.tapError((failed) =>
+      Schema.is(SignInError)(failed) || mayPass(failed)
         ? Ref.set(listAgain, true)
         : Effect.void
     ),
@@ -140,35 +176,52 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
   );
   const scope = yield* Effect.scope;
   const listIfAsked = Effect.gen(function* () {
-    if (yield* Ref.getAndSet(listAgain, false)) yield* Effect.forkIn(listModels, scope);
+    if (yield* Ref.getAndSet(listAgain, false)) {
+      yield* Effect.forkIn(listModels, scope);
+    }
   });
 
   // the call that sends a turn to Kiro, its images fitted
-  const callFor = (turn: Conversation.Turn, auth: Auth) =>
-    images
-      .fit(turn.request(auth.profile))
-      .pipe(Effect.map((request) => kiroCall(auth, JSON.stringify(request))));
+  const callFor = (turn: Turn, auth: Auth) =>
+    images.fit(turn.request(auth.profile)).pipe(
+      Effect.map((request) =>
+        // oxlint-disable-next-line effecttsgo/global-json -- the Kiro request is built from plain JSON values, so stringify cannot throw
+        kiroCall(auth, JSON.stringify(request))
+      )
+    );
 
   // the provider is added again on each reload, with the models then known
   yield* ctx.provider.transform((editor) => {
-    editor.add({ info: PROVIDER, models: Arr.map(Ref.getUnsafe(models), modelInfo) });
+    editor.add({
+      info: PROVIDER,
+      models: Arr.map(Ref.getUnsafe(models), modelInfo),
+    });
   });
 
   yield* ctx.session.hook(
     "http.request",
     Effect.fn("Kiro.request")(
       function* (event) {
-        if (!Str.endsWith("/messages")(new URL(event.request.url).pathname)) return;
+        if (!Str.endsWith("/messages")(new URL(event.request.url).pathname)) {
+          return;
+        }
         // SAFETY: OpenCode's own Anthropic route wrote this body, and
         // Conversation reads each field as if it might be missing
-        const req = (yield* Effect.tryPromise(() =>
-          event.request.clone().json()
-        )) as Conversation.MessagesRequest;
-        const turn = Conversation.open(req, yield* Ref.get(models));
+        const req = (yield* Effect.tryPromise({
+          catch: (cause) =>
+            new Cause.UnknownError(
+              cause,
+              "An error occurred in Effect.tryPromise"
+            ),
+          try: () => event.request.clone().json(),
+        })) as MessagesRequest;
+        const known = yield* Ref.get(models);
+        const turn = open(req, known);
         const auth = yield* account.credentials();
         yield* listIfAsked;
-        const call = yield* HttpClientRequest.toWeb(yield* callFor(turn, auth));
-        sent.set(call, { turn, auth });
+        const request = yield* callFor(turn, auth);
+        const call = yield* HttpClientRequest.toWeb(request);
+        sent.set(call, { auth, turn });
         event.request = call;
       },
       // a hook that fails fails the request with no message, so a failure
@@ -177,7 +230,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         Effect.catchCause(effect, (cause) =>
           Effect.sync(() => {
             const call = standIn();
-            sent.set(call, { error: Failure.fromCause(cause) });
+            sent.set(call, { error: fromCause(cause) });
             event.request = call;
           })
         )
@@ -190,10 +243,12 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
     Effect.fn("Kiro.response")(
       function* (event) {
         const call = sent.get(event.request);
-        if (!call) return;
+        if (call === undefined) {
+          return;
+        }
         sent.delete(event.request);
-        if (call.error) {
-          event.response = Failure.toResponse(call.error);
+        if (call.error !== undefined) {
+          event.response = toResponse(call.error);
           return;
         }
         let res = HttpClientResponse.fromWeb(
@@ -204,16 +259,18 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
         // already has
         if (res.status === 401 || res.status === 403) {
           const turnedDown = event.response;
-          yield* Effect.tryPromise(() => turnedDown.body?.cancel() ?? Promise.resolve()).pipe(
-            Effect.ignore
-          );
+          yield* Effect.tryPromise({
+            catch: (cause) => new Cause.UnknownError(cause),
+            try: () => turnedDown.body?.cancel() ?? Promise.resolve(),
+          }).pipe(Effect.ignore);
           const auth = yield* account.credentials(call.auth.token);
-          res = yield* send(yield* callFor(call.turn, auth), HEADERS_SECONDS);
+          const again = yield* callFor(call.turn, auth);
+          res = yield* send(again, HEADERS_SECONDS);
         }
         if (!isOk(res.status)) {
           const body = yield* res.text.pipe(Effect.orElseSucceed(() => ""));
-          event.response = Failure.toResponse(
-            Failure.fromReply(res.status, Str.slice(0, 1 << 20)(body), res.headers)
+          event.response = toResponse(
+            fromReply(res.status, Str.slice(0, 2 ** 20)(body), res.headers)
           );
           return;
         }
@@ -226,7 +283,7 @@ const make = Effect.fn("Kiro.make")(function* (ctx: Host) {
           Effect.provideService(HttpClient.HttpClient, http),
           Effect.catchCause((cause) =>
             Effect.sync(() => {
-              event.response = cause.pipe(Failure.fromCause, Failure.toResponse);
+              event.response = cause.pipe(fromCause, toResponse);
             })
           )
         )
@@ -249,4 +306,4 @@ export default {
 } satisfies Plugin.Plugin;
 
 // for tests
-export const _internal = { make };
+export const internal = { make };

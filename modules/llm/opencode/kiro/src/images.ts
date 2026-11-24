@@ -8,11 +8,19 @@
 
 import { createHash } from "node:crypto";
 
-import { Array as Arr, Context, Effect, Layer, Predicate, Result } from "effect";
+import {
+  Array as Arr,
+  Context,
+  Effect,
+  Layer,
+  Predicate,
+  Result,
+} from "effect";
 
 import type { KiroRequest } from "./conversation.ts";
 
-type UserInput = KiroRequest["conversationState"]["currentMessage"]["userInputMessage"];
+type UserInput =
+  KiroRequest["conversationState"]["currentMessage"]["userInputMessage"];
 type KiroImage = NonNullable<UserInput["images"]>[number];
 
 const IMAGE_LIMIT = 5 * 1024 * 1024; // Base64 characters
@@ -24,70 +32,86 @@ const IMAGE_DEADLINE = "30 seconds"; // how long one image may take
 const FITTED_KEEP = 4;
 
 // the code of an error Bun.Image fails with, as tryPromise's catch hands it on
-const codeOf = (cause: unknown) => (Predicate.hasProperty(cause, "code") ? cause.code : undefined);
+const codeOf = (cause: unknown) =>
+  Predicate.hasProperty(cause, "code") ? cause.code : undefined;
 
-type Fitted = { format: string; bytes: string; note?: never } | { note: string; bytes?: never };
+type Fitted =
+  | { bytes: string; format: string; note?: never }
+  | { bytes?: never; note: string };
 
 const mib = (length: number) => `${(length / (1024 * 1024)).toFixed(1)} MB`;
 
 // an encoding to try: the format, and how to set it on an image
-type Encoding = { format: string; encode: (img: Bun.Image) => Bun.Image };
+interface Encoding {
+  encode: (img: Bun.Image) => Bun.Image;
+  format: string;
+}
 
 // shrink tries the image's own format at Claude's size, then a lossy one
 // (WebP keeps transparency, JPEG stays JPEG) smaller each time, until the
 // Base64 fits.
 const shrink = Effect.fnUntraced(
   function* (b64: string): Effect.fn.Return<Fitted> {
-    if (!Predicate.isFunction(globalThis.Bun?.Image))
+    if (!Predicate.isFunction(globalThis.Bun?.Image)) {
       return { note: "this plugin host can't resize images" };
+    }
     const raw = Buffer.from(b64, "base64");
     const meta = yield* Effect.tryPromise({
-      try: () => new Bun.Image(raw, { maxPixels: IMAGE_MAX_PIXELS }).metadata(),
       catch: (error) => ({ code: codeOf(error) }),
+      try: () => new Bun.Image(raw, { maxPixels: IMAGE_MAX_PIXELS }).metadata(),
     }).pipe(Effect.result);
-    if (Result.isFailure(meta))
+    if (Result.isFailure(meta)) {
       return {
         note:
           meta.failure.code === "ERR_IMAGE_TOO_MANY_PIXELS"
             ? "it has too many pixels to resize"
             : "it couldn't be read as an image",
       };
-    const { width, height, format } = meta.success;
+    }
+    const { format, height, width } = meta.success;
     const long = Math.max(width, height);
     const jpeg = format === "jpeg";
     const own: Encoding = jpeg
-      ? { format: "jpeg", encode: (img) => img.jpeg({ quality: 85 }) }
+      ? { encode: (img) => img.jpeg({ quality: 85 }), format: "jpeg" }
       : format === "webp"
-        ? { format: "webp", encode: (img) => img.webp({ quality: 85 }) }
-        : { format: "png", encode: (img) => img.png({ compressionLevel: 9 }) };
+        ? { encode: (img) => img.webp({ quality: 85 }), format: "webp" }
+        : { encode: (img) => img.png({ compressionLevel: 9 }), format: "png" };
     const lossy = (quality: number): Encoding =>
       jpeg
-        ? { format: "jpeg", encode: (img) => img.jpeg({ quality }) }
-        : { format: "webp", encode: (img) => img.webp({ quality }) };
+        ? { encode: (img) => img.jpeg({ quality }), format: "jpeg" }
+        : { encode: (img) => img.webp({ quality }), format: "webp" };
     const tries = [
       { edge: Math.min(long, IMAGE_EDGE), ...own },
       { edge: Math.min(long, IMAGE_EDGE), ...lossy(80) },
     ];
-    for (let edge = Math.min(long, IMAGE_EDGE) * 0.7; edge >= IMAGE_MIN_EDGE; edge *= 0.7)
+    for (
+      let edge = Math.min(long, IMAGE_EDGE) * 0.7;
+      edge >= IMAGE_MIN_EDGE;
+      edge *= 0.7
+    ) {
       tries.push({ edge: Math.round(edge), ...lossy(75) });
+    }
     for (const attempt of tries) {
       const out = yield* Effect.tryPromise({
+        catch: (error) => ({ code: codeOf(error) }),
         try: () => {
           let img = new Bun.Image(raw, { maxPixels: IMAGE_MAX_PIXELS });
-          if (attempt.edge < long)
+          if (attempt.edge < long) {
             img = img.resize(attempt.edge, attempt.edge, {
               fit: "inside",
               withoutEnlargement: true,
             });
+          }
           return attempt.encode(img).toBase64();
         },
-        catch: (error) => ({ code: codeOf(error) }),
       }).pipe(Effect.result);
       if (Result.isFailure(out)) {
-        if (out.failure.code === "ERR_IMAGE_FORMAT_UNSUPPORTED") continue;
-        return { note: "it couldn't be resized" };
+        if (out.failure.code !== "ERR_IMAGE_FORMAT_UNSUPPORTED") {
+          return { note: "it couldn't be resized" };
+        }
+      } else if (out.success.length <= IMAGE_LIMIT) {
+        return { bytes: out.success, format: attempt.format };
       }
-      if (out.success.length <= IMAGE_LIMIT) return { format: attempt.format, bytes: out.success };
     }
     return { note: "it couldn't be made small enough" };
   },
@@ -105,22 +129,66 @@ export class Images extends Context.Service<
   Images,
   { readonly fit: (out: KiroRequest) => Effect.Effect<KiroRequest> }
 >()("opencode-kiro/images") {
-  static readonly layer = Layer.sync(Images, () => {
+  public static readonly layer = Layer.sync(Images, () => {
     const fitted = new Map<string, Fitted>(); // sha256 of the Base64 → the result, newest last
 
     const fitOne = Effect.fnUntraced(function* (b64: string) {
       const key = createHash("sha256").update(b64).digest("hex");
       let result = fitted.get(key);
-      if (result) fitted.delete(key); // kept as the newest below
-      else
+      if (result === undefined) {
         result =
-          b64.length > IMAGE_MAX_INPUT ? { note: "it is too large to resize" } : yield* shrink(b64);
+          b64.length > IMAGE_MAX_INPUT
+            ? { note: "it is too large to resize" }
+            : yield* shrink(b64);
+      } else {
+        fitted.delete(key); // kept as the newest below
+      }
       fitted.set(key, result);
       for (const old of fitted.keys()) {
-        if (fitted.size <= FITTED_KEEP) break;
+        if (fitted.size <= FITTED_KEEP) {
+          break;
+        }
         fitted.delete(old);
       }
       return result;
+    });
+
+    // fitInput fits one message's images, in place
+    const fitInput = Effect.fnUntraced(function* (
+      input: UserInput,
+      images: ReadonlyArray<KiroImage>
+    ) {
+      const kept: Array<KiroImage> = [];
+      const notes: Array<string> = [];
+      for (const img of images) {
+        const b64 = img.source?.bytes;
+        if (!Predicate.isString(b64) || b64.length <= IMAGE_LIMIT) {
+          kept.push(img);
+        } else {
+          const result = yield* fitOne(b64);
+          if (result.bytes !== undefined && result.bytes !== "") {
+            kept.push({
+              ...img,
+              format: result.format,
+              source: { ...img.source, bytes: result.bytes },
+            });
+          } else {
+            notes.push(
+              `[An image (${img.format}, ${mib(b64.length)} as Base64) was left out of this message: Kiro takes at most ${mib(IMAGE_LIMIT)} per image, and ${result.note}.]`
+            );
+          }
+        }
+      }
+      if (kept.length > 0) {
+        input.images = kept;
+      } else {
+        delete input.images;
+      }
+      if (notes.length > 0) {
+        const note = Arr.join(notes, "\n");
+        input.content =
+          input.content === "" ? note : `${input.content}\n\n${note}`;
+      }
     });
 
     // fit changes the request in place; an image already under the limit is sent as it is
@@ -128,37 +196,13 @@ export class Images extends Context.Service<
       const state = out.conversationState;
       const users = Arr.append(
         Arr.flatMap(state.history ?? [], (entry) =>
-          entry.userInputMessage ? [entry.userInputMessage] : []
+          entry.userInputMessage === undefined ? [] : [entry.userInputMessage]
         ),
         state.currentMessage.userInputMessage
       );
       for (const input of users) {
-        if (!input.images?.length) continue;
-        const kept: KiroImage[] = [];
-        const notes: string[] = [];
-        for (const img of input.images) {
-          const b64 = img.source?.bytes;
-          if (!Predicate.isString(b64) || b64.length <= IMAGE_LIMIT) {
-            kept.push(img);
-            continue;
-          }
-          const result = yield* fitOne(b64);
-          if (result.bytes)
-            kept.push({
-              ...img,
-              format: result.format,
-              source: { ...img.source, bytes: result.bytes },
-            });
-          else
-            notes.push(
-              `[An image (${img.format}, ${mib(b64.length)} as Base64) was left out of this message: Kiro takes at most ${mib(IMAGE_LIMIT)} per image, and ${result.note}.]`
-            );
-        }
-        if (kept.length) input.images = kept;
-        else delete input.images;
-        if (notes.length) {
-          const note = Arr.join(notes, "\n");
-          input.content = input.content ? `${input.content}\n\n${note}` : note;
+        if (input.images !== undefined && input.images.length > 0) {
+          yield* fitInput(input, input.images);
         }
       }
       return out;

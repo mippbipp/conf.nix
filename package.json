@@ -4,7 +4,8 @@
   "workspaces": {
     "packages": [
       "hosts/gram/x-blocklist",
-      "hosts/pewter/flake-updater"
+      "hosts/pewter/flake-updater",
+      "modules/llm/opencode/kiro"
     ],
     "catalog": {
       "@types/bun": "^1.4.4",

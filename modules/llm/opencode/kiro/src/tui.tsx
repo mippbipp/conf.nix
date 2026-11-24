@@ -3,7 +3,10 @@
 // answers over the RPC in rpc.ts, and says when to ask again; sidebar.ts
 // says what the answer shows as.
 
+/* oxlint-disable typescript/no-unsafe-return -- Solid's JSX.Element includes DOM's Node, which this package's lib leaves out, so the type-aware lint reads JSX as an error type */
+
 import { Plugin } from "@opencode/plugin/tui";
+import { Array as Arr } from "effect";
 import {
   type Accessor,
   createEffect,
@@ -16,7 +19,14 @@ import {
 } from "solid-js";
 
 import { KiroRpc, type UsageAnswer } from "./rpc.ts";
-import * as Sidebar from "./sidebar.ts";
+import {
+  type Line,
+  answerOf,
+  lines,
+  sessionsCounted,
+  shown as isShown,
+  unanswered,
+} from "./sidebar.ts";
 
 function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   const data = props.context.data.session;
@@ -24,9 +34,15 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   const session = () => data.get(props.sessionID);
   const sessionIDs = createMemo(
     () =>
-      Sidebar.sessionsCounted(props.sessionID, session(), data.family(data.root(props.sessionID))),
+      sessionsCounted(
+        props.sessionID,
+        session(),
+        data.family(data.root(props.sessionID))
+      ),
     undefined,
-    { equals: (before, now) => before.join(",") === now.join(",") }
+    {
+      equals: (before, now) => Arr.join(before, ",") === Arr.join(now, ","),
+    }
   );
   const location = createMemo(() => session()?.location, undefined, {
     equals: (before, now) => before?.directory === now?.directory,
@@ -38,9 +54,15 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
       props.context.client
         .rpc(KiroRpc)
         .usage({ sessionIDs: [...sessionIDs()] }, { location: location() })
-    ).then(Sidebar.answerOf, Sidebar.unanswered);
+    )
+      .then(answerOf)
+      .catch(unanswered);
   const [usage, { refetch }] = createResource(
-    () => [sessionIDs().join(","), location()?.directory ?? ""].join("\n"),
+    () =>
+      Arr.join(
+        [Arr.join(sessionIDs(), ","), location()?.directory ?? ""],
+        "\n"
+      ),
     ask
   );
 
@@ -49,33 +71,40 @@ function KiroUsage(props: { context: Plugin.Context; sessionID: string }) {
   // whose account read failed too. A reply's end still asks because events
   // can be missed: the subscription is on the client at mount, which a
   // server restart replaces, and a disconnected one misses what is sent.
-  const stop = props.context.client.rpc(KiroRpc).events.on("updated", () => void refetch());
+  const stop = props.context.client
+    .rpc(KiroRpc)
+    .events.on("updated", () => void refetch());
   onCleanup(stop);
   createEffect(
     on(
       () => data.status(props.sessionID),
       (now, before) => {
-        if (before === "running" && now === "idle") void refetch();
+        if (before === "running" && now === "idle") {
+          void refetch();
+        }
       }
     )
   );
 
   const answer = () => {
-    const latest = usage.latest;
-    return Sidebar.shown(session()?.model?.providerID, latest, sessionIDs()) ? latest : undefined;
+    const { latest } = usage;
+    return isShown(session()?.model?.providerID, latest, sessionIDs())
+      ? latest
+      : undefined;
   };
-  const colour = (tone: Sidebar.Line["tone"]) =>
+  const colour = (tone: Line["tone"]) =>
     ({
-      title: theme().text.base,
-      muted: theme().text.muted,
       error: theme().text.feedback.error.base,
+      muted: theme().text.muted,
+      title: theme().text.base,
     })[tone];
 
   return (
     <Show when={answer()}>
       {(shown: Accessor<UsageAnswer>) => (
         <box>
-          <For each={Sidebar.lines(shown(), sessionIDs(), Date.now())}>
+          {/* oxlint-disable-next-line effecttsgo/global-date -- Solid view code, outside any Effect, so there is no Clock */}
+          <For each={lines(shown(), sessionIDs(), Date.now())}>
             {(line) => (
               <text fg={colour(line.tone)}>
                 {line.tone === "title" ? <b>{line.text}</b> : line.text}
@@ -93,7 +122,9 @@ export default Plugin.define({
   setup(context) {
     return context.ui.slot({
       append: "sidebar.content",
-      render: (input) => <KiroUsage context={context} sessionID={input.sessionID} />,
+      render: (input) => (
+        <KiroUsage context={context} sessionID={input.sessionID} />
+      ),
     });
   },
 });

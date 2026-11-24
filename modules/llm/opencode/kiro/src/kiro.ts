@@ -23,12 +23,18 @@ export const field = <S extends Schema.Constraint>(schema: S) =>
 // reads the status and body itself.
 export const isOk = (status: number) => status >= 200 && status <= 299;
 
+// isSet is whether a number Kiro or the request gave is set: not 0, and not NaN
+export const isSet = (value: number) => value !== 0 && !Number.isNaN(value);
+
 // send makes a request with tracing off: OpenCode's tracer then adds no
 // headers to what Kiro and AWS are sent, and records none of them. A
 // request with a deadline fails with a TimeoutError that names the host if
 // the headers take longer; a caller that reads the body puts its own
 // deadline around both.
-export const send = (request: HttpClientRequest.HttpClientRequest, seconds?: number) =>
+export const send = (
+  request: HttpClientRequest.HttpClientRequest,
+  seconds?: number
+) =>
   HttpClient.execute(request).pipe(
     seconds === undefined ? (effect) => effect : deadline(request.url, seconds),
     Effect.provideService(Tracer.DisablePropagation, true)
@@ -43,6 +49,8 @@ export const deadline =
       duration: `${seconds} seconds`,
       orElse: () =>
         Effect.fail(
-          new Cause.TimeoutError(`${new URL(url).host} didn't answer within ${seconds} seconds`)
+          new Cause.TimeoutError(
+            `${new URL(url).host} didn't answer within ${seconds} seconds`
+          )
         ),
     });
