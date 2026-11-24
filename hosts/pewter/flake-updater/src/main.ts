@@ -77,6 +77,11 @@ const readSecret = Effect.fn("readSecret")(function* (file: string) {
   return Redacted.make(Str.trim(contents));
 });
 
+// A round's `session.wait` sends nothing until the agent goes idle, and Bun's
+// fetch drops a request after 5 to 6 minutes of silence by default. The round
+// timeout bounds the wait instead.
+const noIdleTimeout: BunFetchRequestInit = { timeout: false };
+
 const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
   if (!options.agent) {
     return Layer.empty;
@@ -94,10 +99,11 @@ const agentLayer = Effect.fn("agentLayer")(function* (options: Flags) {
     workspace: options.workDir,
   });
 
-  return agentLiveLayer.pipe(
-    Layer.provide(server),
-    Layer.provide(FetchHttpClient.layer)
+  const http = FetchHttpClient.layer.pipe(
+    Layer.provide(Layer.succeed(FetchHttpClient.RequestInit)(noIdleTimeout))
   );
+
+  return agentLiveLayer.pipe(Layer.provide(server), Layer.provide(http));
 });
 
 const update = Command.make(

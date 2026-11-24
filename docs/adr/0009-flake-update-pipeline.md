@@ -75,7 +75,7 @@ The repair stops and opens or comments on `flake-update: repair failed` when the
 
 The agent never touches the Updater's checkout or its credentials:
 
-- It runs as the `flake-fixer` system user in its own `opencode serve` on `127.0.0.1:4097`, with `ProtectSystem=strict`, `ProtectHome`, and `/run/secrets`, `/var/lib/flake-updater` and `/var/lib/sops-nix` inaccessible. Nothing secret is reachable from its shell; the repository is public.
+- It runs as the `flake-fixer` system user in its own `opencode serve` on `127.0.0.1:4097`, with `ProtectSystem=strict`, `ProtectHome`, and `/run/secrets`, `/var/lib/flake-updater` and `/var/lib/sops-nix` inaccessible. Nothing secret is reachable from its shell; the repository is public. The user's login shell is `nologin`, so the unit sets `SHELL` to bash: opencode runs every shell tool call through `$SHELL`.
 - The Updater reads the workspace back through its own `.git` with a separate index file. Git never runs inside a directory the agent can write, so a planted hook or config has nothing to run. A nested repository imports as a gitlink, and the Updater discards any round that adds or moves one.
 - Its opencode config comes from `hosts/pewter/flake-updater/opencode-config.nix` through a read-only `XDG_CONFIG_HOME`, and project config is disabled. Policies there hard-deny web access, subagents, git, network tools, `nix build`/`run`/`shell`, `--impure`, edits to blocked paths, reads under `secrets/`, and every provider except the model's.
 - Each session carries the Updater's allowlist of read-only shell commands and paths, and denies redirection and the flags that let those commands write files. Anything outside it asks, and the Updater rejects every ask.
