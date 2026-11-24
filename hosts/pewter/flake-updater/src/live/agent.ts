@@ -21,7 +21,7 @@ import {
   Stream,
   String as Str,
 } from "effect";
-import { HttpClient, HttpClientRequest } from "effect/http";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/http";
 
 import { Agent, AgentError, RepairReport } from "../agent.ts";
 import type { RepairRequest } from "../agent.ts";
@@ -188,6 +188,8 @@ const reportPrompt = Arr.join(
 
 const decodeReport = Schema.decodeEffect(Schema.fromJsonString(RepairReport));
 
+const noIdleTimeout: BunFetchRequestInit = { timeout: false };
+
 /** The JSON object in a reply, tolerating a stray code fence. */
 const jsonObject = (text: string) => {
   const start = Str.indexOf("{")(text);
@@ -329,6 +331,10 @@ export const layer = Layer.effect(
           .prompt({ sessionID, text })
           .pipe(Effect.mapError(toAgentError("sending the prompt")));
         yield* client.session.wait({ sessionID }).pipe(
+          // Only this request needs it: it sends nothing until the agent goes
+          // idle, and Bun's fetch drops a request after 5 to 6 minutes of
+          // silence by default. The round timeout bounds the wait instead.
+          Effect.provideService(FetchHttpClient.RequestInit, noIdleTimeout),
           Effect.mapError(toAgentError("waiting for the round")),
           Effect.timeoutOrElse({
             duration: config.roundTimeout,

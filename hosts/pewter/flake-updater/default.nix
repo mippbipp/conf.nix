@@ -179,6 +179,9 @@ in
           ];
           environment = {
             HOME = fixerDir;
+            # systemd sets SHELL from the user's passwd entry, which is nologin,
+            # and opencode runs every shell tool call through it.
+            SHELL = lib.getExe pkgs.bash;
             # Read-only config: the agent cannot rewrite its own policies, and
             # project config from the workspace is never loaded.
             XDG_CONFIG_HOME = "${fixerConfig}";
