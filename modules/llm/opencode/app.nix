@@ -85,5 +85,6 @@ in
       ".config/opencode/pstack-models.md".source =
         config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/conf.nix/modules/llm/.agents/pstack/src/pstack-models.md";
     };
+    packages = [ pkgs.sqlite ]; # to read opencode sessions for retro
   };
 }
