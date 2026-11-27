@@ -201,8 +201,10 @@ resource "oci_core_instance" "pewter" {
   shape               = "VM.Standard.A1.Flex"
 
   shape_config {
-    ocpus         = 2
-    memory_in_gbs = 12
+    # Paid tenancies get 3,000 A1 OCPU-hours and 18,000 GB-hours free each
+    # month. 4 OCPUs and 24 GB use at most 2,976 and 17,856 in a 31-day month.
+    ocpus         = 4
+    memory_in_gbs = 24
   }
 
   create_vnic_details {
