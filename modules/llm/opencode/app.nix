@@ -26,7 +26,9 @@ in
         subagent_depth = 2;
       };
       compaction = {
-        buffer = "45%";
+        # A token buffer at least as large as a model's window is ignored, so
+        # 200k/500k models use the 15% default and 1M models keep ~50% free.
+        buffer = 500000;
         keep.tokens = 20000;
       };
       tool_output = {
